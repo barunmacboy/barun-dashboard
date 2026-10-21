@@ -1,7 +1,7 @@
 // 🏢 사무실 — 에이전트(직원) 아홉 명이 한 사무실에 모여 앉아 일한다 (2026-10-21 사용자: "현황판 페이지의 캐릭터를 한 사무실에 넣어야지").
 // 자료는 /api/state의 team(notify/team.py data() — 디스코드 #상황판 '직원 현황'과 같은 것) + jobs[].runs(실행기 회차) + tasks(디스코드 작업).
 // 그림: 도트 캔버스 한 장(W×H)을 화면 폭에 맞게 키워 그린다(image-rendering: pixelated). 이름표·말풍선은 캔버스 위 HTML(선명·복사·스크린리더).
-// 상태: 🟢 일하는 중 = 타자 치는 손·화면 빛 · 🟡 할 일 있음 = 노란 ! · 🔴 막힘 = 빨간 ! 와 땀 · ⚪ 대기 = 눈 감고 Zzz.
+// 상태: 🟢 일하는 중 = 타자 치는 손·화면 빛 · 🟡 결재 대기(사장님 확인·승인·결정을 기다림) = 노란 ! · 🔴 막힘 = 빨간 ! 와 땀 · ⚪ 대기 = 눈 감고 Zzz.
 // 말풍선은 일하는 중·할 일·막힘인 직원만(쉬는 직원까지 띄우면 읽을 것이 너무 많음). 좁은 화면에서는 말풍선 대신 아래 직원 목록으로.
 // 움직임 줄이기 설정(prefers-reduced-motion)이면 멈춘 그림 한 장만.
 (function () {
@@ -205,7 +205,7 @@
 
   // ── 화면 ─────────────────────────────────────────────────────────────────
   let frame = 0, timer = null, sel = null, last = null, order = [], H = heightFor(9);
-  const STATE_TXT = { busy: '일하는 중', todo: '할 일 있음', blocked: '막혔어요', idle: '쉬는 중' };
+  const STATE_TXT = { busy: '일하는 중', todo: '결재 대기', blocked: '막혔어요', idle: '쉬는 중' };
   const look = (d) => LOOK[d] || { hair: '#333', shirt: '#777' };
   const kinds = new Map();
   let cv = null;
@@ -300,7 +300,7 @@
     const c = document.getElementById('office-count');
     if (c) {
       c.textContent = '';
-      for (const [k, lab] of [['busy', '일하는 중'], ['todo', '할 일 있음'], ['blocked', '막힘'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
+      for (const [k, lab] of [['busy', '일하는 중'], ['todo', '결재 대기'], ['blocked', '막힘'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
     }
     paint(); renderDetail();
     if (!timer && !reduce) timer = setInterval(() => { if (document.hidden || !cv || !cv.offsetParent) return; frame++; paint(); }, 260);
