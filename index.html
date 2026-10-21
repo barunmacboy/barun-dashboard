@@ -326,6 +326,31 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
 .name { font-weight: 600; }
+
+/* ── 데이터 탭(data.js) ─────────────────────── */
+.dt-tables { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-bottom: 12px; }
+.dt-tables .tab { background: var(--fill2); }
+.dt-tables .tab[aria-selected="true"] { background: var(--ink); color: var(--card); }
+.dt-n { font-size: 12px; font-weight: 600; opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.dt-q { width: 100%; font: inherit; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--fill); color: var(--ink); margin-bottom: 10px; }
+.dt-q:focus { outline: 2px solid var(--blue); background: var(--card); }
+.dt-facet { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 8px; }
+.chipbtn { border: 0; background: var(--fill); color: var(--sub); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 30px; }
+.chipbtn.on { background: var(--blue); color: #fff; }
+.dt-wrap { overflow-x: auto; border-radius: 12px; }
+table.dt { font-size: 13px; min-width: 720px; }
+table.dt th { position: sticky; top: 0; background: var(--card); white-space: nowrap; }
+table.dt td { white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+table.dt tbody tr { cursor: pointer; }
+table.dt tbody tr:hover, table.dt tbody tr:focus-visible { background: var(--hover); outline: none; }
+table.dt tbody tr.on { background: var(--blue-bg); }
+.dt-more { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.dt-detail .kv pre { background: transparent; padding: 0; margin: 0; max-height: 140px; }
+.dt-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
+.dt-form { background: var(--fill2); border-radius: 14px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+.dt-field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.dt-field input, .dt-field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 40px; }
+.dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -341,6 +366,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
     <button class="tab" role="tab" data-tab="activity" aria-controls="p-activity">활동</button>
     <button class="tab" role="tab" data-tab="work" aria-controls="p-work">작업·자동화</button>
     <button class="tab" role="tab" data-tab="records" aria-controls="p-records">기록</button>
+    <button class="tab" role="tab" data-tab="data" aria-controls="p-data">데이터</button>
   </nav>
 </div>
 
@@ -433,6 +459,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
       <div class="card"><div class="card-h"><h2>백업</h2></div><div id="backup"></div></div>
     </div>
   </section>
+  <section class="panel" id="p-data" role="tabpanel" aria-label="데이터" hidden></section>
 </main>
 
 <script src="config.js"></script>
@@ -483,7 +510,7 @@ function chip(text, cls) { return el('span', 'badge ' + (cls || ''), text); }
 const relDay = (iso, now) => !iso ? '' : (iso.slice(0, 10) === (now || '').slice(0, 10) ? iso.slice(11, 16) : iso.slice(5, 10).replace('-', '/') + ' ' + iso.slice(11, 16));
 
 // ── 탭 ─────────────────────────────────────
-const TABS = ['home', 'todo', 'activity', 'work', 'records'];
+const TABS = ['home', 'todo', 'activity', 'work', 'records', 'data'];
 function showTab(name, push = true) {
   if (!TABS.includes(name)) name = 'home';
   for (const t of TABS) { $('p-' + t).hidden = t !== name; }
@@ -492,6 +519,7 @@ function showTab(name, push = true) {
   if (push && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'activity') window.dispatchEvent(new Event('resize'));   // 숨어 있던 타임라인을 지금 폭으로 다시 그림
   if (name === 'home' && window.barunOfficeRepaint) window.barunOfficeRepaint();
+  if (name === 'data' && window.barunData) window.barunData();
   window.scrollTo({ top: 0 });
 }
 document.querySelectorAll('.tab').forEach((b) => {
@@ -816,5 +844,6 @@ window.addEventListener('hashchange', route); route();
 </script>
 <script src="office.js"></script>
 <script src="activity.js"></script>
+<script src="data.js"></script>
 </body>
 </html>
