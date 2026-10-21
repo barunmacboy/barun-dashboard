@@ -154,31 +154,56 @@ details[open] > summary::before { transform: rotate(90deg); }
 .avatar.k-busy::after { background: var(--blue); } .avatar.k-todo::after { background: var(--orange); } .avatar.k-blocked::after { background: var(--red); }
 
 /* ── 사무실 ───────────────────────────────── */
-.room { position: relative; width: 100%; border-radius: 16px; overflow: hidden; background: var(--fill); }
+/* 왼쪽 그림(작게) + 오른쪽 촘촘한 직원 목록. 그림 위 글은 같은 크기 상태 표시·이름표뿐, 자세한 건 마우스를 올린 카드로 */
+.office-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 920px) { .office-grid { grid-template-columns: minmax(0, 1fr); } .room-wrap { max-width: 560px; margin: 0 auto; width: 100%; } }
+.room-wrap { position: relative; }
+.room { position: relative; width: 100%; border-radius: 16px; overflow: hidden; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
 .room canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
-.st { all: unset; position: absolute; cursor: pointer; border-radius: 10px; }
-.st:hover { background: rgba(49, 130, 246, .08); }
-.st:focus-visible { outline: 3px solid var(--blue); outline-offset: 0; }
-.st .tag { position: absolute; left: 50%; top: 100%; transform: translate(-50%, -2px); display: inline-flex; align-items: center; gap: 5px;
-  background: var(--card); color: var(--ink); font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
-.st .tag .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--axis); flex: none; }
-.st.k-busy .tag .dot { background: var(--blue); } .st.k-todo .tag .dot { background: var(--orange); } .st.k-blocked .tag .dot { background: var(--red); }
-.st[aria-pressed="true"] .tag { background: var(--blue); color: #fff; } .st[aria-pressed="true"] .tag .dot { background: #fff; }
-.st .bubble { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: min(260px, 26vw);
-  background: var(--card); color: var(--ink2); font-size: 12.5px; line-height: 1.45; padding: 6px 10px; border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .14); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; z-index: 2; pointer-events: none; }
-.st.k-busy .bubble { box-shadow: 0 0 0 2px var(--blue), 0 2px 10px rgba(0, 0, 0, .14); }
-.st.k-todo .bubble { box-shadow: 0 0 0 2px var(--orange), 0 2px 10px rgba(0, 0, 0, .14); }
-.st.k-blocked .bubble { box-shadow: 0 0 0 2px var(--red), 0 2px 10px rgba(0, 0, 0, .14); }
-.st .bubble[hidden] { display: none; }
-@media (max-width: 700px) { .st .bubble { display: none !important; } .st .tag { font-size: 11px; padding: 1px 6px; gap: 3px; } }
-@media (max-width: 420px) { .st .tag { font-size: 10px; } }
+.st { all: unset; position: absolute; cursor: pointer; border-radius: 8px; }
+.st:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.st .tag { position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 55%); max-width: 118%; overflow: hidden; text-overflow: ellipsis;
+  background: var(--card); color: var(--ink2); font-size: 11px; line-height: 16px; font-weight: 600; padding: 0 6px; border-radius: 999px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .14); pointer-events: none; transition: background .12s, color .12s; }
+.st.hov .tag, .st:focus-visible .tag { background: var(--ink); color: var(--card); }
+.st[aria-pressed="true"] .tag { background: var(--blue); color: #fff; }
+/* 머리 위 상태 표시 — 모두 같은 크기(16px 원) */
+.st .sig { position: absolute; left: 50%; top: 0; transform: translate(-50%, -70%); width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center; font: 800 11px/1 system-ui, sans-serif; color: #fff; box-shadow: 0 0 0 2px var(--card); pointer-events: none; }
+.st .sig[hidden] { display: none; }
+.st.k-todo .sig { background: var(--orange); } .st.k-blocked .sig { background: var(--red); }
+.st.k-busy .sig { background: var(--blue); }
+.st.k-busy .sig::before { content: ""; width: 2px; height: 2px; border-radius: 50%; background: #fff; box-shadow: -3px 0 0 #fff, 3px 0 0 #fff; animation: sigdot 1.2s infinite steps(3); }
+@keyframes sigdot { 0% { box-shadow: -3px 0 0 rgba(255,255,255,.4), 3px 0 0 rgba(255,255,255,.4); } 33% { box-shadow: -3px 0 0 #fff, 3px 0 0 rgba(255,255,255,.4); } 66% { box-shadow: -3px 0 0 #fff, 3px 0 0 #fff; } }
+@media (prefers-reduced-motion: reduce) { .st.k-busy .sig::before { animation: none; } }
+.st .tag .mini { display: none; }
+@media (max-width: 520px) { .st .tag { font-size: 10px; padding: 0 5px; line-height: 15px; } .st .tag .full { display: none; } .st .tag .mini { display: inline; } .st .sig { width: 13px; height: 13px; font-size: 9px; } }
+/* 마우스를 올린 직원 카드 — 늘 같은 너비 */
+.office-pop { position: absolute; z-index: 30; width: min(300px, calc(100% - 8px)); background: var(--card); color: var(--ink); border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .18), 0 0 0 1px var(--line); padding: 12px 14px; pointer-events: none; font-size: 13px; }
+.office-pop[hidden] { display: none; }
+.op-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.op-title { flex: 1; min-width: 0; } .op-name { font-weight: 700; font-size: 15px; } .op-role { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-kv { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 8px; margin: 0; }
+.op-kv dt { color: var(--muted); font-size: 12px; padding-top: 1px; }
+.op-kv dd { margin: 0; color: var(--ink2); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.op-kv dd.warn { color: var(--orange-ink); font-weight: 600; }
+.op-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+/* 촘촘한 직원 목록 */
+.avatar.sm { width: 28px; height: 28px; font-size: 14px; }
+.avatar.sm::after { width: 9px; height: 9px; right: -2px; bottom: -2px; }
+.roster { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .roster > li { min-width: 0; }
-.roster { margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 8px; list-style: none; padding: 0; }
-@media (max-width: 960px) { .roster { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .roster { grid-template-columns: minmax(0, 1fr); } }
-.roster .row { padding: 10px 8px; }
+.roster .row { padding: 3px 8px; min-height: 38px; gap: 9px; border-radius: 10px; }
+.roster .row-body { gap: 0; } .roster .row-title { line-height: 19px; } .roster .row-sub { line-height: 17px; }
+.roster .row.hov { background: var(--hover); }
+.roster .row-title { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.roster .row-title .badge { font-size: 11px; padding: 1px 6px; }
+.roster .row-sub { font-size: 12.5px; }
+.roster .row-sub b { color: var(--sub); font-weight: 600; }
+.roster .row-right { gap: 2px; }
+.row-cards { font-size: 11px; font-weight: 600; color: var(--orange-ink); background: var(--orange-bg); border-radius: 6px; padding: 0 6px; }
+.row-cards.bad { color: var(--red-ink); background: var(--red-bg); }
 .office-count { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 #office-detail { margin-top: 12px; background: var(--fill2); border-radius: 16px; padding: 16px; }
 #office-detail[hidden] { display: none; }
@@ -425,7 +450,7 @@ table.dt.sheet tbody tr.on { background: var(--blue-bg); }
 
     <div class="card" id="office-sec">
       <div class="card-h"><h2>사무실</h2><span class="office-count" id="office-count"></span>
-        <span class="desc">에이전트 한 명이 직원 한 명이에요. 말풍선은 지금 하는 일이고, 직원을 누르면 한 일·할 일을 볼 수 있어요.</span></div>
+        <span class="desc">에이전트 한 명이 직원 한 명이에요. 직원에게 마우스를 올리면 지금 하는 일이, 누르면 한 일·할 일 전체가 보여요.</span></div>
       <div id="office"></div>
       <div id="office-detail" hidden></div>
     </div>
