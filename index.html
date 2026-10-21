@@ -293,7 +293,8 @@ function render(s) {
     const bs = el('div', 'btns');
     const B = (lab, a, cls) => { const b = el('button', 'btn ' + (cls || ''), lab); b.dataset.act = a; b.dataset.key = i.key; bs.append(b); };
     if (i.approval) { B('✅ 승인', 'approve', 'primary'); B('거절', 'reject', 'danger'); }
-    B('✅ 처리함', 'done'); B('👀 보는 중', 'ack'); B('⏰ 내일 아침 다시', 'snooze');
+    if (i.key !== 'login-needed') B('✅ 처리함', 'done');   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦(notify/logins)
+    B('👀 보는 중', 'ack'); B('⏰ 내일 아침 다시', 'snooze');
     li.append(bs); tl.append(li);
   }
 
