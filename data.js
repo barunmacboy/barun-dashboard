@@ -339,7 +339,7 @@
       acts.append(form('문제 표시(빨간 줄 + #할-일 카드)', field('칸', pc), field('문제', why), field('할 일', todo),
         btn('문제로 표시', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'problem', tab: r.tab, row: r.row, col: pc.value, why: why.value.trim(), todo: todo.value.trim() }, b, out))));
     }
-    if (!ordered) { acts.append(form('줄 옮기기·나누기·지우기', E('p', 'muted small', '재고 줄은 플랫폼 주문 번호(key)가 없어 아직 시트에서만 할 수 있어요.'))); return; }
+    if (!ordered) { stockActs(r, acts, out); return; }
     const tot = +(r.send_qty || r.qty || 0) || 2;
     const keep = inp('이 줄 수량', String(Math.max(1, tot - 1))), mv = inp('새 줄 수량', '1');
     acts.append(form('줄 나누기(관세 US$150 등)', E('p', 'muted small', '같은 주문을 두 줄로 — 새 줄은 같은 탭 맨 아래, 송장·신청번호 칸은 비워요.'), field('이 줄 보낼수량', keep), field('새 줄 보낼수량', mv),
@@ -355,6 +355,15 @@
         if (t.trim() !== String(r.receiver || '').trim()) { out.hidden = false; out.textContent = '이름이 달라 지우지 않았어요'; return; }
         doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: r.key }, b, out);
       })));
+  }
+
+  function stockActs(r, acts, out) {     // 재고 줄(key 없음): 옮기기·지우기 — 줄 번호 + 상품명·공홈주문번호·수령인이 화면과 같을 때만
+    const name = r.name || r.shop_order || '재고';
+    const to = select(tabsOf().filter((t) => t !== r.tab));
+    acts.append(form('다른 탭으로 옮기기', E('p', 'muted small', '새 탭 맨 아래로 옮겨요.'), field('옮길 탭', to),
+      btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: '', ident: ident(r), to: to.value, confirm: `재고 '${name}' 줄을 ${r.tab} → ${to.value} 탭으로 옮길까요?` }, b, out))));
+    acts.append(form('줄 지우기', E('p', 'muted small', '지운 줄은 통째로 백업해 둬요. 아직 쓰지 않은 재고인지 먼저 확인해 주세요.'),
+      btn('이 재고 줄 지우기', 'danger', (b) => doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: '', ident: ident(r), confirm: `재고 '${name}'(${r.tab} ${r.row}행) 줄을 지울까요?` }, b, out))));
   }
 
   async function historyBox(box, r) {

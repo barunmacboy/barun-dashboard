@@ -378,7 +378,7 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
 /* 시트 보고서(기록 탭) */
 .rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.rep-body { display: grid; gap: 18px; }
+.rep-body { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .rep-lead { color: var(--muted); font-size: 13px; }
 .rep-lead:first-child { color: var(--ink); font-size: 16px; font-weight: 700; }
 .rep-h { font-size: 15px; margin: 0 0 6px; }
@@ -396,6 +396,35 @@ table.rep td.ed { background: #fff8db; padding: 3px 6px; }
 .rep-out { font-size: 13px; white-space: pre-wrap; flex-basis: 100%; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) table.rep td.ed { background: #3a3215; } }
 :root[data-theme="dark"] table.rep td.ed { background: #3a3215; }
+
+/* 매출분석 그래프 — 계열색: 네이버=분류 3번·쿠팡=2번·합계=1번(dataviz 검사기 통과, 어두운 화면은 따로 고른 값) */
+#rep-card { --rep-s1: #2a78d6; --rep-s2: #eb6834; --rep-s3: #1baf7a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #rep-card { --rep-s1: #3987e5; --rep-s2: #d95926; --rep-s3: #199e70; } }
+:root[data-theme="dark"] #rep-card { --rep-s1: #3987e5; --rep-s2: #d95926; --rep-s3: #199e70; }
+.ch-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
+.ch-grid > .ch:first-child { grid-column: 1 / -1; }
+@media (max-width: 760px) { .ch-grid { grid-template-columns: minmax(0, 1fr); } }
+.ch { margin: 0; background: var(--fill2); border-radius: 14px; padding: 14px; min-width: 0; }
+.ch-t { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.ch-legend, .ch-share-l { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--sub); margin-bottom: 6px; }
+.ch-key { display: inline-flex; align-items: center; gap: 6px; } .ch-key i, .ch-tl i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.ch-key b { color: var(--ink); font-weight: 700; }
+.ch-plot { position: relative; }
+.ch-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.ch-grid line.ch-grid, .ch-svg .ch-grid { stroke: var(--grid); stroke-width: 1; }
+.ch-svg .ch-ax { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ch-svg .ch-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ch-svg .ch-cross { stroke: var(--axis); stroke-width: 1; }
+.ch-svg .ch-dot { stroke: var(--fill2); stroke-width: 2; }
+.ch-tip { position: absolute; background: var(--card); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.14), 0 0 0 1px var(--line); pointer-events: none; min-width: 130px; }
+.ch-tip[hidden] { display: none; } .ch-tl { display: flex; align-items: center; gap: 6px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.ch-share { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; margin: 10px 0 10px; }
+.ch-share span { min-width: 2px; }
+.ch-bars { display: grid; gap: 6px; }
+.ch-bar { display: grid; grid-template-columns: 64px minmax(0, 1fr) 72px; gap: 8px; align-items: center; font-size: 12.5px; }
+.ch-bl { color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-bv { text-align: right; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.ch-track { height: 10px; } .ch-track i { display: block; height: 100%; background: var(--rep-s1); border-radius: 0 4px 4px 0; }
 
 /* 주문 시트(데이터 탭) — 칸 누르면 고치기 · 아래 고정 저장 막대 */
 .dt-stock { margin: 4px 0 10px; } .dt-stock .dt-acts { margin-top: 8px; grid-template-columns: 1fr; }
