@@ -114,12 +114,10 @@ code { font: 12px ui-monospace, Menlo, monospace; background: var(--chip); paddi
 #office-detail { margin-top: 10px; } .od-h { font-weight: 650; margin-bottom: 6px; }
 .od-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; } @media (max-width: 760px) { .od-grid { grid-template-columns: 1fr; } }
 .od-t { font-weight: 600; font-size: 13px; margin-bottom: 4px; } .od-col ul { margin: 0; padding-left: 16px; font-size: 13px; } .od-col li { margin: 3px 0; }
-.team { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-.member { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); font-size: 13px; }
-.member .nm { font-weight: 700; font-size: 14px; } .member .rl { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-.member .row { margin-top: 4px; } .member .lab { color: var(--muted); margin-right: 4px; }
-.member.busy { border-color: var(--st-run); } .member.blocked { border-color: var(--st-crit); } .member.todo { border-color: var(--st-warn); }
-.member { border-left-width: 4px; } .member.idle { opacity: .6; } .member .row.sub { color: var(--muted); font-size: 12px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; } @media (max-width: 1000px) { .board { grid-template-columns: 1fr 1fr; } } @media (max-width: 600px) { .board { grid-template-columns: 1fr; } }
+.bcol { background: var(--chip); border-radius: 8px; padding: 8px; min-width: 0; } .bcol h3 { font-size: 13px; margin: 0 0 6px; display: flex; justify-content: space-between; }
+.bcol ul { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; } .bcol li { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 12px; }
+.bcol li .bt { font-size: 13px; font-weight: 600; word-break: break-word; } .bcol li .bm { color: var(--muted); }
 .todo-list { list-style: none; padding: 0; margin: 0; }
 .todo-list > li { padding: 9px 0; border-top: 1px solid var(--line); }
 .todo-list .t { font-weight: 600; }
@@ -185,8 +183,8 @@ ul.log li.hl { background: var(--chip); border-radius: 6px; }
     <div class="office" id="office"></div>
     <div id="office-detail"></div>
   </section>
-  <section id="team-sec"><h2>👥 직원 현황 <span class="muted small">막힘·일하는 중이 위로 — 디스코드 #상황판 카드와 같은 자료</span></h2>
-    <div class="team" id="team"></div>
+  <section id="board-sec"><h2>📋 일 보드 <span class="muted small">모든 일(#할-일 카드·요청·승인·개선·감지·회차)을 한 표에서 — 새 일은 아래 '디스코드 작업'의 맡기기로</span></h2>
+    <div class="board" id="board"></div>
   </section>
   <section id="todo"><h2>🟠 할 일 <span class="muted small">디스코드 #할-일과 같은 카드 — 여기서 눌러도 똑같이 처리돼요</span></h2>
     <div class="btns" style="margin:0 0 8px"><button class="btn" data-act="review">🧹 할 일 다시 확인</button><button class="btn" data-act="refresh">🔄 디스코드 카드 새로고침</button></div>
@@ -312,32 +310,27 @@ function render(s) {
     ['승인 대기', s.approvals + taskWait, `디스코드 #할-일 승인 버튼${taskWait ? ` · 작업판 ${taskWait}건` : ''}`, (s.approvals + taskWait) ? 's-warn' : ''],
   ];
   try { window.barunOffice && window.barunOffice(s); } catch (e) { console.error('사무실', e); }
-  // 👥 직원 현황
-  const tm = $('team'); tm.textContent = '';
+  // 👥 직원 현황은 🏢 사무실(office.js)로 합침(2026-10-21 재설계)
   const hmm = (x) => x ? x.slice(5, 16).replace('T', ' ') : '';
-  // 막힘 → 일하는 중 → 할 일 있음 → 쉬는 중, 직원마다 2줄 + 자세히(접힘) (2026-10-21 사용자: "시인성 좋게")
-  const RK = { '🔴': 0, '🟢': 1, '🟡': 2 };
-  const team = [...(s.team || [])].sort((a, b) => (RK[(a.state || '').slice(0, 2)] ?? 3) - (RK[(b.state || '').slice(0, 2)] ?? 3));
-  for (const m of team) {
-    const st = m.state || '';
-    const card = el('div', 'member ' + (st.startsWith('🟢') ? 'busy' : st.startsWith('🔴') ? 'blocked' : st.startsWith('🟡') ? 'todo' : 'idle'));
-    card.append(el('div', 'nm', `${m.name} · ${st}`));
-    const row = (val, cls) => { if (val) card.append(el('div', 'row ' + (cls || ''), val)); };
-    const L = m.last || {};
-    row(m.now ? `▶ 지금 ${m.now}` : L.at ? `✓ ${hmm(L.at).slice(6)} ${L.kind === 'skip' ? '할 일 없어 건너뜀' : (L.text || '').slice(0, 90)}` : m.role);
-    const nx = m.next || {};
-    row([nx.at ? `다음 ${hmm(nx.at).slice(6)} ${nx.job || ''}` : (nx.job || m.wake ? `다음: ${nx.job || m.wake}` : ''),
-         m.cards ? `할 일 ${m.cards}건${m.urgent ? `(긴급 ${m.urgent})` : ''}${m.top_card ? ' — ' + m.top_card : ''}` : ''].filter(Boolean).join(' · '), 'sub');
-    if (m.debt || (m.improving || []).length) {
-      const d = el('details'); d.append(el('summary', 'muted small', `자세히 — 맡은 일·기술부채 ${m.debt || 0}·개선 ${(m.improving || []).length}`));
-      d.append(el('div', 'muted small', m.role || ''));
-      if (m.debt) d.append(el('div', 'muted small', `기술부채 ${m.debt}건 — ${m.debt_top.file || ''}: ${m.debt_top.text || ''}`));
-      for (const x of (m.improving || [])) d.append(el('div', 'muted small', `개선 중 ${x.id} ${x.what}(${x.kind})`));
-      card.append(d);
+  // 📋 일 보드 (core/items.py)
+  const bd = $('board'); bd.textContent = '';
+  const B = s.board || {};
+  if (B.error) bd.append(el('div', 'muted', '일 표를 읽지 못함: ' + B.error));
+  const COLS = [['waiting_human', '🙋 사람 확인'], ['waiting_approval', '✋ 승인 대기'], ['running', '⏳ 진행 중'], ['queued', '🗂 대기·미룸'], ['done', '✅ 최근 끝·실패(24시간)']];
+  for (const [k, lab] of (B.cols ? COLS : [])) {
+    const rows = B.cols[k] || []; const c = el('div', 'bcol'); const h = el('h3'); h.append(el('span', null, lab), el('span', 'muted', String(rows.length))); c.append(h);
+    const ul = el('ul');
+    for (const r of rows.slice(0, 30)) {
+      const li = el('li'); li.append(el('div', 'bt', `${(B.kinds || {})[r.kind] || r.kind} ${r.title.replace(/<@[!&]?\d+>/g, '@')}`));
+      const st = (B.labels || {})[r.state] || r.state;
+      li.append(el('div', 'bm', `${hmm(r.updated)} · ${st}${r.role ? ' · ' + r.role : ''}${r.source ? ' · ' + r.source : ''}`));
+      if (r.body) { const d = el('details'); d.append(el('summary', 'muted small', '내용'), el('pre', null, r.body)); li.append(d); }
+      if (r.ref) { const a = el('a', 'small', '디스코드 ↗'); a.href = r.ref; a.target = '_blank'; a.rel = 'noopener'; li.append(a); }
+      ul.append(li);
     }
-    tm.append(card);
+    if (!rows.length) ul.append(el('li', 'muted', '없음'));
+    c.append(ul); bd.append(c);
   }
-
   // 🟠 할 일 (버튼: 처리함·보는 중·내일 다시 · 승인 대기면 승인·거절)
   const tl = $('todo-list'); tl.textContent = '';
   if (!(s.issues || []).length) tl.append(el('li', 'muted', '✅ 열린 할 일 없음'));
