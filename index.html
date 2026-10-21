@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바른청년 운영 현황</title>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #1d2330; --muted: #6b7385; --line: #e3e6ec;
+  --ok: #1f8a4c; --ok-bg: #e6f4ec; --run: #1f5fbf; --run-bg: #e7effb;
+  --warn: #b26a00; --warn-bg: #fdf1dc; --bad: #c0392b; --bad-bg: #fbe7e5; --chip: #eef0f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --card: #1b1f27; --ink: #e6e9ef; --muted: #98a0b0; --line: #2a303b;
+    --ok: #5cc98a; --ok-bg: #173226; --run: #7aa8f0; --run-bg: #18263c;
+    --warn: #f0b155; --warn-bg: #3a2c14; --bad: #f08174; --bad-bg: #3b1d1a; --chip: #252a34;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif; }
+header { padding: 18px 16px 8px; max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap;
+  align-items: baseline; gap: 8px 16px; }
+h1 { font-size: 20px; margin: 0; }
+.sub { color: var(--muted); font-size: 13px; }
+main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 14px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.tile .k { color: var(--muted); font-size: 12px; }
+.tile .v { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+section h2 { font-size: 15px; margin: 0 0 10px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: none; }
+.scroll { overflow-x: auto; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--chip);
+  color: var(--muted); white-space: nowrap; }
+.s-done, .s-ok { background: var(--ok-bg); color: var(--ok); }
+.s-running { background: var(--run-bg); color: var(--run); }
+.s-stale, .s-warn { background: var(--warn-bg); color: var(--warn); }
+.s-bad { background: var(--bad-bg); color: var(--bad); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.name { font-weight: 600; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+pre { white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; font: 12px/1.5 ui-monospace, Menlo, monospace;
+  background: var(--chip); padding: 8px; border-radius: 6px; }
+ul.log { list-style: none; margin: 0; padding: 0; max-height: 460px; overflow: auto; }
+ul.log li { padding: 6px 0; border-top: 1px solid var(--line); }
+ul.log li:first-child { border-top: none; }
+.md h1, .md h2, .md h3 { font-size: 14px; margin: 12px 0 4px; }
+.md ul { margin: 4px 0; padding-left: 18px; }
+.md p { margin: 4px 0; }
+.md { max-height: 520px; overflow: auto; }
+code { font: 12px ui-monospace, Menlo, monospace; background: var(--chip); padding: 0 4px; border-radius: 4px; }
+.err { color: var(--bad); }
+
+/* ---- 에이전트 활동 타임라인 (색은 상태용 고정 팔레트 + 아이콘·글자로 함께 구분) ---- */
+:root { --st-good: #0ca30c; --st-warn: #fab219; --st-serious: #ec835a; --st-crit: #d03b3b; --st-run: #2a78d6;
+  --ink-muted: #898781; --grid: #e1e0d9; --axis: #c3c2b7; --surface: #fcfcfb; --night: rgba(30,40,80,.045); --band: rgba(0,0,0,.018); }
+@media (prefers-color-scheme: dark) { :root { --st-run: #3987e5; --grid: #2c2c2a; --axis: #383835; --surface: #1a1a19;
+  --night: rgba(120,140,255,.06); --band: rgba(255,255,255,.025); } }
+.act-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 10px; }
+.segctl { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.segctl button { border: 0; background: transparent; color: var(--ink); padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.segctl button.on { background: var(--chip); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: 12px; }
+.lg { display: inline-flex; align-items: center; gap: 5px; }
+.sw { display: inline-block; }
+.sw.bar { width: 22px; height: 12px; border-radius: 4px; color: #fff; font-size: 9px; line-height: 12px; text-align: center; }
+#act-chart .skipdot { fill: var(--card); stroke: var(--muted); stroke-width: 1.5; cursor: pointer; }
+.sw.skipdot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); background: transparent; }
+.sw.dia { width: 9px; height: 9px; transform: rotate(45deg); background: var(--st-good); display: inline-block; }
+#act-chart .mk-hubok { fill: var(--st-good); }
+.hub-health { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.hub-src { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: var(--card); }
+.hub-src.bad { border-color: var(--st-crit); }
+.hub-src .small { display: block; }
+.hub-counts { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; font-size: 13px; }
+.hub-counts b { font-size: 17px; margin-right: 3px; }
+.flow { list-style: none; padding: 0; margin: 0; }
+.flow > li { display: grid; grid-template-columns: 52px 92px 1fr; gap: 8px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); }
+.flow .when { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; padding-top: 2px; }
+.flow .src { font-size: 13px; font-weight: 600; }
+.flow .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13px; }
+.flow .pill { border-radius: 999px; padding: 2px 9px; border: 1px solid var(--line); background: var(--bg); }
+.flow .pill.det { font-weight: 600; }
+.flow .pill.ok { border-color: var(--st-good); } .flow .pill.fail { border-color: var(--st-crit); color: var(--st-crit); }
+.flow .pill.todo { border-color: var(--st-warn); } .flow .pill.skip { opacity: .65; } .flow .pill.running { border-color: var(--st-run); }
+.flow .arrow { color: var(--muted); }
+.flow .result { flex-basis: 100%; color: var(--ink); }
+.flow details { flex-basis: 100%; }
+@media (max-width: 640px) { .flow > li { grid-template-columns: 44px 1fr; } .flow .chain { grid-column: 1 / -1; } }
+.todo-list { list-style: none; padding: 0; margin: 0; }
+.todo-list > li { padding: 9px 0; border-top: 1px solid var(--line); }
+.todo-list .t { font-weight: 600; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.btn { font: inherit; font-size: 13px; padding: 4px 11px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+.btn:hover { filter: brightness(.96); } .btn:disabled { opacity: .5; cursor: wait; }
+.btn.primary { background: var(--st-run); border-color: var(--st-run); color: #fff; } .btn.danger { border-color: var(--st-crit); color: var(--st-crit); }
+.taskbox { display: flex; gap: 8px; margin: 6px 0 12px; } .taskbox textarea { flex: 1; min-height: 44px; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(92vw, 640px); background: var(--ink); color: var(--card); padding: 10px 14px; border-radius: 10px; font-size: 14px; white-space: pre-wrap; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+#login { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; }
+#login .box { background: var(--card); color: var(--ink); padding: 20px; border-radius: 12px; width: min(92vw, 420px); }
+#login input { width: 100%; box-sizing: border-box; font: inherit; padding: 9px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.sw.bar.planned { border: 1.5px dashed var(--ink-muted); background: transparent; }
+.sw.dot { width: 9px; height: 9px; border-radius: 50%; }
+.sw.sq { width: 8px; height: 8px; border-radius: 1.5px; background: var(--ink-muted); }
+.sw.tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--muted); }
+.sw.tick { width: 3px; height: 12px; border-radius: 1.5px; background: var(--axis); }
+.st-ok { fill: var(--st-good); background: var(--st-good); } .st-fail { fill: var(--st-crit); background: var(--st-crit); }
+.st-run { fill: var(--st-run); background: var(--st-run); } .st-skip { fill: var(--axis); background: var(--axis); } .st-stale { fill: var(--st-warn); background: var(--st-warn); }
+.linkbtn { margin-left: auto; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+#act-chart { position: relative; overflow-x: auto; }
+#act-chart svg { display: block; font-family: inherit; }
+#act-chart .dayband { fill: var(--band); } #act-chart .night { fill: var(--night); }
+#act-chart .grid { stroke: var(--grid); stroke-width: 1; } #act-chart .laneline { stroke: var(--grid); stroke-width: 1; }
+#act-chart .groupline { stroke: var(--axis); stroke-width: 1; }
+#act-chart .axis { fill: var(--ink-muted); font-size: 11px; } #act-chart .axis-date { fill: var(--muted); font-size: 11px; font-weight: 600; }
+#act-chart .group { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+#act-chart .lane { fill: var(--ink); font-size: 13px; font-weight: 600; } #act-chart .lane-sub { fill: var(--muted); font-size: 11px; }
+#act-chart .bar { stroke: var(--card); stroke-width: 2; cursor: pointer; }
+#act-chart .bar:hover, #act-chart .mk:hover { filter: brightness(1.12); }
+#act-chart .bar-icon { fill: #fff; font-size: 10px; font-weight: 700; pointer-events: none; }
+#act-chart .planned { fill: transparent; stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 3 3; cursor: pointer; }
+#act-chart .slot { stroke: var(--ink-muted); stroke-width: 1.5; opacity: .6; }
+#act-chart .step { fill: #fff; opacity: .9; pointer-events: none; }
+#act-chart .mk { stroke: var(--card); stroke-width: 2; cursor: pointer; }
+.mk-crit { fill: var(--st-crit); background: var(--st-crit); } .mk-high { fill: var(--st-serious); background: var(--st-serious); }
+.mk-info { fill: var(--st-run); background: var(--st-run); } .mk-debug { fill: var(--axis); background: var(--axis); }
+#act-chart .mk-log { fill: var(--ink-muted); } #act-chart .mk-ops { fill: var(--muted); }
+#act-chart .mk-write { fill: var(--axis); stroke-width: 1; } #act-chart .mk-fail { fill: var(--st-crit); }
+#act-chart .count { fill: var(--muted); font-size: 10px; pointer-events: none; }
+#act-chart .mk-failpip { fill: var(--st-crit); stroke: var(--card); stroke-width: 1.5; pointer-events: none; }
+#act-chart .now { stroke: var(--st-crit); stroke-width: 1.5; stroke-dasharray: 4 3; }
+#act-chart .now-label { fill: var(--st-crit); font-size: 11px; font-weight: 600; }
+#act-tip { position: absolute; z-index: 5; max-width: 320px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); pointer-events: none; font-size: 12px; }
+.tip-title { font-weight: 650; margin-bottom: 4px; } .tip-row { color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+#act-detail h3 { font-size: 14px; margin: 4px 0 8px; }
+dl.kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 0; }
+dl.kv dt { color: var(--muted); font-size: 12px; } dl.kv dd { margin: 0; } dl.kv pre { margin: 0; }
+#act-table { max-height: 420px; overflow: auto; margin-top: 10px; }
+ul.log li.hl { background: var(--chip); border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>바른청년 운영 현황</h1>
+  <span class="sub" id="updated">불러오는 중…</span>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <section id="todo"><h2>🟠 할 일 <span class="muted small">디스코드 #할-일과 같은 카드 — 여기서 눌러도 똑같이 처리돼요</span></h2>
+    <div class="btns" style="margin:0 0 8px"><button class="btn" data-act="review">🧹 할 일 다시 확인</button><button class="btn" data-act="refresh">🔄 디스코드 카드 새로고침</button></div>
+    <ul class="todo-list" id="todo-list"></ul>
+  </section>
+  <section>
+    <h2>에이전트 활동</h2>
+    <div class="act-head" id="act-controls"></div>
+    <div id="act-chart"><div id="act-tip" hidden></div></div>
+    <div id="act-table" hidden></div>
+  </section>
+  <section><h2>선택한 항목</h2><div id="act-detail"></div></section>
+  <section id="hub"><h2>📡 이벤트 허브 <span class="muted small">정해진 시각 대신 몇 분마다 살펴보고, 바뀐 게 있으면 바로 처리 — 최근 24시간 무엇을 감지했고 무엇을 했는지</span></h2>
+    <div class="hub-health" id="hub-health"></div>
+    <div class="hub-counts" id="hub-counts"></div>
+    <ul class="flow" id="hub-flow"></ul>
+  </section>
+  <section>
+    <h2>자동작업</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>업무</th><th>담당</th><th>다음 실행</th><th>진행 신호</th><th>최근 결과</th></tr></thead>
+      <tbody id="jobs"></tbody>
+    </table></div>
+  </section>
+  <section id="tasks-sec"><h2>디스코드 작업 <span class="muted small">#작업판·분야 채널·DM·#할-일 답글로 말하면 지휘 에이전트가 분야 에이전트에게 나눠 맡김</span></h2>
+    <div class="taskbox"><textarea id="task-text" placeholder="에이전트에게 맡길 일 (예: 몰테일 호주 건 신청 상태 알려줘) — #작업판에 글로 올라가고 바꾸는 일은 승인 버튼을 거쳐요"></textarea><button class="btn primary" id="task-send">맡기기</button></div>
+    <div class="scroll"><table>
+      <thead><tr><th>작업</th><th>자리</th><th>상태</th><th>분야</th><th>마지막</th><th>결과</th></tr></thead>
+      <tbody id="tasks"></tbody>
+    </table></div>
+  </section>
+  <section id="invoices"><h2>🧾 인보이스 <span class="muted small">메일에서 받은 인보이스 PDF(공용 보관 폴더) — 눌러서 보기·받기. 같은 파일은 한 번만 들어옴</span></h2>
+    <ul class="log" id="inv"></ul>
+  </section>
+  <section><h2>알림 기록</h2><ul class="log" id="events"></ul></section>
+  <div class="grid2">
+    <section><h2>오늘 작업 일지</h2><ul class="log" id="worklog"></ul></section>
+    <section><h2>현재 상태 (STATUS.md)</h2><div class="md" id="status"></div></section>
+  </div>
+  <div class="grid2">
+    <section><h2>git 기록</h2><div id="git"></div></section>
+    <section><h2>백업</h2><div id="backup"></div></section>
+  </div>
+</main>
+<script src="config.js"></script>
+<script>
+// 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
+const API = (window.BARUN_API || '').replace(/\/$/, '');
+let TOKEN = ''; try { TOKEN = localStorage.getItem('barun.token') || ''; } catch (e) { /* 저장소 없음 */ }
+async function apiFetch(path, opts = {}) {
+  const h = Object.assign({}, opts.headers || {}); if (TOKEN) h.Authorization = 'Bearer ' + TOKEN;
+  const r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h }));
+  if (r.status === 401) { showLogin(); throw new Error('토큰 필요'); }
+  return r;
+}
+window.barunFetch = apiFetch;
+function showLogin() {
+  if (document.getElementById('login')) return;
+  const w = document.createElement('div'); w.id = 'login';
+  w.innerHTML = '<div class="box"><b>바른청년 현황판</b><p class="muted small">처음 쓰는 기기예요. 디스코드 DM으로 받은 접근 토큰을 붙여 넣어 주세요(이 기기에만 저장).</p><input id="tok" type="password" autocomplete="off" placeholder="brn_…"><button class="btn primary" id="tok-ok">들어가기</button></div>';
+  document.body.append(w);
+  document.getElementById('tok-ok').onclick = () => { TOKEN = document.getElementById('tok').value.trim(); try { localStorage.setItem('barun.token', TOKEN); } catch (e) { /* 무시 */ } w.remove(); tick(); if (window.barunReloadTimeline) window.barunReloadTimeline(); };
+}
+function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.append(t); } t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 7000); }
+async function act(body, btn) {
+  if (body.action === 'reject' && !confirm('거절할까요?')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json(); toast((j.ok ? '' : '⚠ ') + j.msg); tick();
+  } catch (e) { toast('⚠ ' + e.message); } finally { if (btn) btn.disabled = false; }
+}
+document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-act]'); if (b) act(Object.assign({ action: b.dataset.act }, b.dataset.key ? { key: b.dataset.key } : {}, b.dataset.job ? { job: b.dataset.job } : {}), b); });
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const hm = (s) => s ? s.replace('T', ' ').slice(5, 16) : '—';
+const STATE_KO = { running: '진행 중', stale: '멈춤 의심', done: '완료', unknown: '—' };
+const KIND_KO = { launchd: '프로그램', agent: '실행기', 'claude-desktop': '데스크톱 앱', 'agent-pending': '이전 대기' };
+
+function chip(text, cls) { return el('span', 'chip ' + (cls || ''), text); }
+
+function mdRender(src, root) {
+  root.textContent = '';
+  let ul = null;
+  const inline = (parent, text) => {
+    // **굵게**, `코드`만 처리(나머지는 그대로 글자로)
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/);
+    for (const p of parts) {
+      if (/^\*\*.+\*\*$/.test(p)) parent.appendChild(el('strong', null, p.slice(2, -2)));
+      else if (/^`.+`$/.test(p)) parent.appendChild(el('code', null, p.slice(1, -1)));
+      else if (p) parent.appendChild(document.createTextNode(p));
+    }
+  };
+  for (const line of src.split('\n')) {
+    const h = line.match(/^(#{1,3})\s+(.*)/);
+    const li = line.match(/^\s*[-*]\s+(.*)/);
+    if (h) { ul = null; const e = el('h' + h[1].length); inline(e, h[2]); root.appendChild(e); }
+    else if (li) { if (!ul) { ul = el('ul'); root.appendChild(ul); } const e = el('li'); inline(e, li[1]); ul.appendChild(e); }
+    else if (line.trim()) { ul = null; const e = el('p', line.startsWith('>') ? 'muted small' : null); inline(e, line.replace(/^>\s?/, '')); root.appendChild(e); }
+    else ul = null;
+  }
+}
+
+function render(s) {
+  $('updated').textContent = '갱신 ' + hm(s.now) + ' · 20초마다 자동';
+  const hbs = Object.entries(s.heartbeats);
+  const running = hbs.filter(([, h]) => h.state === 'running');
+  const stale = hbs.filter(([, h]) => h.state === 'stale');
+  const agentFails = s.jobs.flatMap(j => (j.runs || []).filter(r => !r.skip).slice(0, 1)).filter(r => r.rc && r.rc !== 0);
+  const lcFails = s.jobs.filter(j => j.launchd && !j.launchd.pid && j.launchd.last_exit && j.launchd.last_exit !== 0);  // 떠 있는 상시 서비스의 재시작 기록은 실패로 안 셈
+  const taskWait = (s.tasks || []).filter(t => t.state === 'wait').length;
+  const im = s.improve || {};
+  const tiles = [
+    ['진행 중 업무', running.length, running.map(([n]) => n).join(' · ') || '없음', running.length ? 's-running' : ''],
+    ['멈춤 의심', stale.length, stale.map(([n]) => n).join(' · ') || `신호 ${45}분 기준`, stale.length ? 's-warn' : ''],
+    ['최근 실패', agentFails.length + lcFails.length, [...lcFails.map(j => j.id)].join(' · ') || '실행기·launchd 마지막 결과', (agentFails.length + lcFails.length) ? 's-bad' : ''],
+    ['GitHub', s.git.ahead === 0 && s.git.behind === 0 ? '동기화' : `+${s.git.ahead ?? '?'} / -${s.git.behind ?? '?'}`, `커밋 안 된 파일 ${s.git.dirty.length}개`, ''],
+    ['자가개선', `부채 ${im.debt_score ?? '-'}`, `열린 제안 ${im.open || 0} · 효과 측정 중 ${im.applied || 0}` + (Object.keys(im.verdicts || {}).length ? ' · ' + Object.entries(im.verdicts).map(([k, v]) => `${k} ${v}`).join(' ') : ''), im.debt_new ? 's-warn' : ''],
+    ['최근 백업', s.backup.latest ? s.backup.latest.slice(5) : '없음', `보관 ${s.backup.count}일치`, s.backup.latest ? '' : 's-bad'],
+    ['승인 대기', s.approvals + taskWait, `디스코드 #할-일 승인 버튼${taskWait ? ` · 작업판 ${taskWait}건` : ''}`, (s.approvals + taskWait) ? 's-warn' : ''],
+  ];
+  // 🟠 할 일 (버튼: 처리함·보는 중·내일 다시 · 승인 대기면 승인·거절)
+  const tl = $('todo-list'); tl.textContent = '';
+  if (!(s.issues || []).length) tl.append(el('li', 'muted', '✅ 열린 할 일 없음'));
+  const SV = { urgent: ['🔴 긴급', 's-bad'], critical: ['🔴 긴급', 's-bad'], todo: ['🟠 오늘', 's-warn'], high: ['🟠 오늘', 's-warn'], info: ['🔵 참고', ''] };
+  for (const i of (s.issues || [])) {
+    const li = el('li'); const [sl, sc] = SV[i.severity] || [i.severity || '', ''];
+    li.append(chip(sl, sc), document.createTextNode(' '), el('span', 't', i.title));
+    if (i.state === 'ack') li.append(document.createTextNode(' '), chip('👀 보는 중'));
+    if (i.count > 1) li.append(el('span', 'muted small', ` · ${i.count}번`));
+    if (i.todo) li.append(el('div', 'muted small', '할 일: ' + i.todo));
+    if (i.body) { const d = el('details'); d.append(el('summary', 'muted small', '내용'), el('pre', null, i.body)); li.append(d); }
+    const bs = el('div', 'btns');
+    const B = (lab, a, cls) => { const b = el('button', 'btn ' + (cls || ''), lab); b.dataset.act = a; b.dataset.key = i.key; bs.append(b); };
+    if (i.approval) { B('✅ 승인', 'approve', 'primary'); B('거절', 'reject', 'danger'); }
+    B('✅ 처리함', 'done'); B('👀 보는 중', 'ack'); B('⏰ 내일 아침 다시', 'snooze');
+    li.append(bs); tl.append(li);
+  }
+
+  const t = $('tiles'); t.textContent = '';
+  for (const [k, v, d, cls] of tiles) {
+    const b = el('div', 'tile'); b.append(el('div', 'k', k)); const vv = el('div', 'v', String(v)); b.append(vv);
+    if (cls) vv.appendChild(document.createTextNode(' ')), vv.appendChild(chip('●', cls));
+    b.append(el('div', 'd', d)); t.append(b);
+  }
+
+  const tb = $('jobs'); tb.textContent = '';
+  for (const j of s.jobs) {
+    const tr = el('tr');
+    const c1 = el('td'); c1.append(el('div', 'name', j.desc ? j.desc.split(' — ')[0] : j.id));
+    c1.append(el('div', 'muted small', j.desc && j.desc.includes(' — ') ? j.desc.split(' — ').slice(1).join(' — ') : j.id));
+    const c2 = el('td'); c2.append(chip(KIND_KO[j.kind] || j.kind));
+    if (j.runner) c2.append(document.createTextNode(' '), chip(j.runner));
+    if (j.browser && j.browser !== 'none') c2.append(document.createTextNode(' '), chip(j.browser));
+    const c3 = el('td', null, j.next || '—');
+    const c4 = el('td');
+    if (j.heartbeat) {
+      const h = j.heartbeat; c4.append(chip(STATE_KO[h.state] || h.state, 's-' + h.state));
+      c4.append(el('div', 'muted small', (h.step || '') + ' · ' + hm(h.at || h.started)));
+    } else if (j.launchd && j.launchd.pid) c4.append(chip('실행 중', 's-running'));
+    else c4.append(el('span', 'muted', '—'));
+    const c5 = el('td');
+    const ran = (j.runs || []).filter(r => !r.skip), skips = (j.runs || []).filter(r => r.skip);
+    if (skips.length && (!ran.length || skips[0].start > ran[0].start)) {
+      c5.append(chip('건너뜀 — 할 일 없음', ''));
+      c5.append(el('div', 'muted small', hm(skips[0].start.replace(' ', 'T')) + ' · ' + skips[0].why));
+    }
+    if (ran.length) {
+      const r = ran[0];
+      const ok = r.end && r.rc === 0;
+      c5.append(chip(r.end ? (ok ? '정상' : `실패 rc=${r.rc}`) : '진행 중', r.end ? (ok ? 's-ok' : 's-bad') : 's-running'));
+      c5.append(el('div', 'muted small', hm(r.start.replace(' ', 'T')) + (r.secs != null ? ` · ${r.secs}초` : '') + (r.runner ? ` · ${r.runner}` : '')));
+      if (r.fallback) c5.append(chip('Claude 로그인 없음 → Codex로 대체', 's-warn'));
+      if (r.summary) { const d = el('details'); d.append(el('summary', null, '마지막 답')); d.append(el('pre', null, r.summary)); c5.append(d); }
+      if (j.runs.length > 1) {
+        const d = el('details'); d.append(el('summary', null, `이전 ${j.runs.length - 1}회`));
+        const p = el('pre', null, j.runs.filter(x => x !== r).map(x => x.skip ? `${x.start}  건너뜀 — ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n'));
+        d.append(p); c5.append(d);
+      }
+    } else if (skips.length) {
+      /* 건너뛴 회차만 있음 — 위에 표시 */
+    } else if (j.launchd && j.launchd.pid) {
+      c5.append(chip('실행 중', 's-running'));   // 상시 서비스(대시보드 등)
+    } else if (j.launchd) {
+      const le = j.launchd.last_exit;
+      c5.append(chip(le === 0 ? '정상' : (le == null ? '—' : `종료코드 ${le}`), le === 0 ? 's-ok' : (le == null ? '' : 's-bad')));
+    } else c5.append(el('span', 'muted small', j.kind === 'claude-desktop' ? '앱 안 기록(진행 신호 참고)' : '—'));
+    if (j.kind === 'agent' && j.label) { const b = el('button', 'btn', '▶ 지금 실행'); b.dataset.act = 'run'; b.dataset.job = j.id; c3.append(el('div'), b); }
+    tr.append(c1, c2, c3, c4, c5); tb.append(tr);
+  }
+
+  // 📡 이벤트 허브 — 원천 상태 + 사건 흐름(감지 → 처리 → 결과)
+  const hub = s.hub || {};
+  const hh = $('hub-health'); hh.textContent = '';
+  if (hub.error) hh.append(el('span', 'muted', '허브 기록을 읽지 못함: ' + hub.error));
+  const H = hub.health || {};
+  if (H.sources) {
+    const live = el('div', 'hub-src' + (H.alive ? '' : ' bad'));
+    live.append(chip(H.alive ? '● 허브 실행 중' : '✕ 허브 멈춤', H.alive ? 's-ok' : 's-bad'), el('span', 'muted small', `최근 24시간 다시 시작 ${H.restarts || 0}번`));
+    hh.append(live);
+    for (const [k, v] of Object.entries(H.sources)) {
+      const b = el('div', 'hub-src' + (v.ok ? '' : ' bad'));
+      b.append(document.createTextNode(`${v.icon} ${v.label} `), chip(v.ok ? '정상' : (v.fails ? `실패 ${v.fails}번` : '확인 지연'), v.ok ? 's-ok' : 's-bad'));
+      b.append(el('span', 'muted small', `${v.age_min == null ? '아직 확인 전' : v.age_min + '분 전 확인'} · ${Math.round(v.every / 60)}분마다` + (v.error && !v.ok ? ` · ${v.error.slice(0, 60)}` : '')));
+      hh.append(b);
+    }
+  }
+  const hc = $('hub-counts'); hc.textContent = '';
+  const C = hub.counts || {};
+  for (const [k, lab] of [['incidents', '감지'], ['ops', '주문 수집 실행'], ['kicks', '업무 깨움'], ['cards', '#할-일 카드'], ['fails', '실패']]) {
+    const sp = el('span'); sp.append(el('b', null, String(C[k] || 0)), document.createTextNode(lab)); hc.append(sp);
+  }
+  const hf = $('hub-flow'); hf.textContent = '';
+  const ST = { ok: ['✅ 처리됨', 's-ok'], fail: ['✕ 실패', 's-bad'], todo: ['🟠 사람 확인', 's-warn'], running: ['● 진행 중', 's-running'], skip: ['– 건너뜀', ''] };
+  if (!(hub.incidents || []).length) hf.append(el('li', 'muted', '최근 24시간 감지된 변화 없음'));
+  for (const i of (hub.incidents || [])) {
+    const li = el('li');
+    li.append(el('div', 'when', i.at.slice(11, 16)), el('div', 'src', `${i.icon} ${i.label}`));
+    const ch = el('div', 'chain');
+    ch.append(el('span', 'pill det', '감지: ' + i.detected));
+    for (const st of i.steps) {
+      ch.append(el('span', 'arrow', '→'));
+      ch.append(el('span', 'pill ' + st.status, st.text));
+      if (st.run) { ch.append(el('span', 'arrow', '→')); ch.append(el('span', 'pill ' + st.run.status, (st.run.status === 'ok' ? '회차 정상' : st.run.status === 'skip' ? '회차 건너뜀' : st.run.status === 'running' ? '회차 진행 중' : '회차 실패') + (st.run.secs ? ` ${st.run.secs}초` : ''))); }
+    }
+    const [lab, cls] = ST[i.status] || [i.status, ''];
+    const r = el('div', 'result'); r.append(chip(lab, cls), document.createTextNode(' ' + (i.outcome || '')));
+    ch.append(r);
+    const extra = i.steps.map(st => [st.reason && `이유: ${st.reason}`, st.detail && `결과: ${st.detail}`, st.run && st.run.text && `${st.text} 회차: ${st.run.text}`].filter(Boolean).join('\n')).filter(Boolean).join('\n');
+    if (extra) { const d = el('details'); d.append(el('summary', 'muted small', '자세히'), el('pre', null, extra)); ch.append(d); }
+    li.append(ch); hf.append(li);
+  }
+
+  const inv = $('inv'); inv.textContent = '';
+  if (!(s.invoices || []).length) inv.append(el('li', 'muted', '보관된 인보이스 없음'));
+  for (const f of (s.invoices || [])) {
+    const li = el('li'); const a = el('a', null, f.name); a.href = '#';
+    a.onclick = async (ev) => { ev.preventDefault(); try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank'); } catch (e) { toast('⚠ ' + e.message); } };
+    li.append(a, el('span', 'muted small', ` · ${f.at.replace('T', ' ').slice(5)} · ${f.kb}KB`)); inv.append(li);
+  }
+
+  const TASK_KIND = { workboard: '#작업판', inbox: '#할-일 답글', channel: '분야 채널', dm: 'DM' };
+  const TASK_ST = { new: ['📨 요청', ''], run: ['🔧 진행', 's-running'], wait: ['✋ 승인 대기', 's-warn'], done: ['✅ 완료', 's-ok'], fail: ['❌ 실패', 's-bad'] };
+  const tt = $('tasks'); tt.textContent = '';
+  if (!(s.tasks || []).length) { const tr = el('tr'); const td = el('td', 'muted', '아직 작업 없음 — 디스코드 #작업판·분야 채널·DM에 할 일을 쓰면 여기 나옵니다'); td.colSpan = 6; tr.append(td); tt.append(tr); }
+  for (const t of (s.tasks || [])) {
+    const tr = el('tr'); const [lab, cls] = TASK_ST[t.state] || [t.state, ''];
+    const c1 = el('td'); c1.append(el('div', 'name', t.title || '작업'), el('div', 'muted small', `차례 ${t.turns}${t.cost ? ` · ${t.cost}달러` : ''}`));
+    const c2 = el('td'); c2.append(chip(lab, cls), el('div', 'muted small', t.stage ? `단계 ${t.stage}` : ''));
+    const c3 = el('td', null, t.domains.join(', ') || '—');
+    const c4 = el('td', null, hm(t.last));
+    const c5 = el('td', 'small', t.summary || '—');
+    const ck = el('td'); ck.append(chip(TASK_KIND[t.kind] || t.kind || '#작업판'));
+    tr.append(c1, ck, c2, c3, c4, c5); tt.append(tr);
+  }
+
+  const SEV = { urgent: ['긴급', 's-bad'], critical: ['긴급', 's-bad'], todo: ['오늘', 's-warn'], high: ['오늘', 's-warn'], info: ['참고', ''], debug: ['기록', ''] };
+  const ev = $('events'); ev.textContent = '';
+  if (!(s.events || []).length) ev.append(el('li', 'muted', '아직 기록 없음'));
+  for (const e of (s.events || [])) {
+    const li = el('li'); li.id = 'ev-' + e.id;
+    const [lab, cls] = SEV[e.severity] || [e.severity, ''];
+    li.append(chip(lab, cls), document.createTextNode(' '), chip('#' + e.room), document.createTextNode(' '), el('span', 'name', e.title));
+    const where = Object.entries(e.delivered || {}).filter(([, v]) => v === true).map(([k]) => k === 'suppressed' ? '중복 묶음' : k).join('·') || '미발송';
+    li.append(el('div', 'muted small', `${hm(e.at)} · ${e.domain || '-'} · ${e.source || '-'} · ${where}` + (e.repeated ? ` · ${e.repeated}회 반복` : '')));
+    if (e.body || e.todo) { const d = el('details'); d.append(el('summary', null, '내용')); d.append(el('pre', null, (e.body || '') + (e.todo ? '\n할 일: ' + e.todo : ''))); li.append(d); }
+    ev.append(li);
+  }
+
+  const wl = $('worklog'); wl.textContent = '';
+  if (!s.worklog.length) wl.append(el('li', 'muted', '오늘 기록 없음'));
+  for (const l of s.worklog) wl.append(el('li', null, l));
+
+  mdRender(s.status_md || '(없음)', $('status'));
+
+  const g = $('git'); g.textContent = '';
+  const gl = el('ul', 'log');
+  for (const c of s.git.log) { const li = el('li'); li.append(el('code', null, c.hash), document.createTextNode(' '), el('span', 'muted small', c.when + ' '), document.createTextNode(c.subject)); gl.append(li); }
+  g.append(gl);
+  if (s.git.dirty.length) { const d = el('details'); d.append(el('summary', null, `커밋 안 된 파일 ${s.git.dirty.length}개`)); d.append(el('pre', null, s.git.dirty.join('\n'))); g.append(d); }
+
+  const b = $('backup'); b.textContent = '';
+  b.append(el('p', null, s.backup.latest ? `가장 최근: ${s.backup.latest} (로컬 ${s.backup.count}일치 보관)` : '로컬 백업 없음'));
+  if (s.backup.log.length) b.append(el('pre', null, s.backup.log.join('\n')));
+}
+
+async function tick() {
+  try {
+    const r = await apiFetch('/api/state');
+    render(await r.json());
+  } catch (e) {
+    $('updated').textContent = '불러오기 실패: ' + e; $('updated').className = 'sub err';
+  }
+}
+tick(); setInterval(tick, 20000);
+document.getElementById('task-send').onclick = async (ev) => { const t = document.getElementById('task-text'); if (!t.value.trim()) return; await act({ action: 'task', text: t.value.trim() }, ev.target); t.value = ''; };
+function focusHash() { const t = location.hash && document.getElementById(location.hash.slice(1)); if (t) { t.classList.add('hl'); t.scrollIntoView({ block: 'center' }); } }
+window.addEventListener('hashchange', focusHash); setTimeout(focusHash, 1500);
+</script>
+<script src="activity.js"></script>
+</body>
+</html>
