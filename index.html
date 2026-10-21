@@ -376,6 +376,7 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 .dt-field input, .dt-field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 40px; }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
+.todo-fil { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 /* 시트 보고서(기록 탭) */
 .rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .rep-body { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
@@ -664,6 +665,7 @@ function mdRender(src, root) {
 
 const SV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오늘', 'warn'], high: ['오늘', 'warn'], info: ['참고', ''] };
 const openTodos = new Set();
+let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 넘음)
 
 function render(s) {
   $('updated').textContent = `${hm(s.now).slice(6)} 갱신`; $('updated').className = 'upd';
@@ -737,13 +739,36 @@ function render(s) {
   // 할 일 — 급한 것·승인 먼저, 버튼은 한 줄(주 행동 하나 + 보조)
   const tl = $('todo-list'); tl.textContent = '';
   if (!issues.length) tl.append(el('div', 'empty', '✅ 열린 할 일이 없어요'));
-  for (const i of sorted) {
+  // 묶어 보기(2026-10-22 사장님 "더 편하게"): 버튼 한 번으로 끝나는 것 · 3일 넘게 그대로인 것 — 오래된 건 한꺼번에 정리
+  const oneTap = (i) => i.approval || (i.choices || []).length;
+  const oldOne = (i) => i.last && (Date.parse(s.now) - Date.parse(i.last)) > 72 * 3600e3;
+  const FIL = [['all', '전체', () => true], ['tap', '버튼 한 번', oneTap], ['old', '3일 넘음', oldOne]];
+  const fbar = el('div', 'todo-fil');
+  for (const [k, lab, fn] of FIL) {
+    const n = issues.filter(fn).length; if (k !== 'all' && !n) continue;
+    const b = el('button', 'chipbtn' + (todoFilter === k ? ' on' : ''), `${lab} ${n}`); b.type = 'button'; b.setAttribute('aria-pressed', String(todoFilter === k));
+    b.onclick = () => { todoFilter = k; render(s); }; fbar.append(b);
+  }
+  const shown = sorted.filter((FIL.find((f) => f[0] === todoFilter) || FIL[0])[2]);
+  if (todoFilter === 'old' && shown.length) {
+    const bulk = el('button', 'btn sm weak', `보이는 ${shown.length}건 모두 '처리했어요'`); bulk.type = 'button';
+    bulk.onclick = async () => {
+      if (!confirm(`3일 넘게 그대로인 ${shown.length}건을 모두 닫을까요? 아직 할 일이 남은 카드는 먼저 빼 주세요(카드마다 '보는 중'을 누르면 목록에 남아요).`)) return;
+      bulk.disabled = true;
+      for (const i of shown) { try { await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'done', key: i.key, note: '현황판에서 오래된 카드 한꺼번에 정리' }) }); } catch (e) { /* 하나 실패해도 계속 */ } }
+      toast(`${shown.length}건을 닫았어요`); todoFilter = 'all'; tick();
+    };
+    fbar.append(bulk);
+  }
+  if (issues.length) tl.append(fbar);
+  for (const i of shown) {
     const it = el('div', 'todo' + (openTodos.has(i.key) ? ' open' : '')); it.id = 'todo-' + i.key;
     const [sl, sc] = SV[i.severity] || [i.severity || '', ''];
     const meta = el('div', 'meta'); meta.append(chip(sl, sc));
     if (i.approval) meta.append(chip('승인 필요', 'run'));
     if ((i.choices || []).length) meta.append(chip('골라 주세요', 'run'));
     if (i.state === 'ack') meta.append(chip('보는 중'));
+    if (oldOne(i)) meta.append(chip(`${Math.floor((Date.parse(s.now) - Date.parse(i.last)) / 864e5)}일째`, 'warn'));
     meta.append(el('span', null, [dom[i.domain] || i.domain, i.last ? relDay(i.last, s.now) : '', i.count > 1 ? `${i.count}번째` : ''].filter(Boolean).join(' · ')));
     const t = el('div', 't', clean(i.title)); t.tabIndex = 0; t.setAttribute('role', 'button'); t.setAttribute('aria-expanded', String(openTodos.has(i.key)));
     const toggle = () => { it.classList.toggle('open'); openTodos[it.classList.contains('open') ? 'add' : 'delete'](i.key); t.setAttribute('aria-expanded', String(it.classList.contains('open'))); };
