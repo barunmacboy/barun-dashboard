@@ -376,6 +376,27 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 .dt-field input, .dt-field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 40px; }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
+/* 시트 보고서(기록 탭) */
+.rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rep-body { display: grid; gap: 18px; }
+.rep-lead { color: var(--muted); font-size: 13px; }
+.rep-lead:first-child { color: var(--ink); font-size: 16px; font-weight: 700; }
+.rep-h { font-size: 15px; margin: 0 0 6px; }
+.rep-wrap { overflow-x: auto; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); }
+table.rep { font-size: 13px; min-width: 100%; border-collapse: collapse; }
+table.rep th { background: var(--fill2); color: var(--sub); font-weight: 600; text-align: left; white-space: nowrap; padding: 8px 10px; }
+table.rep td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+table.rep td.long { white-space: normal; min-width: 240px; max-width: 420px; }
+table.rep td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.rep td.ed { background: #fff8db; padding: 3px 6px; }
+.rep-in { font: inherit; width: 100%; min-width: 90px; padding: 5px 8px; border: 1px solid #e8d48a; border-radius: 8px; background: var(--card); color: var(--ink); }
+.rep-in:focus { outline: 2px solid var(--blue); border-color: transparent; }
+.rep-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: var(--fill2); }
+.rep-bar[hidden] { display: none; }
+.rep-out { font-size: 13px; white-space: pre-wrap; flex-basis: 100%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) table.rep td.ed { background: #3a3215; } }
+:root[data-theme="dark"] table.rep td.ed { background: #3a3215; }
+
 /* 주문 시트(데이터 탭) — 칸 누르면 고치기 · 아래 고정 저장 막대 */
 .dt-stock { margin: 4px 0 10px; } .dt-stock .dt-acts { margin-top: 8px; grid-template-columns: 1fr; }
 .dt-stock .dt-form { grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); }
@@ -912,5 +933,6 @@ window.addEventListener('hashchange', route); route();
 <script src="activity.js"></script>
 <script src="data.js"></script>
 <script src="sourcing.js"></script>
+<script src="reports.js"></script>
 </body>
 </html>
