@@ -610,7 +610,10 @@ function render(s) {
   const ht = $('hero-title'); ht.textContent = '';
   const urgent = issues.filter((i) => ['urgent', 'critical'].includes(i.severity)).length;
   const bd = s.barund || null;
-  if (bd && bd.alive === false) { ht.append('회차 대기열이 ', el('em', 'bad', '멈췄어요')); }
+  const us = (s.usage || {}).claude || {}, uw = us.windows || {};
+  const pct = (w) => (uw[w] && uw[w].util != null) ? Math.round(uw[w].util * 100) : null;
+  if (us.blocked) { ht.append('Claude 사용량 한도에 ', el('em', 'bad', '걸렸어요'), ` — ${us.until}에 풀려요`); }
+  else if (bd && bd.alive === false) { ht.append('회차 대기열이 ', el('em', 'bad', '멈췄어요')); }
   else if (fails) { ht.append('실패한 회차가 ', el('em', 'bad', `${fails}건`), ' 있어요'); }
   else if (urgent) { ht.append('급한 일이 ', el('em', 'bad', `${urgent}건`), ' 있어요'); }
   else if (issues.length) { ht.append('사장님 확인이 필요한 일이 ', el('em', null, `${issues.length}건`), ' 있어요'); }
@@ -618,13 +621,17 @@ function render(s) {
   $('hero-lead').textContent = `지금 ${busy}명이 일하고 있어요` + (nextAgent ? ` · 다음 회차는 ${nextAgent.next} ${(nextAgent.desc || nextAgent.id).split(' — ')[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
   if (bd && bd.alive === false) { al.hidden = false; al.textContent = `⛔ 회차 대기열(barund)이 응답하지 않아요${bd.at ? ` — 마지막 신호 ${hm(bd.at)}` : ''}. 정기·이벤트 회차가 열리지 않아요.`; }
+  else if (us.blocked) { al.hidden = false; al.textContent = `⛔ Claude 사용량 한도 — ${us.until}에 풀려요. 무인 회차는 Codex로 대신 돌고, #작업판 일·대화 세션은 그때까지 멈춰요.`; }
   else al.hidden = true;
+  const p5 = pct('five_hour'), p7 = pct('seven_day');
   const ST = [
     ['할 일', issues.length, '건', urgent ? `긴급 ${urgent}` : '디스코드 #할-일', issues.length ? 'warn' : '', 'todo'],
     ['승인 대기', approvals, '건', taskWait ? `작업판 ${taskWait} 포함` : '버튼으로 승인', approvals ? 'warn' : '', 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
     ['최근 실패', fails, '건', fails ? [...agentFails.map(() => '회차'), ...lcFails.map((j) => j.id)].slice(0, 3).join(', ') : '마지막 결과 기준', fails ? 'bad' : '', 'work'],
     ['기술부채', im.debt_score ?? '-', '점', `열린 제안 ${im.open || 0} · 측정 ${im.applied || 0}`, im.debt_new ? 'warn' : '', 'work'],
+    ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%${uw.five_hour ? ' · ' + uw.five_hour.resets + ' 채워짐' : ''}`,
+      us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : ''), 'work'],
     ['최근 백업', s.backup.latest ? s.backup.latest.slice(5).replace('-', '/') : '없음', '', `보관 ${s.backup.count}일치`, s.backup.latest ? '' : 'bad', 'records'],
   ];
   const sg = $('stats'); sg.textContent = '';
