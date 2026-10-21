@@ -377,6 +377,15 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-field input, .dt-field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 40px; }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
 .todo-fil { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+/* 절감 장부 */
+.sav-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 600px) { .sav-tiles { grid-template-columns: minmax(0, 1fr); } }
+.sav-tile { background: var(--green-bg); border-radius: 14px; padding: 12px 14px; }
+.sav-tile .k { color: var(--green-ink); font-size: 13px; font-weight: 600; } .sav-tile .v { font-size: 22px; font-weight: 800; color: var(--ink); margin: 2px 0; } .sav-tile .d { color: var(--sub); font-size: 13px; }
+table.sav-t { width: 100%; font-size: 13px; border-collapse: collapse; } table.sav-t th { text-align: left; color: var(--sub); background: var(--fill2); padding: 8px 10px; white-space: nowrap; }
+table.sav-t td { padding: 7px 10px; border-top: 1px solid var(--line); } table.sav-t td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#sav .od-t { margin-top: 14px; }
+
 /* 시트 보고서(기록 탭) */
 .rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .rep-body { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
@@ -545,6 +554,10 @@ table.dt.sheet tbody tr.on { background: var(--blue-bg); }
 
   <!-- 작업·자동화 -->
   <section class="panel" id="p-work" role="tabpanel" aria-label="작업·자동화" hidden>
+    <div class="card" id="sav-sec">
+      <div class="card-h"><h2>💰 절감 장부</h2><span class="desc">효율화로 아낀 시간·AI 비용이에요. 디스코드 #효율화에도 같은 내용이 쌓여요.</span></div>
+      <div id="sav"></div>
+    </div>
     <div class="card" id="tasks-sec">
       <div class="card-h"><h2>디스코드 작업</h2><span class="desc">#작업판·분야 채널·DM·#할-일 답글로 맡긴 일이에요.</span></div>
       <ul class="list" id="tasks"></ul>
@@ -667,6 +680,33 @@ const SV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오
 const openTodos = new Set();
 let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 넘음)
 
+// 💰 절감 장부(작업·자동화 탭) — notify/savings.py: 종류별 누적·오늘, 개선 목록(디스코드 #효율화와 같은 내용)
+function renderSavings(sv, durK) {
+  const box = document.getElementById('sav'); if (!box) return; box.textContent = '';
+  if (sv.error) { box.append(el('p', 'muted', '절감 장부를 읽지 못했어요: ' + sv.error)); return; }
+  const a = sv.all || {}, w = sv.week || {}, t = sv.today || {}, won = (u) => `$${(u || 0).toFixed(2)} (약 ${(Math.round((u || 0) * (sv.usd_krw || 1330) / 100) * 100).toLocaleString('ko-KR')}원)`;
+  const head = el('div', 'sav-tiles');
+  for (const [k, x] of [[`${(sv.first || '').slice(5).replace('-', '/')}부터 누적`, a], ['최근 7일', w], ['오늘', t]]) {
+    const d = el('div', 'sav-tile'); d.append(el('div', 'k', k), el('div', 'v', durK(x.secs)), el('div', 'd', 'AI ' + won(x.cost))); head.append(d);
+  }
+  box.append(head);
+  const L = sv.labels || {};
+  const rows = Object.entries(a.by || {}).sort((p, q) => (q[1].cost * 600 + q[1].secs) - (p[1].cost * 600 + p[1].secs));
+  if (rows.length) {
+    const tb = el('table', 'sav-t'); const hr = el('tr'); ['무엇으로', '횟수', '아낀 시간', 'AI 비용', '오늘'].forEach((h) => hr.append(el('th', null, h))); const th = el('thead'); th.append(hr); tb.append(th);
+    const bd = el('tbody');
+    for (const [k, b] of rows) { const tw = (t.by || {})[k] || { n: 0, secs: 0 }; const tr = el('tr'); [L[k] || (k === 'script' ? '스크립트 회차 — 에이전트 대신' : k), b.n.toLocaleString('ko-KR') + '번', durK(b.secs), '$' + b.cost.toFixed(2), `${tw.n}번 · ${durK(tw.secs)}`].forEach((v, i) => tr.append(el('td', i ? 'num' : null, v))); bd.append(tr); }
+    tb.append(bd); const wr = el('div', 'rep-wrap'); wr.append(tb); box.append(wr);
+  } else box.append(el('p', 'muted small', '아직 쌓인 절감이 없어요 — 회차가 돌면 쌓여요'));
+  const ch = sv.changes || [];
+  if (ch.length) {
+    box.append(el('div', 'od-t', `🛠 바뀐 것 ${ch.length}건`));
+    const ul = el('ul', 'log');
+    for (const x of ch) { const li = el('li'); li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + ' · ' + (x.by || '')), el('div', null, x.what), x.detail ? el('div', 'muted small', x.detail) : ''); ul.append(li); }
+    box.append(ul);
+  }
+}
+
 function render(s) {
   $('updated').textContent = `${hm(s.now).slice(6)} 갱신`; $('updated').className = 'upd';
   const team = s.team || [];
@@ -701,6 +741,9 @@ function render(s) {
   else if (us.blocked) { al.hidden = false; al.textContent = `⛔ Claude 사용량 한도 — ${us.until}에 풀려요. 무인 회차는 Codex로 대신 돌고, #작업판 일·대화 세션은 그때까지 멈춰요.`; }
   else al.hidden = true;
   const p5 = pct('five_hour'), p7 = pct('seven_day');
+  const sv = s.savings || {}, svA = sv.all || {};
+  const durK = (x) => { x = Math.round(x || 0); return x >= 3600 ? `${Math.floor(x / 3600)}시간 ${Math.floor(x % 3600 / 60)}분` : x >= 60 ? `${Math.floor(x / 60)}분` : `${x}초`; };
+  renderSavings(sv, durK);
   const ST = [
     ['할 일', issues.length, '건', urgent ? `긴급 ${urgent}` : '디스코드 #할-일', issues.length ? 'warn' : '', 'todo'],
     ['승인 대기', approvals, '건', taskWait ? `작업판 ${taskWait} 포함` : '버튼으로 승인', approvals ? 'warn' : '', 'todo'],
@@ -709,6 +752,7 @@ function render(s) {
     ['기술부채', im.debt_score ?? '-', '점', `열린 제안 ${im.open || 0} · 측정 ${im.applied || 0}`, im.debt_new ? 'warn' : '', 'work'],
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%${uw.five_hour ? ' · ' + uw.five_hour.resets + ' 채워짐' : ''}`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : ''), 'work'],
+    ['아낀 것', svA.secs ? durK(svA.secs) : '-', '', svA.secs || svA.cost ? `AI $${(svA.cost || 0).toFixed(2)} · 오늘 ${durK((sv.today || {}).secs || 0)}` : '효율화가 쌓이면 보여요', svA.secs ? 'ok' : '', 'work:sav-sec'],
     ['최근 백업', s.backup.latest ? s.backup.latest.slice(5).replace('-', '/') : '없음', '', `보관 ${s.backup.count}일치`, s.backup.latest ? '' : 'bad', 'records'],
   ];
   const sg = $('stats'); sg.textContent = '';
