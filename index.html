@@ -96,6 +96,24 @@ code { font: 12px ui-monospace, Menlo, monospace; background: var(--chip); paddi
 .flow .result { flex-basis: 100%; color: var(--ink); }
 .flow details { flex-basis: 100%; }
 @media (max-width: 640px) { .flow > li { grid-template-columns: 44px 1fr; } .flow .chain { grid-column: 1 / -1; } }
+.office { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; padding: 10px; border-radius: 10px;
+  background: repeating-linear-gradient(45deg, var(--chip) 0 10px, transparent 10px 20px); }
+.seat { all: unset; box-sizing: border-box; cursor: pointer; background: var(--card); border: 2px solid var(--line); border-radius: 8px; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.seat:focus-visible { outline: 2px solid var(--st-run, var(--run)); outline-offset: 2px; }
+.seat canvas { width: 100%; max-width: 192px; aspect-ratio: 48 / 36; image-rendering: pixelated; image-rendering: crisp-edges; align-self: center; border-radius: 4px; }
+.seat.k-busy { border-color: var(--run); } .seat.k-todo { border-color: var(--warn); } .seat.k-blocked { border-color: var(--bad); } .seat.k-idle { opacity: .82; }
+.seat.sel { box-shadow: 0 0 0 3px var(--run-bg); }
+.seat-nm { font-size: 13px; } .seat-st { color: var(--muted); font-size: 12px; }
+.seat-say { position: relative; background: var(--chip); border-radius: 8px; padding: 5px 8px; font-size: 12px; line-height: 1.4; min-height: 2.8em; }
+.seat-say::before { content: ""; position: absolute; top: -6px; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top: 0; border-bottom-color: var(--chip); }
+.k-busy .seat-say { background: var(--run-bg); } .k-busy .seat-say::before { border-bottom-color: var(--run-bg); }
+.k-blocked .seat-say { background: var(--bad-bg); } .k-blocked .seat-say::before { border-bottom-color: var(--bad-bg); }
+.k-todo .seat-say { background: var(--warn-bg); } .k-todo .seat-say::before { border-bottom-color: var(--warn-bg); }
+.seat-sub { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.seat-sub div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#office-detail { margin-top: 10px; } .od-h { font-weight: 650; margin-bottom: 6px; }
+.od-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; } @media (max-width: 760px) { .od-grid { grid-template-columns: 1fr; } }
+.od-t { font-weight: 600; font-size: 13px; margin-bottom: 4px; } .od-col ul { margin: 0; padding-left: 16px; font-size: 13px; } .od-col li { margin: 3px 0; }
 .team { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .member { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); font-size: 13px; }
 .member .nm { font-weight: 700; font-size: 14px; } .member .rl { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
@@ -162,6 +180,11 @@ ul.log li.hl { background: var(--chip); border-radius: 6px; }
 </header>
 <main>
   <div class="tiles" id="tiles"></div>
+  <section id="office-sec"><h2>🏢 사무실 <span class="muted small" id="office-count"></span></h2>
+    <div class="muted small" style="margin:-4px 0 8px">에이전트 한 명 = 직원 한 명. 말풍선이 지금 하는 일 · ✓ 마지막으로 한 일 · ⏭ 다음 할 일 — 캐릭터를 누르면 자세히</div>
+    <div class="office" id="office"></div>
+    <div id="office-detail"></div>
+  </section>
   <section id="team-sec"><h2>👥 직원 현황 <span class="muted small">막힘·일하는 중이 위로 — 디스코드 #상황판 카드와 같은 자료</span></h2>
     <div class="team" id="team"></div>
   </section>
@@ -288,6 +311,7 @@ function render(s) {
     ['최근 백업', s.backup.latest ? s.backup.latest.slice(5) : '없음', `보관 ${s.backup.count}일치`, s.backup.latest ? '' : 's-bad'],
     ['승인 대기', s.approvals + taskWait, `디스코드 #할-일 승인 버튼${taskWait ? ` · 작업판 ${taskWait}건` : ''}`, (s.approvals + taskWait) ? 's-warn' : ''],
   ];
+  try { window.barunOffice && window.barunOffice(s); } catch (e) { console.error('사무실', e); }
   // 👥 직원 현황
   const tm = $('team'); tm.textContent = '';
   const hmm = (x) => x ? x.slice(5, 16).replace('T', ' ') : '';
@@ -505,6 +529,7 @@ document.getElementById('task-send').onclick = async (ev) => { const t = documen
 function focusHash() { const t = location.hash && document.getElementById(location.hash.slice(1)); if (t) { t.classList.add('hl'); t.scrollIntoView({ block: 'center' }); } }
 window.addEventListener('hashchange', focusHash); setTimeout(focusHash, 1500);
 </script>
+<script src="office.js"></script>
 <script src="activity.js"></script>
 </body>
 </html>
