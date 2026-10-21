@@ -206,7 +206,10 @@ const API = (window.BARUN_API || '').replace(/\/$/, '');
 let TOKEN = ''; try { TOKEN = localStorage.getItem('barun.token') || ''; } catch (e) { /* 저장소 없음 */ }
 async function apiFetch(path, opts = {}) {
   const h = Object.assign({}, opts.headers || {}); if (TOKEN) h.Authorization = 'Bearer ' + TOKEN;
-  const r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h }));
+  // Tailscale이 켜진 기기에서는 이 주소가 사설 IP로 풀려 크롬이 '로컬 네트워크 접근' 허용을 물어본다 — 오래 걸리면 안내
+  const slow = API ? setTimeout(() => toast('주소창 쪽에 "로컬 네트워크의 기기에 접근" 허용 요청이 떠 있으면 [허용]을 눌러 주세요(이 기기에서 한 번만).'), 6000) : 0;
+  let r;
+  try { r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h })); } finally { clearTimeout(slow); }
   if (r.status === 401) { showLogin(); throw new Error('토큰 필요'); }
   return r;
 }
