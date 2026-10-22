@@ -399,10 +399,8 @@
         ag_subs: (t.subagents || []).length, ag_secs: t.secs, ag_extra: 'task', ag_link: t.url, last: {}, next: {} });
       if (++i >= 5) break;
     }
-    for (const o of A.others.slice(0, 8 - i)) {
-      team.push({ domain: `other:${o.pid}`, name: o.kind === 'Codex 앱' ? '🖥 Codex 앱' : `👤 ${o.kind}`, role: o.what, state: '⚪ 사람 세션', now: '',
-        ag_extra: 'other', last: { at: '', text: `${mmss(o.secs)} 전부터 열려 있음` }, next: {} });
-    }
+    // 사람이 직접 연 Claude Code·Codex 세션은 넣지 않는다(작업 기록이 없어 '최근 기록 없음'만 보임 — 2026-10-22 사장님).
+    // 디스코드에서 맡긴 일의 진행은 홈 '💬 디스코드에서 맡긴 일' 카드(tasks.js)에서.
     return { ...s, team };
   }
   window.barunOfficeAgents = () => { if (raw) render(raw); };

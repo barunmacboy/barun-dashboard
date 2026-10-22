@@ -109,10 +109,7 @@
       L.append(E('div', 'ag-h', `스크립트(AI 없이) ${d.scripts.length}`));
       for (const s of d.scripts) L.append(row('running', s.name, [['● 도는 중', 'run']], '', '', []));
     }
-    if (d.others.length) {
-      L.append(E('div', 'ag-h', `사람이 연 세션 ${d.others.length} — 보기만`));
-      for (const o of d.others) L.append(row('', o.kind, [[o.tty || '', '']], o.what, `${dur(o.secs)} 전부터 · pid ${o.pid}`, []));
-    }
+    // 사람이 직접 연 세션(기록 없음)은 보이지 않는다 — 2026-10-22 사장님. 디스코드에서 맡긴 일은 홈 '💬 디스코드에서 맡긴 일'.
     L.append(E('div', 'ag-h', `다음 차례(대기열) ${d.queue.length}`));
     const ol = E('ol', 'ag-q list');
     if (!d.queue.length) ol.append(E('li', 'muted small', '기다리는 회차가 없어요 — 정기 시각·새 일이 생기면 바로 들어와요'));
