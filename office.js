@@ -242,8 +242,8 @@
 
   // ── 화면 ─────────────────────────────────────────────────────────────────
   let frame = 0, timer = null, sel = null, hover = null, last = null, order = [], extra = [];
-  const STATE_TXT = { busy: '일하는 중', todo: '결재 대기', blocked: '막혔어요', idle: '쉬는 중' };
-  const look = (d) => LOOK[d] || { hair: '#333', shirt: '#777' };
+  const STATE_TXT = { busy: '일하는 중', todo: '결재 대기', blocked: '막혔어요', idle: '쉬는 중', paused: '멈춤' };
+  const look = (d) => LOOK[d] || AG_LOOK[String(d).split(':')[0]] || { hair: '#333', shirt: '#777' };
   const kinds = new Map();
   let cv = null, pop = null;
   const spot = (d) => SPOT[d] || extra.find((x) => x.d === d) || { x: 20, y: 120 };
@@ -256,7 +256,7 @@
     const people = order.map((d) => ({ d, ...spot(d) }));
     for (const y of [...new Set(people.map((p) => p.y))].sort((a, b) => a - b)) {   // 한 줄씩: 사람을 그린 뒤 그 줄 책상으로 아랫몸을 덮는다
       const rowP = people.filter((p) => p.y === y);
-      for (const p of rowP) drawPerson(g, p.d, p.x, p.y, look(p.d), kinds.get(p.d) || 'idle', frame);
+      for (const p of rowP) { const k = kinds.get(p.d) || 'idle'; drawPerson(g, p.d, p.x, p.y, look(p.d), k === 'paused' ? 'idle' : k, frame); }
       for (const pod of new Set(rowP.map((p) => p.pod).filter(Boolean))) drawPodDesk(g, PODS[pod][0], PODS[pod][1], y);
       for (const p of rowP) { if (p.boss) drawBossDesk(g, p.x, p.y); else if (!p.pod) drawPodDesk(g, p.x - 14, p.x + 14, p.y); }
       for (const p of rowP) {        // 고른·가리킨 직원: 의자 뒤 빛 + 책상 앞 밑줄
@@ -375,7 +375,41 @@
     root.onkeydown = (e) => { if (e.key === 'Escape') hidePop(); };
   }
 
-  function render(s) {
+  // 2026-10-22 사장님: "지금 어떤 에이전트가 어떤 일을 하고 다음 대기열은 무엇인지 사무실 그림에도" — /api/agents(core/agents.py, dashboard/agents.js가 읽어 window.barunAgentsData)
+  // 직원: 그 분야 회차가 돌면 '지금'·경과·보조 에이전트, 대기열 수, 멈춤. 작업판 일꾼·사람이 연 세션은 아래 '임시 책상' 줄에.
+  const AG_LOOK = { task: { hair: '#2b2118', shirt: '#6b5bd6', prop: 'flag' }, other: { hair: '#555', shirt: '#9aa3ad', prop: 'cup' } };
+  const mmss = (s) => s == null ? '' : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분` : s >= 60 ? `${Math.floor(s / 60)}분` : `${s}초`;
+  let raw = null;
+  function withAgents(s) {
+    const A = window.barunAgentsData; if (!A) return s;
+    const team = (s.team || []).map((m) => {
+      const mine = A.staff.filter((x) => x.domain === m.domain);
+      const run = mine.filter((x) => x.state === 'running');
+      const q = mine.reduce((n, x) => n + x.waiting.length, 0) + (m.domain === 'commander' ? A.tasks.filter((t) => t.state === 'queued').length : 0);
+      const tk = m.domain === 'commander' ? A.tasks.filter((t) => t.state === 'running') : [];
+      const subs = [...run, ...tk].reduce((n, x) => n + (x.subagents || []).length, 0);
+      const out = { ...m, ag_queue: q, ag_subs: subs, ag_paused: mine.length > 0 && mine.every((x) => x.paused) };
+      if (run.length) { const r = run[0]; out.state = '🟢 ' + (m.state || '').replace(/^\S+\s*/, ''); out.now = `${r.name} · ${mmss(r.secs)}째${r.doing ? ' — ' + r.doing : ''}`; out.ag_secs = r.secs; }
+      else if (tk.length) { out.state = '🟢 작업판'; out.now = `💬 ${tk.map((t) => clip(t.title, 24)).join(' · ')}`; out.ag_secs = tk[0].secs; }
+      return out;
+    });
+    let i = 0;
+    for (const t of A.tasks.filter((t) => t.state === 'running')) {      // 작업판 일꾼 — 지휘 에이전트 밑에서 도는 별도 claude
+      team.push({ domain: `task:${t.id}`, name: '🧑‍💻 작업판 일꾼', role: clip(t.title, 30), state: '🟢 ' + (t.stage || ''), now: `${clip(t.title, 40)} · ${t.stage} ${mmss(t.secs)}째${t.doing ? ' — ' + t.doing : ''}`,
+        ag_subs: (t.subagents || []).length, ag_secs: t.secs, ag_extra: 'task', ag_link: t.url, last: {}, next: {} });
+      if (++i >= 5) break;
+    }
+    for (const o of A.others.slice(0, 8 - i)) {
+      team.push({ domain: `other:${o.pid}`, name: o.kind === 'Codex 앱' ? '🖥 Codex 앱' : `👤 ${o.kind}`, role: o.what, state: '⚪ 사람 세션', now: '',
+        ag_extra: 'other', last: { at: '', text: `${mmss(o.secs)} 전부터 열려 있음` }, next: {} });
+    }
+    return { ...s, team };
+  }
+  window.barunOfficeAgents = () => { if (raw) render(raw); };
+
+  function render(s0) {
+    raw = s0;
+    const s = withAgents(s0);
     last = s;
     const root = document.getElementById('office'); if (!root) return;
     const byDom = new Map((s.team || []).map((m) => [m.domain, m]));
@@ -385,17 +419,25 @@
     const next = [...known, ...others];
     if (next.join(',') !== order.join(',') || !cv || !root.contains(cv)) { order = next; build(root); }
     const roster = document.getElementById('office-roster'); roster.textContent = '';
-    const cnt = { busy: 0, todo: 0, blocked: 0, idle: 0 };
-    const rank = { blocked: 0, todo: 1, busy: 2, idle: 3 };
+    const cnt = { busy: 0, todo: 0, blocked: 0, idle: 0, paused: 0 };
+    const rank = { blocked: 0, todo: 1, busy: 2, paused: 3, idle: 4 };
     const rows = [];
     for (const d of order) {
-      const m = byDom.get(d); const kind = kindOf(m.state); kinds.set(d, kind); cnt[kind]++;
+      const m = byDom.get(d); let kind = kindOf(m.state);
+      if (m.ag_paused && kind !== 'busy') kind = 'paused';
+      kinds.set(d, kind); cnt[kind]++;
       const [emo, nm] = splitName(m.name);
       const ln = line(m, s);
       const b = root.querySelector(`.st[data-seat="${d}"]`);
       b.className = `st k-${kind}` + (hover === d ? ' hov' : '');
-      const sig = b.querySelector('.sig'); sig.textContent = kind === 'busy' ? '' : (kind === 'idle' ? '' : '!');
-      sig.hidden = kind === 'idle';
+      const sig = b.querySelector('.sig'); sig.textContent = kind === 'busy' ? '' : (kind === 'idle' || kind === 'paused' ? '' : '!');
+      sig.hidden = kind === 'idle' || kind === 'paused';
+      // 머리 위 말풍선(지금 하는 일·경과·보조 에이전트) · 책상 옆 대기 꼬리표 · 멈춤 표시
+      let bub = b.querySelector('.bub'); if (!bub) { bub = E('span', 'bub'); b.append(bub); }
+      bub.textContent = kind === 'busy' && m.ag_secs != null ? `${mmss(m.ag_secs)}${m.ag_subs ? ` · 🤖${m.ag_subs}` : ''}` : kind === 'paused' ? '⏸ 휴식' : '';
+      bub.hidden = !bub.textContent;
+      let qt = b.querySelector('.qtag'); if (!qt) { qt = E('span', 'qtag'); b.append(qt); }
+      qt.textContent = m.ag_queue ? `대기 ${m.ag_queue}` : ''; qt.hidden = !m.ag_queue;
       const tag = b.querySelector('.tag'); tag.textContent = ''; tag.append(E('span', 'full', short(nm)), E('span', 'mini', mini(nm)));
       b.setAttribute('aria-label', `${nm}, ${STATE_TXT[kind]}. ${ln.t}`);
       rows.push({ d, m, kind, emo, nm, ln });
@@ -412,7 +454,7 @@
       const sub = E('span', 'row-sub'); if (ln.k) sub.append(E('b', null, ln.k + ' ')); sub.append(document.createTextNode(ln.t));
       body.append(t1, sub);
       const right = E('span', 'row-right');
-      right.append(E('span', 'row-meta', nx.at ? `다음 ${day(nx.at, s.now)}` : (m.wake ? '이벤트로' : '')));
+      right.append(E('span', 'row-meta', (m.ag_queue ? `대기 ${m.ag_queue} · ` : '') + (nx.at ? `다음 ${day(nx.at, s.now)}` : (m.wake ? '이벤트로' : (m.ag_extra === 'task' ? '작업판' : m.ag_extra === 'other' ? '보기만' : '')))));
       if (m.cards) right.append(E('span', 'row-cards' + (m.urgent ? ' bad' : ''), `할 일 ${m.cards}`));
       row.append(E('span', 'avatar sm k-' + kind, emo), body, right);
       li.append(row); roster.append(li);
@@ -420,7 +462,12 @@
     const c = document.getElementById('office-count');
     if (c) {
       c.textContent = '';
-      for (const [k, lab] of [['busy', '일하는 중'], ['todo', '결재 대기'], ['blocked', '막힘'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
+      for (const [k, lab] of [['busy', '일하는 중'], ['todo', '결재 대기'], ['blocked', '막힘'], ['paused', '멈춤'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
+      const A = window.barunAgentsData;
+      if (A && A.counts) {
+        if (A.counts.subagents) c.append(E('span', 'badge', `보조 🤖 ${A.counts.subagents}`));
+        if (A.counts.queued) c.append(E('span', 'badge', `대기열 ${A.counts.queued}`));
+      }
     }
     paint(); renderDetail();
     if (pop && !pop.hidden && hover) { const a = root.querySelector(`.st[data-seat="${hover}"]`); if (a) showPop(hover, a); }
