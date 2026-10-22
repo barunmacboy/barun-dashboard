@@ -88,11 +88,12 @@ main.wrap { padding-bottom: 64px; }
 .alert[hidden] { display: none; }
 .stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 900px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 480px) { .stat { padding: 10px 12px; } .stat .v { font-size: 20px; } .hero h2 { font-size: 23px; } .card { padding: 20px 16px; } }
+@media (max-width: 420px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }   /* 휴대폰: 3칸이면 '11.3시간'·'10/22'가 잘림(2026-10-22) */
+@media (max-width: 480px) { .stat { padding: 10px 12px; } .stat .v { font-size: clamp(16px, 5.4vw, 20px); } .hero h2 { font-size: 23px; } .card { padding: 20px 16px; } }
 .stat { border: 0; text-align: left; background: var(--fill2); border-radius: var(--r-sm); padding: 12px 14px; cursor: pointer; min-width: 0; min-height: 76px; }
 .stat:hover { background: var(--hover); }
 .stat .k { color: var(--muted); font-size: 13px; font-weight: 500; }
-.stat .v { white-space: nowrap; font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.stat .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.3; }
 .stat .v small { font-size: 14px; font-weight: 600; margin-left: 1px; }
 .stat .d { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat.warn .v { color: var(--orange-ink); } .stat.bad .v { color: var(--red); } .stat.run .v { color: var(--blue); }
@@ -752,7 +753,8 @@ function render(s) {
     ['기술부채', im.debt_score ?? '-', '점', `열린 제안 ${im.open || 0} · 측정 ${im.applied || 0}`, im.debt_new ? 'warn' : '', 'work'],
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%${uw.five_hour ? ' · ' + uw.five_hour.resets + ' 채워짐' : ''}`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : ''), 'work'],
-    ['아낀 것', svA.secs ? durK(svA.secs) : '-', '', svA.secs || svA.cost ? `AI $${(svA.cost || 0).toFixed(2)} · 오늘 ${durK((sv.today || {}).secs || 0)}` : '효율화가 쌓이면 보여요', svA.secs ? 'ok' : '', 'work:sav-sec'],
+    // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
+    ['아낀 것', svA.secs ? (svA.secs >= 3600 ? Math.round(svA.secs / 360) / 10 : Math.round(svA.secs / 60)) : '-', svA.secs ? (svA.secs >= 3600 ? '시간' : '분') : '', svA.secs || svA.cost ? `AI $${(svA.cost || 0).toFixed(2)} · 오늘 ${durK((sv.today || {}).secs || 0)}` : '효율화가 쌓이면 보여요', svA.secs ? 'ok' : '', 'work:sav-sec'],
     ['최근 백업', s.backup.latest ? s.backup.latest.slice(5).replace('-', '/') : '없음', '', `보관 ${s.backup.count}일치`, s.backup.latest ? '' : 'bad', 'records'],
   ];
   const sg = $('stats'); sg.textContent = '';
