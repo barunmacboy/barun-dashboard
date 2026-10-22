@@ -1,0 +1,103 @@
+// 📮 보낸 문의 탭 — 배대지·구매처·쿠팡에 넣은 1:1 문의가 어디까지 왔나(2026-10-22 사장님: "여기저기 1:1 문의를 많이 넣는데 트래킹하는 화면").
+// 순서 = 할 일 순: 답 옴(확인 필요) → 기다림(오래된 것 먼저, 2일 주황·4일 빨강) → 최근 끝. 읽기: GET /api/asks(ops/asks.py), 상태 바꾸기: POST /api/action {action:'ask'}.
+// index.html을 고치지 않고 스스로 탭 버튼·패널을 붙인다(sourcing.js와 같은 방식).
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const LVL = { new: ['답 옴', 'run'], bad: ['4일+', 'bad'], warn: ['2일+', 'warn'], wait: ['기다림', ''], ok: ['끝', 'ok'] };
+  let timer = 0, busy = false;
+
+  function install() {
+    if ($('p-asks') || typeof TABS === 'undefined') return false;
+    const css = E('style'); css.textContent = `
+      .ak-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 2px; border-top: 1px solid var(--line); }
+      .ak-row:first-child { border-top: 0; }
+      .ak-site { flex: 0 0 auto; min-width: 74px; font-size: 12px; font-weight: 600; color: var(--sub); padding-top: 2px; word-break: keep-all; }
+      .ak-body { flex: 1; min-width: 0; } .ak-t { font-weight: 600; line-height: 1.4; }
+      .ak-m { font-size: 13px; color: var(--sub); margin-top: 3px; } .ak-a { font-size: 13px; margin-top: 6px; padding: 8px 10px; background: var(--fill2); border-radius: var(--r-sm); }
+      .ak-side { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+      .ak-age { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+      .ak-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      @media (max-width: 720px) { .ak-row { flex-wrap: wrap; } .ak-side { flex-direction: row; width: 100%; justify-content: space-between; } #ak-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
+    document.head.append(css);
+    const nav = document.querySelector('.tabs');
+    const btn = E('button', 'tab'); btn.type = 'button'; btn.append(document.createTextNode('📮 보낸 문의 '));
+    const n = E('span', 'n'); n.id = 'n-asks'; n.hidden = true; btn.append(n);
+    Object.assign(btn.dataset, { tab: 'asks' }); btn.setAttribute('role', 'tab'); btn.setAttribute('aria-controls', 'p-asks');
+    nav.insertBefore(btn, nav.querySelector('[data-tab="activity"]'));
+    const sec = E('section', 'panel'); sec.id = 'p-asks'; sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-label', '보낸 문의'); sec.hidden = true;
+    sec.innerHTML = `
+      <div class="card hero"><h2 id="ak-title">불러오는 중이에요</h2><p class="lead" id="ak-lead"></p><div class="stats" id="ak-stats"></div></div>
+      <div class="card"><div class="card-h"><h2>답이 왔어요 — 확인해 주세요</h2><span class="desc">읽고 다음 조치가 끝나면 [끝]을 눌러요.</span></div><div id="ak-new"></div></div>
+      <div class="card"><div class="card-h"><h2>답을 기다리는 중</h2><span class="desc">오래된 것부터 · 2일 넘으면 주황, 4일 넘으면 빨강 · 몰테일·메일 답은 자동으로 '답 옴'으로 바뀌어요</span></div><div id="ak-wait"></div></div>
+      <div class="card"><div class="card-h"><h2>최근 끝난 문의</h2><span class="desc">지난 14일</span></div><div id="ak-done"></div></div>`;
+    document.querySelector('main').append(sec);
+    TABS.splice(TABS.indexOf('activity'), 0, 'asks');
+    const orig = window.showTab;
+    window.showTab = function (name, push) { orig(name, push); if (name === 'asks') { load(); start(); } else stop(); };
+    btn.onclick = () => window.showTab('asks');
+    let want = location.hash.slice(1); try { want = want || localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
+    if (want === 'asks') window.showTab('asks', false);
+    load();   // 탭 숫자(답 옴)는 처음부터
+    setInterval(() => { if (!document.hidden && $('p-asks').hidden) load(); }, 120000);
+    return true;
+  }
+
+  const start = () => { stop(); timer = setInterval(() => { if (!document.hidden && !$('p-asks').hidden) load(); }, 30000); };
+  const stop = () => { if (timer) clearInterval(timer); timer = 0; };
+  const stat = (k, v, d, cls) => { const s = E('div', 'stat ' + (cls || '')); s.style.cursor = 'default'; s.append(E('div', 'k', k), E('div', 'v', v), E('div', 'd', d || '')); return s; };
+  const day = (iso) => !iso ? '' : String(iso).slice(5, 16).replace('T', ' ').replace('-', '/');
+  const ageTxt = (a) => a < 1 ? `${Math.round(a * 24)}시간` : `${Math.floor(a)}일 ${Math.round((a % 1) * 24)}시간`;
+
+  async function setState(id, state, b) {
+    b.disabled = true;
+    try {
+      const r = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'ask', key: id, state }) });
+      const j = await r.json(); if (window.toast) window.toast((j.ok ? '' : '⚠ ') + j.msg); load();
+    } catch (e) { b.disabled = false; }
+  }
+
+  function row(r) {
+    const d = E('div', 'ak-row');
+    const body = E('div', 'ak-body');
+    body.append(E('div', 'ak-t', r.title || r.no));
+    const meta = [`글 ${r.no}`, r.ref, `보냄 ${day(r.sent_at)}`, r.by].filter(Boolean).join(' · ');
+    body.append(E('div', 'ak-m', meta));
+    if (r.memo) body.append(E('div', 'ak-m', '📝 ' + r.memo));
+    if (r.answer) body.append(E('div', 'ak-a', (r.state === '기다림' ? '' : '💬 ') + r.answer));
+    const side = E('div', 'ak-side');
+    const [lab, cls] = LVL[r.level] || ['', ''];
+    const top = E('div'); top.append(E('span', 'badge ' + cls, lab), document.createTextNode(' '), E('span', 'ak-age', r.state === '끝' ? day(r.answered_at || r.updated) : ageTxt(r.age)));
+    side.append(top);
+    const bt = E('div', 'ak-btns');
+    if (r.url) { const a = E('a', 'btn sm ghost', '글 열기 ↗'); a.href = r.url; a.target = '_blank'; a.rel = 'noopener'; bt.append(a); }
+    if (r.state !== '끝') { const b = E('button', 'btn sm', '끝'); b.type = 'button'; b.title = '확인하고 다음 조치까지 끝났으면'; b.onclick = () => setState(r.id, '끝', b); bt.append(b); }
+    if (r.state === '답 옴') { const b = E('button', 'btn sm ghost', '다시 물었어요'); b.type = 'button'; b.onclick = () => setState(r.id, '기다림', b); bt.append(b); }
+    side.append(bt);
+    d.append(E('div', 'ak-site', r.site + (r.auto ? '' : ' ✋')), body, side);
+    if (!r.auto) d.querySelector('.ak-site').title = '답을 자동으로 못 읽는 곳 — 사람이나 에이전트가 확인해야 해요';
+    return d;
+  }
+  const fill = (id, list, emptyText) => { const c = $(id); c.innerHTML = ''; if (!list.length) c.append(E('div', 'muted small', emptyText)); for (const r of list) c.append(row(r)); };
+
+  function render(d) {
+    const nNew = d.answered.length, nWait = d.waiting.length, nOver = d.overdue.length;
+    const badge = $('n-asks'); badge.textContent = String(nNew); badge.hidden = !nNew;
+    $('ak-title').textContent = nNew ? `답 온 문의 ${nNew}건을 확인해 주세요` : nOver ? `2일 넘게 답이 없는 문의가 ${nOver}건이에요` : nWait ? `문의 ${nWait}건 답을 기다리고 있어요` : '열린 문의가 없어요';
+    $('ak-lead').textContent = `기다림 ${nWait}건 · 답 옴 ${nNew}건 · 최근 끝 ${d.done.length}건 — 답을 자동으로 확인하는 비율 ${d.auto_pct ?? '—'}% (✋ 표시는 직접 확인해야 하는 곳)`;
+    const st = $('ak-stats'); st.innerHTML = '';
+    st.append(stat('답 옴', String(nNew), '확인 필요', nNew ? 'run' : ''), stat('기다림', String(nWait), Object.entries(d.by_site).map(([k, v]) => v ? `${k} ${v}` : '').filter(Boolean).join(' · ')),
+      stat('2일 넘음', String(nOver), '재촉·다른 방법 검토', nOver ? 'warn' : 'ok'), stat('최근 끝', String(d.done.length), '지난 14일', ''));
+    fill('ak-new', d.answered, '답이 왔는데 확인 안 한 문의가 없어요');
+    fill('ak-wait', [...d.waiting].sort((a, b) => b.age - a.age), '기다리는 문의가 없어요');
+    fill('ak-done', d.done, '최근 끝난 문의가 없어요');
+  }
+
+  async function load() {
+    if (busy) return; busy = true;
+    try { const r = await (window.barunFetch || fetch)('/api/asks'); if (r.ok) render(await r.json()); }
+    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+  }
+
+  if (!install()) document.addEventListener('DOMContentLoaded', install);
+})();

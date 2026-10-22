@@ -57,7 +57,7 @@
         <div class="au-meter" id="au-meter" role="meter" aria-valuemin="0" aria-valuemax="100"><b></b><i></i></div>
         <div class="au-meter-l"><span>0%</span><span id="au-goal-l"></span></div>
         <div class="stats" id="au-stats" style="margin-top:14px"></div></div>
-      <div class="card"><div class="card-h"><h2>주문 흐름 14단계</h2><span class="desc">칸을 누르면 지금 방식·막힌 이유·다음 할 일이 보여요. 숫자 = 최근 7일 그 단계를 사람 손 없이 지난 주문 비율.</span></div>
+      <div class="card"><div class="card-h"><h2 id="au-flow-h">업무 흐름</h2><span class="desc">칸을 누르면 지금 방식·막힌 이유·다음 할 일이 보여요. 숫자 = 최근 7일 그 단계를 사람 손 없이 지난 주문 비율(보낸 문의는 답을 자동으로 확인하는 비율).</span></div>
         <div class="au-leg" id="au-leg"></div><div class="au-flow" id="au-flow" role="group" aria-label="주문 흐름 단계"></div>
         <div class="au-detail" id="au-detail" aria-live="polite"></div></div>
       <div class="grid2">
@@ -108,7 +108,7 @@
   function render(d) {
     data = d;
     const p = d.pct ?? 0, goal = d.goal;
-    const worst = d.stages.filter((s) => s.pct != null && s.orders).sort((a, b) => a.pct - b.pct || b.orders - a.orders)[0];
+    const worst = d.stages.filter((s) => s.pct != null && s.orders && s.applies !== 'asks').sort((a, b) => a.pct - b.pct || b.orders - a.orders)[0];
     $('au-title').textContent = `사람 손 안 탄 주문 ${pctTxt(d.pct)} — 목표 ${goal}%`;
     $('au-lead').textContent = `최근 ${d.days}일 주문 ${d.orders}건 중 ${d.done - d.touched}건이 처음부터 끝까지 자동이었어요.` +
       (worst ? ` 가장 큰 막힘은 '${worst.name}'(${worst.orders}건 중 자동 ${worst.auto}건)이에요.` : '');
@@ -124,6 +124,7 @@
       stat('지금 로드맵', `${d.now_phase}단계`, `${ph.title || ''} · ${ph.done || 0}/${ph.total || 0}`, 'run'));
     const leg = $('au-leg'); leg.innerHTML = '';
     LV.forEach(([nm, c], i) => { const s = E('span'); const dot = E('i'); dot.style.background = c; s.append(dot, document.createTextNode(`${i} ${nm}`)); leg.append(s); });
+    $('au-flow-h').textContent = `업무 흐름 ${d.stages.length}단계`;
     const fl = $('au-flow'); fl.innerHTML = '';
     if (!pick || !d.stages.some((s) => s.id === pick)) pick = (worst || d.stages[0]).id;
     for (const s of d.stages) {
