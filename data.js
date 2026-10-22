@@ -290,7 +290,7 @@
     const A = last.actions || [];
     if (A.includes('sheet_edit')) sheetActs(r, acts, out);
     if (A.includes('order_mark') && r.key) {
-      const h = select(['해외구매', '재고발송', '취소', '반품환불', '미정'], r.handling), m = inp('메모(예: 재고로 보냄 — 호주 12행)');
+      const h = select(['해외구매', '재고발송', '취소', '반품환불', '예외', '옛 주문', '미정'], r.handling), m = inp('메모(예: 재고로 보냄 — 호주 12행)');
       acts.append(form('처리 방식(장부)', E('p', 'muted small', '이 주문을 어떻게 처리했는지 남기면 감시가 다시 묻지 않아요.'), field('처리 방식', h), field('메모', m),
         btn('장부에 남기기', 'weak', (b) => doAct({ kind: 'order_mark', key: r.key, handling: h.value, memo: m.value.trim() }, b, out))));
     }
