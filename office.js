@@ -152,6 +152,7 @@
     if (look.glasses) { const k = '#2a2a33'; for (const gx of [3, 8]) { px(ox + gx, hy + 3, k, 3, 1); px(ox + gx, hy + 4, k, 1, 2); px(ox + gx + 2, hy + 4, k, 1, 2); px(ox + gx, hy + 6, k, 3, 1); } px(ox + 6, hy + 4, k, 2, 1); }   // 테 안경(눈은 보임)
     if (look.hat) { px(ox + 2, hy - 1, look.hat, 10, 2); px(ox + 1, hy + 1, shade(look.hat, 0.8), 12, 1); px(ox + 6, hy - 2, shade(look.hat, 1.1), 2, 1); }
     if (look.headset) { px(ox, hy + 3, '#2a2a33', 1, 4); px(ox + 13, hy + 3, '#2a2a33', 1, 4); px(ox + 1, hy, '#2a2a33', 12, 1); px(ox + 12, hy + 7, '#2a2a33', 1, 1); px(ox + 10, hy + 8, '#2a2a33', 2, 1); }
+    if (look.apron) { px(cx - 3, y + 10, '#fff4dc', 6, 3); px(cx - 4, y + 10, '#c98a2b', 1, 1); px(cx + 3, y + 10, '#c98a2b', 1, 1); px(cx - 1, y + 11, '#d64545', 2, 1); }   // 알바 앞치마(가슴 로고)
     if (look.tie) { px(cx - 1, y + 10, '#c0392b', 2, 3); px(cx - 2, y + 10, '#fff', 1, 1); px(cx + 1, y + 10, '#fff', 1, 1); }
     // 노트북(뒷면 — 책상 위, 얼굴은 가리지 않음). 일할 때 화면 빛이 위로
     px(cx - 5, y + 11, P.lid2, 10, 3); px(cx - 4, y + 12, P.lid, 8, 2); px(cx - 1, y + 12, '#fff', 2, 1);
@@ -375,32 +376,39 @@
     root.onkeydown = (e) => { if (e.key === 'Escape') hidePop(); };
   }
 
-  // 2026-10-22 사장님: "지금 어떤 에이전트가 어떤 일을 하고 다음 대기열은 무엇인지 사무실 그림에도" — /api/agents(core/agents.py, dashboard/agents.js가 읽어 window.barunAgentsData)
-  // 직원: 그 분야 회차가 돌면 '지금'·경과·보조 에이전트, 대기열 수, 멈춤. 작업판 일꾼·사람이 연 세션은 아래 '임시 책상' 줄에.
-  const AG_LOOK = { task: { hair: '#2b2118', shirt: '#6b5bd6', prop: 'flag' }, other: { hair: '#555', shirt: '#9aa3ad', prop: 'cup' } };
+  // 2026-10-22 15:33 사장님: "디스코드를 통해 만들어진 에이전트 작업 현황만 … 왜 무엇을 어떻게 몇분째 … 시각화 그림에도 포함, 원래의 에이전트가 아닌 애들은 알바처럼".
+  // 자료: 홈 '💬 디스코드에서 맡긴 일'과 같은 /api/tasks(dashboard/tasks.js가 window.barunTasksData로 넘김).
+  //   가장 오래 도는 일 = 팀장(지휘) 자리 말풍선 · 그 일이 분야 직원에게 맡긴 보조 에이전트 = 그 직원 자리 말풍선
+  //   직원이 아닌 도우미(조사·탐색 등)와 동시에 도는 다른 지휘 일꾼 = 아래 줄 '알바' 자리(모자·앞치마) — 일이 끝나면 자리가 빔
+  const AG_LOOK = { alba: { hair: '#4a3426', shirt: '#e9a23b', hat: '#d64545', apron: true, prop: 'cup' } };
   const mmss = (s) => s == null ? '' : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분` : s >= 60 ? `${Math.floor(s / 60)}분` : `${s}초`;
   let raw = null;
   function withAgents(s) {
-    const A = window.barunAgentsData; if (!A) return s;
+    const D = window.barunTasksData; if (!D) return s;
+    const run = (D.tasks || []).filter((t) => t.state === 'run').sort((a, b) => (b.secs || 0) - (a.secs || 0));
+    const queued = (D.tasks || []).filter((t) => t.state === 'queued').length;
+    const busy = new Map();         // 직원 domain → {task, what}
+    const alba = [];
+    run.forEach((t, i) => {
+      if (i === 0) busy.set('commander', { t, what: t.doing || '' });
+      else alba.push({ t, what: t.doing || '', role: '지휘 일꾼' });
+      for (const a of t.subagents || []) {
+        if (a.staff && SPOT[a.type] && !busy.has(a.type)) busy.set(a.type, { t, what: a.what || '' });
+        else alba.push({ t, what: a.what || '', role: a.staff ? a.who : (a.type || '도우미') });
+      }
+    });
     const team = (s.team || []).map((m) => {
-      const mine = A.staff.filter((x) => x.domain === m.domain);
-      const run = mine.filter((x) => x.state === 'running');
-      const q = mine.reduce((n, x) => n + x.waiting.length, 0) + (m.domain === 'commander' ? A.tasks.filter((t) => t.state === 'queued').length : 0);
-      const tk = m.domain === 'commander' ? A.tasks.filter((t) => t.state === 'running') : [];
-      const subs = [...run, ...tk].reduce((n, x) => n + (x.subagents || []).length, 0);
-      const out = { ...m, ag_queue: q, ag_subs: subs, ag_paused: mine.length > 0 && mine.every((x) => x.paused) };
-      if (run.length) { const r = run[0]; out.state = '🟢 ' + (m.state || '').replace(/^\S+\s*/, ''); out.now = `${r.name} · ${mmss(r.secs)}째${r.doing ? ' — ' + r.doing : ''}`; out.ag_secs = r.secs; }
-      else if (tk.length) { out.state = '🟢 작업판'; out.now = `💬 ${tk.map((t) => clip(t.title, 24)).join(' · ')}`; out.ag_secs = tk[0].secs; }
+      const b = busy.get(m.domain);
+      const out = { ...m, ag_queue: m.domain === 'commander' ? queued : 0 };
+      if (b) {
+        out.state = '🟢 ' + (m.state || '').replace(/^\S+\s*/, '');
+        out.now = `💬 ${clip(b.t.title, 30)} · ${mmss(b.t.secs)}째${b.what ? ' — ' + b.what : ''}`;
+        out.ag_secs = b.t.secs; out.ag_title = b.t.title; out.ag_subs = m.domain === 'commander' ? (b.t.subagents || []).length : 0;
+      }
       return out;
     });
-    let i = 0;
-    for (const t of A.tasks.filter((t) => t.state === 'running')) {      // 작업판 일꾼 — 지휘 에이전트 밑에서 도는 별도 claude
-      team.push({ domain: `task:${t.id}`, name: '🧑‍💻 작업판 일꾼', role: clip(t.title, 30), state: '🟢 ' + (t.stage || ''), now: `${clip(t.title, 40)} · ${t.stage} ${mmss(t.secs)}째${t.doing ? ' — ' + t.doing : ''}`,
-        ag_subs: (t.subagents || []).length, ag_secs: t.secs, ag_extra: 'task', ag_link: t.url, last: {}, next: {} });
-      if (++i >= 5) break;
-    }
-    // 사람이 직접 연 Claude Code·Codex 세션은 넣지 않는다(작업 기록이 없어 '최근 기록 없음'만 보임 — 2026-10-22 사장님).
-    // 디스코드에서 맡긴 일의 진행은 홈 '💬 디스코드에서 맡긴 일' 카드(tasks.js)에서.
+    alba.slice(0, 8).forEach((x, i) => team.push({ domain: `alba:${i}`, name: '🧢 알바', role: `${x.role} — ${clip(x.t.title, 24)}`, state: '🟢 알바',
+      now: `💬 ${clip(x.t.title, 30)} · ${mmss(x.t.secs)}째${x.what ? ' — ' + x.what : ''}`, ag_secs: x.t.secs, ag_title: x.t.title, ag_extra: 'alba', last: {}, next: {} }));
     return { ...s, team };
   }
   window.barunOfficeAgents = () => { if (raw) render(raw); };
@@ -432,7 +440,7 @@
       sig.hidden = kind === 'idle' || kind === 'paused';
       // 머리 위 말풍선(지금 하는 일·경과·보조 에이전트) · 책상 옆 대기 꼬리표 · 멈춤 표시
       let bub = b.querySelector('.bub'); if (!bub) { bub = E('span', 'bub'); b.append(bub); }
-      bub.textContent = kind === 'busy' && m.ag_secs != null ? `${mmss(m.ag_secs)}${m.ag_subs ? ` · 🤖${m.ag_subs}` : ''}` : kind === 'paused' ? '⏸ 휴식' : '';
+      bub.textContent = kind === 'busy' && m.ag_secs != null ? `${clip(m.ag_title, 9)} · ${mmss(m.ag_secs)}` : '';   // 디스코드 일 제목 짧게 · 몇 분째
       bub.hidden = !bub.textContent;
       let qt = b.querySelector('.qtag'); if (!qt) { qt = E('span', 'qtag'); b.append(qt); }
       qt.textContent = m.ag_queue ? `대기 ${m.ag_queue}` : ''; qt.hidden = !m.ag_queue;
@@ -452,7 +460,7 @@
       const sub = E('span', 'row-sub'); if (ln.k) sub.append(E('b', null, ln.k + ' ')); sub.append(document.createTextNode(ln.t));
       body.append(t1, sub);
       const right = E('span', 'row-right');
-      right.append(E('span', 'row-meta', (m.ag_queue ? `대기 ${m.ag_queue} · ` : '') + (nx.at ? `다음 ${day(nx.at, s.now)}` : (m.wake ? '이벤트로' : (m.ag_extra === 'task' ? '작업판' : m.ag_extra === 'other' ? '보기만' : '')))));
+      right.append(E('span', 'row-meta', (m.ag_queue ? `대기 ${m.ag_queue} · ` : '') + (nx.at ? `다음 ${day(nx.at, s.now)}` : (m.wake ? '이벤트로' : (m.ag_extra === 'alba' ? `알바 · ${mmss(m.ag_secs)}째` : '')))));
       if (m.cards) right.append(E('span', 'row-cards' + (m.urgent ? ' bad' : ''), `할 일 ${m.cards}`));
       row.append(E('span', 'avatar sm k-' + kind, emo), body, right);
       li.append(row); roster.append(li);
@@ -461,11 +469,8 @@
     if (c) {
       c.textContent = '';
       for (const [k, lab] of [['busy', '일하는 중'], ['todo', '결재 대기'], ['blocked', '막힘'], ['paused', '멈춤'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
-      const A = window.barunAgentsData;
-      if (A && A.counts) {
-        if (A.counts.subagents) c.append(E('span', 'badge', `보조 🤖 ${A.counts.subagents}`));
-        if (A.counts.queued) c.append(E('span', 'badge', `대기열 ${A.counts.queued}`));
-      }
+      const D = window.barunTasksData;
+      if (D && D.counts && D.counts.run) c.append(E('span', 'badge run', `디스코드 일 ${D.counts.run}`));
     }
     paint(); renderDetail();
     if (pop && !pop.hidden && hover) { const a = root.querySelector(`.st[data-seat="${hover}"]`); if (a) showPop(hover, a); }

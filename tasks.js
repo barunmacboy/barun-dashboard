@@ -20,7 +20,11 @@
       .tk-s { font-size: 14px; color: var(--sub); margin-top: 4px; overflow-wrap: anywhere; }
       .tk-steps { margin: 8px 0 0; padding: 8px 12px; background: var(--fill2); border-radius: var(--r-sm); font-size: 13px; color: var(--sub); }
       .tk-steps div + div { margin-top: 3px; } .tk-steps .now { color: var(--blue-ink); font-weight: 600; }
-      .tk-more { margin-top: 8px; }`;
+      .tk-more { margin-top: 8px; }
+      .tk-min { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--blue-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .tk-kv { display: grid; grid-template-columns: 44px 1fr; gap: 3px 8px; margin: 6px 0 0; font-size: 14px; }
+      .tk-kv dt { color: var(--muted); } .tk-kv dd { margin: 0; color: var(--sub); overflow-wrap: anywhere; }
+      .tk-stop { margin-top: 6px; }`;
     document.head.append(css);
     const sec = E('div', 'card'); sec.id = 'tk-sec';
     sec.innerHTML = `<div class="card-h"><h2>💬 디스코드에서 맡긴 일</h2><span class="act" id="tk-count"></span>
@@ -33,36 +37,59 @@
       window.showTab.__tk = true;
     }
     load();
-    timer = setInterval(() => { if (!document.hidden && !$('p-home').hidden) load(); }, 10000);
+    timer = setInterval(() => { if (!document.hidden) load(); }, 10000);   // 그림·홈 둘 다 쓰므로 탭과 관계없이
     return true;
   }
 
+  // 2026-10-22 15:33 사장님: "왜 무엇을 어떻게 몇분째 하고있는지만 나오면 됨" — 줄마다 그 네 가지만.
+  const DOM = { orders: '📦 주문·발송', mail: '✉️ 메일·송장', pricing: '💰 가격·위너', inquiry: '💬 고객문의', close: '📊 마감·분석', improve: '🛠 개선', infra: '⚙️ 인프라', sourcing: '🔎 소싱·원가' };
+  function how(t) {
+    if (t.state === 'run') {
+      const subs = (t.subagents || []).map((s) => (s.staff ? s.who : `🧢 알바(${s.type || '도우미'})`) + (s.what ? ` — ${s.what}` : ''));
+      return subs.length ? `🧭 지휘 → ${subs.join(' · ')}` : `🧭 지휘 에이전트가 직접${t.stage === '실행' ? ' 처리' : ' 조사'}`;
+    }
+    return (t.domains || []).length ? `🧭 지휘 → ${t.domains.map((d) => DOM[d] || d).join(' · ')}` : '';
+  }
+  function what(t) {
+    if (t.state === 'run') return t.doing || (t.steps || []).slice(-1)[0] || '막 시작했어요';
+    if (t.state === 'wait') return t.summary ? `계획을 올리고 승인·답을 기다려요 — ${t.summary}` : '승인·답을 기다려요';
+    if (t.state === 'queued') return '앞선 일이 끝나면 바로 시작해요(동시에 4개까지)';
+    return t.summary || '';
+  }
   function row(t) {
     const r = E('div', 'tk-row');
     const top = E('div', 'tk-t');
     const [lab, cls] = ST[t.state] || [t.state, ''];
     top.append(E('span', 'badge ' + cls, lab));
-    if (t.url) { const a = E('a', null, t.title || '(제목 없음)'); a.href = t.url; a.target = '_blank'; a.rel = 'noopener'; top.append(a); }
+    if (t.url) { const a = E('a', null, t.title || '(제목 없음)'); a.href = t.url; a.target = '_blank'; a.rel = 'noopener'; a.title = '디스코드 스레드 열기'; top.append(a); }
     else top.append(E('span', null, t.title || '(제목 없음)'));
+    const min = t.state === 'run' ? `${dur(t.secs)}째` : t.state === 'wait' ? `${dur(t.secs)}째 기다림` : t.state === 'queued' ? `${dur(t.secs)}째 대기` : hm(t.last);
+    top.append(E('span', 'tk-min', min));
     r.append(top);
-    const meta = [t.by, t.kind, t.stage ? `${t.stage} 단계` : '', t.domains && t.domains.length ? t.domains.join('·') : '',
-      t.state === 'run' ? `${dur(t.secs)}째` : t.state === 'wait' ? `${dur(t.secs)}째 기다림` : t.state === 'queued' ? `${dur(t.secs)}째 대기` : hm(t.last),
-      t.turns > 1 ? `주고받기 ${t.turns}번` : ''].filter(Boolean);
-    r.append(E('div', 'tk-m', meta.join(' · ')));
+    const kv = E('dl', 'tk-kv');
+    const add = (k, v) => { if (!v) return; kv.append(E('dt', null, k), E('dd', null, v)); };
+    add('왜', `${t.by || '사장님'} 요청 · ${t.kind || '디스코드'}${t.stage ? ` · ${t.stage} 단계` : ''}`);
+    add('무엇', what(t));
+    add('어떻게', how(t));
+    r.append(kv);
     if (t.state === 'run') {
-      const box = E('div', 'tk-steps');
-      for (const s of t.steps || []) box.append(E('div', null, s));
-      if (t.doing) box.append(E('div', 'now', '지금: ' + t.doing));
-      for (const s of t.subagents || []) box.append(E('div', null, `↳ ${s.who}${s.what ? ' — ' + s.what : ''} 일하는 중`));
-      if (!box.childNodes.length) box.append(E('div', null, '막 시작했어요'));
-      r.append(box);
-    } else if (t.summary) {
-      r.append(E('div', 'tk-s', (t.state === 'wait' ? '마지막 답: ' : '') + t.summary));
+      const b = E('button', 'btn sm ghost tk-stop', '■ 중지'); b.type = 'button';
+      b.onclick = async () => {
+        if (!confirm(`'${t.title}' 작업을 멈출까요?`)) return;
+        b.disabled = true;
+        try {
+          const res = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'task_stop', key: t.id }) });
+          const j = await res.json(); if (window.toast) window.toast((j.ok ? '' : '⚠ ') + j.msg);
+        } catch (e) { /* 토큰 창 */ } finally { load(); }
+      };
+      r.append(b);
     }
     return r;
   }
 
   function render(d) {
+    window.barunTasksData = d;                               // 사무실 그림(office.js)이 같은 자료로 말풍선·알바 자리를 그림
+    if (window.barunOfficeAgents) window.barunOfficeAgents();
     const c = d.counts || {};
     const cnt = $('tk-count'); cnt.innerHTML = '';
     for (const [k, n] of [['run', c.run], ['wait', c.wait], ['queued', c.queued], ['done', c.done]]) {
