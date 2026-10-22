@@ -1,6 +1,6 @@
-// 📮 보낸 문의 탭 — 배대지·구매처·쿠팡에 넣은 1:1 문의가 어디까지 왔나(2026-10-22 사장님: "여기저기 1:1 문의를 많이 넣는데 트래킹하는 화면").
+// 📮 보낸 문의 화면 — 배대지·구매처·쿠팡에 넣은 1:1 문의가 어디까지 왔나(2026-10-22 사장님: "여기저기 1:1 문의를 많이 넣는데 트래킹하는 화면").
 // 순서 = 할 일 순: 답 옴(확인 필요) → 기다림(오래된 것 먼저, 2일 주황·4일 빨강) → 최근 끝. 읽기: GET /api/asks(ops/asks.py), 상태 바꾸기: POST /api/action {action:'ask'}.
-// index.html을 고치지 않고 스스로 탭 버튼·패널을 붙인다(sourcing.js와 같은 방식).
+// 자리: index.html에 미리 있는 화면(#p-…)을 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
   const $ = (id) => document.getElementById(id);
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -8,7 +8,7 @@
   let timer = 0, busy = false;
 
   function install() {
-    if ($('p-asks') || typeof TABS === 'undefined') return false;
+    const sec = $('p-asks'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
     const css = E('style'); css.textContent = `
       .ak-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 2px; border-top: 1px solid var(--line); }
       .ak-row:first-child { border-top: 0; }
@@ -20,24 +20,13 @@
       .ak-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
       @media (max-width: 720px) { .ak-row { flex-wrap: wrap; } .ak-side { flex-direction: row; width: 100%; justify-content: space-between; } #ak-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
     document.head.append(css);
-    const nav = document.querySelector('.tabs');
-    const btn = E('button', 'tab'); btn.type = 'button'; btn.append(document.createTextNode('📮 보낸 문의 '));
-    const n = E('span', 'n'); n.id = 'n-asks'; n.hidden = true; btn.append(n);
-    Object.assign(btn.dataset, { tab: 'asks' }); btn.setAttribute('role', 'tab'); btn.setAttribute('aria-controls', 'p-asks');
-    nav.insertBefore(btn, nav.querySelector('[data-tab="activity"]'));
-    const sec = E('section', 'panel'); sec.id = 'p-asks'; sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-label', '보낸 문의'); sec.hidden = true;
     sec.innerHTML = `
       <div class="card hero"><h2 id="ak-title">불러오는 중이에요</h2><p class="lead" id="ak-lead"></p><div class="stats" id="ak-stats"></div></div>
       <div class="card"><div class="card-h"><h2>답이 왔어요 — 확인해 주세요</h2><span class="desc">읽고 다음 조치가 끝나면 [끝]을 눌러요.</span></div><div id="ak-new"></div></div>
       <div class="card"><div class="card-h"><h2>답을 기다리는 중</h2><span class="desc">오래된 것부터 · 2일 넘으면 주황, 4일 넘으면 빨강 · 몰테일·메일 답은 자동으로 '답 옴'으로 바뀌어요</span></div><div id="ak-wait"></div></div>
       <div class="card"><div class="card-h"><h2>최근 끝난 문의</h2><span class="desc">지난 14일</span></div><div id="ak-done"></div></div>`;
-    document.querySelector('main').append(sec);
-    TABS.splice(TABS.indexOf('activity'), 0, 'asks');
-    const orig = window.showTab;
-    window.showTab = function (name, push) { orig(name, push); if (name === 'asks') { load(); start(); } else stop(); };
-    btn.onclick = () => window.showTab('asks');
-    let want = location.hash.slice(1); try { want = want || localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
-    if (want === 'asks') window.showTab('asks', false);
+    document.addEventListener('barun:page', (e) => { if (e.detail === 'asks') { load(); start(); } else stop(); });
+    if (!sec.hidden) start();
     load();   // 탭 숫자(답 옴)는 처음부터
     setInterval(() => { if (!document.hidden && $('p-asks').hidden) load(); }, 120000);
     return true;
@@ -82,7 +71,7 @@
 
   function render(d) {
     const nNew = d.answered.length, nWait = d.waiting.length, nOver = d.overdue.length;
-    const badge = $('n-asks'); badge.textContent = String(nNew); badge.hidden = !nNew;
+    if (window.barunBadge) window.barunBadge('asks', nNew);   // 메뉴 숫자(답 옴)
     $('ak-title').textContent = nNew ? `답 온 문의 ${nNew}건을 확인해 주세요` : nOver ? `2일 넘게 답이 없는 문의가 ${nOver}건이에요` : nWait ? `문의 ${nWait}건 답을 기다리고 있어요` : '열린 문의가 없어요';
     $('ak-lead').textContent = `기다림 ${nWait}건 · 답 옴 ${nNew}건 · 최근 끝 ${d.done.length}건 — 답을 자동으로 확인하는 비율 ${d.auto_pct ?? '—'}% (✋ 표시는 직접 확인해야 하는 곳)`;
     const st = $('ak-stats'); st.innerHTML = '';

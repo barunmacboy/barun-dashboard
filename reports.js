@@ -1,4 +1,4 @@
-// 📑 시트 보고서 — 구글 시트에만 있던 보고 탭(전체현황·매출분석·판매점검·메일정리·설정)을 현황판 '기록' 탭에서 (2026-10-22 사장님: 시트를 안 써도 될 만큼).
+// 📑 시트 보고서 — 구글 시트에만 있던 보고 탭(전체현황·매출분석·판매점검·메일정리·설정)을 현황판 '보고서' 화면에서 (2026-10-22 사장님: 시트를 안 써도 될 만큼).
 // 자료: GET /api/db/grid?tab= (dashboard/dbview.py — 주문 장부 원본 barun.db 격자, ops/gridstore.py). 보고 탭은 각 회차가 다시 쓰고, 여기서는 보기만.
 // 설정 탭만 노란 칸(직접환율·탭 기본통화·배대지센터·고정비)을 고칠 수 있다 → POST /api/action {action:"db", kind:"settings_set"} → ops/orderedit.settings.
 // 그리기: 빈 줄로 나뉜 덩어리마다 — 첫 칸만 있는 줄은 소제목, 그 다음 줄은 머리글, 나머지는 표(덩어리 안에서 늘 빈 열은 뺌).
@@ -181,7 +181,7 @@
   }
 
   function build() {
-    const panel = document.getElementById('p-records'); if (!panel || card()) return;
+    const panel = document.getElementById('p-reports'); if (!panel || card()) return;
     const c = E('div', 'card'); c.id = 'rep-card';
     const h = E('div', 'card-h'); h.append(E('h2', null, '시트 보고서'), E('span', 'desc rep-desc', ''));
     c.append(h, E('div', 'rep-tabs'), Object.assign(E('div', 'rep-bar'), { hidden: true }), E('div', 'rep-body'));
@@ -189,8 +189,8 @@
   }
 
   window.barunReports = () => { build(); load(); };
-  const pr = document.getElementById('p-records');
-  if (pr) {      // 기록 탭이 '숨김 → 보임'으로 바뀔 때만 새로 읽음(같은 값을 다시 써도 바뀜 신호가 와서, 고치던 칸·도움말이 지워지던 것)
+  const pr = document.getElementById('p-reports');
+  if (pr) {      // 보고서 화면이 '숨김 → 보임'으로 바뀔 때만 새로 읽음(같은 값을 다시 써도 바뀜 신호가 와서, 고치던 칸·도움말이 지워지던 것)
     build(); let shown = !pr.hidden;
     new MutationObserver(() => { const now = !pr.hidden; if (now && !shown) load(); shown = now; }).observe(pr, { attributes: true, attributeFilter: ['hidden'] });
     if (shown) load();

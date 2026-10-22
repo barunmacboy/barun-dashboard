@@ -1,5 +1,5 @@
 // 💬 디스코드에서 맡긴 일 — #작업판·#할-일 카드 답글·DM으로 시작된 일의 지금 상태와 진행(2026-10-22 사장님:
-// "디스코드 현황판에서 시작된 것들의 현황과 진행상황이 나와야지"). 자리: 홈 맨 위 카드 바로 아래.
+// "디스코드 현황판에서 시작된 것들의 현황과 진행상황이 나와야지"). 자리: '맡긴 일' 화면(#p-tasks) — 한눈에는 같은 자료로 요약(barun:tasks 이벤트).
 // 읽기: GET /api/tasks(dashboard/taskview.py) — 홈이 보일 때 10초마다. 일하는 중이면 최근 움직임·도는 보조 에이전트까지.
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -10,7 +10,7 @@
   let timer = 0, busy = false, showDone = false;
 
   function install() {
-    if ($('tk-sec') || !$('p-home')) return false;
+    const page = $('p-tasks'); if ($('tk-sec') || !page) return !!$('tk-sec');
     const css = E('style'); css.textContent = `
       .tk-row { padding: 12px 2px; border-top: 1px solid var(--line); }
       .tk-row:first-child { border-top: 0; }
@@ -28,15 +28,10 @@
       .tk-stop { margin-top: 6px; }`;
     document.head.append(css);
     const sec = E('div', 'card'); sec.id = 'tk-sec';
-    sec.innerHTML = `<div class="card-h"><h2>💬 디스코드에서 맡긴 일</h2><span class="act" id="tk-count"></span>
+    sec.innerHTML = `<div class="card-h"><h2>디스코드에서 맡긴 일</h2><span class="act" id="tk-count"></span>
       <span class="desc">#작업판·카드 답글·DM으로 시작된 일이에요. 줄을 누르면 디스코드 스레드가 열려요.</span></div><div id="tk-list"></div>`;
-    const hero = document.querySelector('#p-home .hero');
-    if (hero && hero.nextSibling) hero.parentNode.insertBefore(sec, hero.nextSibling); else $('p-home').prepend(sec);
-    const orig = window.showTab;
-    if (orig && !orig.__tk) {
-      window.showTab = function (name, push) { orig(name, push); if (name === 'home') load(); };
-      window.showTab.__tk = true;
-    }
+    page.append(sec);
+    document.addEventListener('barun:page', (e) => { if (e.detail === 'home' || e.detail === 'tasks') load(); });
     load();
     timer = setInterval(() => { if (!document.hidden) load(); }, 10000);   // 그림·홈 둘 다 쓰므로 탭과 관계없이
     return true;
@@ -101,6 +96,7 @@
   function render(d) {
     window.barunTasksData = d;                               // 사무실 그림(office.js)이 같은 자료로 말풍선·알바 자리를 그림
     if (window.barunOfficeAgents) window.barunOfficeAgents();
+    document.dispatchEvent(new CustomEvent('barun:tasks', { detail: d }));   // 한눈에 '맡긴 일' 요약(index.html)
     const c = d.counts || {};
     const cnt = $('tk-count'); cnt.innerHTML = '';
     for (const [k, n] of [['run', c.run], ['wait', c.wait], ['queued', c.queued], ['done', c.done]]) {

@@ -1,6 +1,6 @@
-// 🔎 소싱 탭 — 소싱 장부 진행을 실시간으로(2026-10-21 사장님: "소싱 작업 현황도 실시간으로 현황판과 디스코드에서 볼 수 있게").
-// 읽기: GET /api/sourcing (dashboard/sourcing.py, 읽기 전용) — 탭이 보일 때 15초마다 다시 읽음. 줄 상태 바꾸기는 데이터 탭(소싱 장부)에서.
-// index.html을 고치지 않고 스스로 탭 버튼·패널을 붙인다(TABS·showTab은 index.html의 전역).
+// 🔎 소싱 화면 — 소싱 장부 진행을 실시간으로(2026-10-21 사장님: "소싱 작업 현황도 실시간으로 현황판과 디스코드에서 볼 수 있게").
+// 읽기: GET /api/sourcing (dashboard/sourcing.py, 읽기 전용) — 탭이 보일 때 15초마다 다시 읽음. 줄 상태 바꾸기는 주문 데이터 화면(소싱 장부)에서.
+// 자리: index.html에 미리 있는 #p-sourcing을 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
   const $ = (id) => document.getElementById(id);
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -12,7 +12,7 @@
   let timer = 0, busy = false;
 
   function install() {
-    if ($('p-sourcing') || typeof TABS === 'undefined') return false;
+    const sec = $('p-sourcing'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
     const css = E('style'); css.textContent = `
       .sc-bar { display: flex; height: 28px; border-radius: 8px; overflow: hidden; gap: 2px; background: var(--card); margin: 4px 0 8px; }
       .sc-bar > span { display: block; min-width: 3px; }
@@ -28,12 +28,6 @@
       .sc-steps div + div { margin-top: 4px; }
       @media (max-width: 720px) { #sc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
     document.head.append(css);
-    const nav = document.querySelector('.tabs');
-    const btn = E('button', 'tab', '소싱'); btn.type = 'button';
-    Object.assign(btn.dataset, { tab: 'sourcing' }); btn.setAttribute('role', 'tab'); btn.setAttribute('aria-controls', 'p-sourcing');
-    btn.onclick = () => showTab('sourcing');
-    nav.append(btn);
-    const sec = E('section', 'panel'); sec.id = 'p-sourcing'; sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-label', '소싱'); sec.hidden = true;
     sec.innerHTML = `
       <div class="card hero"><h2 id="sc-title">불러오는 중이에요</h2><p class="lead" id="sc-lead"></p><div class="stats" id="sc-stats"></div></div>
       <div class="card"><div class="card-h"><h2>장부 400줄 어디까지 왔나</h2><span class="desc">줄마다 상태 하나 — 후보·정밀확인은 아직 열린 줄, 나머지는 닫힌 줄이에요.</span></div>
@@ -46,15 +40,11 @@
         <div class="card"><div class="card-h"><h2>등록 준비</h2><span class="act" id="sc-ap"></span></div><ul class="list" id="sc-ready"></ul></div>
         <div class="card"><div class="card-h"><h2>외부 대기</h2><span class="desc">답·조건을 기다리는 줄</span></div><ul class="list" id="sc-wait"></ul></div>
       </div>
-      <div class="card"><div class="card-h"><h2>방금 바뀐 줄</h2><span class="desc">15초마다 새로 읽어요 · 줄 상태를 바꾸려면 데이터 탭 → 소싱 장부</span></div><ul class="list sc-feed" id="sc-feed"></ul></div>
+      <div class="card"><div class="card-h"><h2>방금 바뀐 줄</h2><span class="desc">15초마다 새로 읽어요 · 줄 상태를 바꾸려면 주문 데이터 → 소싱 장부</span></div><ul class="list sc-feed" id="sc-feed"></ul></div>
       <div class="card"><div class="card-h"><h2>다음 차례 10줄</h2></div><ul class="list" id="sc-next"></ul></div>`;
-    document.querySelector('main').append(sec);
-    TABS.push('sourcing');
-    const orig = window.showTab;
-    window.showTab = function (name, push) { orig(name, push); if (name === 'sourcing') { load(); start(); } else stop(); };
-    btn.onclick = () => window.showTab('sourcing');
-    let want = location.hash.slice(1); try { want = want || localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
-    if (want === 'sourcing') window.showTab('sourcing', false);
+    // 보임·숨김은 index.html이 'barun:page'로 알려 줌(2026-10-22 리뉴얼 — 탭 덧붙이기·showTab 덮어쓰기 없앰)
+    document.addEventListener('barun:page', (e) => { if (e.detail === 'sourcing') { load(); start(); } else stop(); });
+    if (!sec.hidden) { load(); start(); }
     return true;
   }
 

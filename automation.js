@@ -1,6 +1,6 @@
-// 🚀 자동화 탭 — 완전 자동화 목표(사람 손 2% 미만)까지 어디쯤인지: 큰 숫자 → 흐름 띠(단계별 수준) → 단계 자세히 → 추이 → 로드맵·다음 할 일 → 새로 찾은 여지
+// 🚀 자동화율 화면 — 완전 자동화 목표(사람 손 2% 미만)까지 어디쯤인지: 큰 숫자 → 흐름 띠(단계별 수준) → 단계 자세히 → 추이 → 로드맵·다음 할 일 → 새로 찾은 여지
 // (2026-10-22 사장님: "파이프라인을 작업 단위로 쪼개 자동화 단계와 전체 자동화율을 한눈에"). 읽기: GET /api/automation(autoimprove/pipeline.py).
-// 원본은 config/pipeline.toml — 화면은 보여 주기만. index.html을 고치지 않고 스스로 탭 버튼·패널을 붙인다(sourcing.js와 같은 방식).
+// 원본은 config/pipeline.toml — 화면은 보여 주기만. 자리: index.html에 미리 있는 화면(#p-…)을 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
   const $ = (id) => document.getElementById(id);
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -10,7 +10,7 @@
   let timer = 0, busy = false, data = null, pick = null;
 
   function install() {
-    if ($('p-auto') || typeof TABS === 'undefined') return false;
+    const sec = $('p-auto'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
     const css = E('style'); css.textContent = `
       .au-meter { position: relative; height: 14px; border-radius: 7px; background: var(--fill); margin: 14px 0 6px; overflow: visible; }
       .au-meter > b { display: block; height: 100%; border-radius: 7px; background: var(--st-run); transition: width .4s; }
@@ -47,11 +47,6 @@
       @media (max-width: 900px) { .au-phases { grid-template-columns: 1fr; } }
       @media (max-width: 720px) { #au-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
     document.head.append(css);
-    const nav = document.querySelector('.tabs');
-    const btn = E('button', 'tab', '🚀 자동화'); btn.type = 'button';
-    Object.assign(btn.dataset, { tab: 'auto' }); btn.setAttribute('role', 'tab'); btn.setAttribute('aria-controls', 'p-auto');
-    nav.insertBefore(btn, nav.querySelector('[data-tab="work"]'));
-    const sec = E('section', 'panel'); sec.id = 'p-auto'; sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-label', '자동화'); sec.hidden = true;
     sec.innerHTML = `
       <div class="card hero"><h2 id="au-title">불러오는 중이에요</h2><p class="lead" id="au-lead"></p>
         <div class="au-meter" id="au-meter" role="meter" aria-valuemin="0" aria-valuemax="100"><b></b><i></i></div>
@@ -69,13 +64,8 @@
         <div class="card"><div class="card-h"><h2>사람 카드가 나온 곳</h2><span class="desc">최근 7일 #할-일 카드 — 많은 곳부터 줄여요</span></div><ul class="list" id="au-cards"></ul></div>
         <div class="card"><div class="card-h"><h2>새로 찾은 자동화 여지</h2><span class="desc">회차 점검·에이전트가 찾을 때마다 쌓여요</span></div><ul class="list" id="au-ideas"></ul></div>
       </div>`;
-    document.querySelector('main').append(sec);
-    TABS.splice(TABS.indexOf('work'), 0, 'auto');
-    const orig = window.showTab;
-    window.showTab = function (name, push) { orig(name, push); if (name === 'auto') { load(); start(); } else stop(); };
-    btn.onclick = () => window.showTab('auto');
-    let want = location.hash.slice(1); try { want = want || localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
-    if (want === 'auto') window.showTab('auto', false);
+    document.addEventListener('barun:page', (e) => { if (e.detail === 'auto') { load(); start(); } else stop(); });
+    if (!sec.hidden) { load(); start(); }
     return true;
   }
 

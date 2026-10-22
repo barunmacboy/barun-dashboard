@@ -377,7 +377,7 @@
   }
 
   // 2026-10-22 15:33 사장님: "디스코드를 통해 만들어진 에이전트 작업 현황만 … 왜 무엇을 어떻게 몇분째 … 시각화 그림에도 포함, 원래의 에이전트가 아닌 애들은 알바처럼".
-  // 자료: 홈 '💬 디스코드에서 맡긴 일'과 같은 /api/tasks(dashboard/tasks.js가 window.barunTasksData로 넘김).
+  // 자료: '맡긴 일' 화면과 같은 /api/tasks(dashboard/tasks.js가 window.barunTasksData로 넘김).
   //   가장 오래 도는 일 = 팀장(지휘) 자리 말풍선 · 그 일이 분야 직원에게 맡긴 보조 에이전트 = 그 직원 자리 말풍선
   //   직원이 아닌 도우미(조사·탐색 등)와 동시에 도는 다른 지휘 일꾼 = 아래 줄 '알바' 자리(모자·앞치마) — 일이 끝나면 자리가 빔
   const AG_LOOK = { alba: { hair: '#4a3426', shirt: '#e9a23b', hat: '#d64545', apron: true, prop: 'cup' } };

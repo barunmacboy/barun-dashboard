@@ -1,4 +1,4 @@
-// 🗂 데이터 탭 — barun.db 표 찾아보기 + 바로 조치(2026-10-21 사장님: "디비도 현황판에서 접근하고 어떤 액션이든 바로",
+// 🗂 주문 데이터 화면 — barun.db 표 찾아보기 + 바로 조치(2026-10-21 사장님: "디비도 현황판에서 접근하고 어떤 액션이든 바로",
 //   "더이상 구글 스프레드시트를 사용하지 않을 수 있을 정도의 기능").
 // 읽기: GET /api/db/tables · /api/db/rows?table=&q=&w_<칸>=&preset=&offset= · /api/db/history?key= (dashboard/dbview.py, 읽기 전용)
 // 조치: POST /api/action {action:"db", kind, ...} → notify/actions.py → 주문 시트는 ops/orderedit.py(줄·먼저 고친 사람·회차 확인, 누른 사람 이름으로 일지)
