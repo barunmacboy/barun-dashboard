@@ -21,6 +21,7 @@
       .tk-steps { margin: 8px 0 0; padding: 8px 12px; background: var(--fill2); border-radius: var(--r-sm); font-size: 13px; color: var(--sub); }
       .tk-steps div + div { margin-top: 3px; } .tk-steps .now { color: var(--blue-ink); font-weight: 600; }
       .tk-more { margin-top: 8px; }
+      .tk-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
       .tk-min { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--blue-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
       .tk-kv { display: grid; grid-template-columns: 44px 1fr; gap: 3px 8px; margin: 6px 0 0; font-size: 14px; }
       .tk-kv dt { color: var(--muted); } .tk-kv dd { margin: 0; color: var(--sub); overflow-wrap: anywhere; }
@@ -72,18 +73,28 @@
     add('무엇', what(t));
     add('어떻게', how(t));
     r.append(kv);
-    if (t.state === 'run') {
-      const b = E('button', 'btn sm ghost tk-stop', '■ 중지'); b.type = 'button';
+    // 관리 버튼(2026-10-22 사장님: "여기서 에이전트 관리가 되어야지 종료시키거나 지우거나")
+    //   일하는 중: ■ 지금 하던 것만 멈춤(답글로 이어 갈 수 있음) · ⏹ 끝내기(멈추고 기다리던 답글·승인 버튼도 거둠)
+    //   승인·답 기다림·차례 기다림: ⏹ 끝내기 · 끝·실패: 🗑 목록에서 지우기(디스코드 스레드·기록은 남음)
+    const bar = E('div', 'tk-btns');
+    const btn = (label, cls, action, ask) => {
+      const b = E('button', 'btn sm ' + cls, label); b.type = 'button';
       b.onclick = async () => {
-        if (!confirm(`'${t.title}' 작업을 멈출까요?`)) return;
+        if (ask && !confirm(ask)) return;
         b.disabled = true;
         try {
-          const res = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'task_stop', key: t.id }) });
+          const res = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, key: t.id }) });
           const j = await res.json(); if (window.toast) window.toast((j.ok ? '' : '⚠ ') + j.msg);
         } catch (e) { /* 토큰 창 */ } finally { load(); }
       };
-      r.append(b);
-    }
+      bar.append(b);
+    };
+    if (t.state === 'run') btn('■ 지금 하던 것 멈춤', 'ghost', 'task_stop', `'${t.title}' — 지금 하던 것만 멈출까요? (스레드에 답글을 달면 이어 가요)`);
+    if (['run', 'wait', 'queued'].includes(t.state)) btn('⏹ 끝내기', 'ghost', 'task_close', `'${t.title}' 일을 끝낼까요? 하던 것을 멈추고 기다리던 답글·승인 버튼도 거둬요.`);
+    if (['done', 'fail'].includes(t.state)) btn('🗑 목록에서 지우기', 'ghost', 'task_hide', null);
+    else btn('🗑 끝내고 지우기', 'ghost', 'task_hide', `'${t.title}' 일을 끝내고 이 목록에서도 뺄까요? (디스코드 스레드·기록은 남아요)`);
+    if (t.url) { const a = E('a', 'btn sm ghost', '↗ 디스코드'); a.href = t.url; a.target = '_blank'; a.rel = 'noopener'; bar.append(a); }
+    r.append(bar);
     return r;
   }
 
