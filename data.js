@@ -27,6 +27,7 @@
   // 바꾼 기록에서 되돌릴 수 있는 일(ops/orderedit.undo와 같게)
   const UNDO_OPS = ['칸', '일괄', '붙여넣기', '채우기', '되돌리기', '설정', '메모', '색', '지우기'];
   let cur = DEF('sheet_rows'), last = null, sel = null, built = false;
+  let cell = null;       // 주문 시트에서 고른 칸 {k: 탭:행, c} — 위 '칸 내용' 줄에 전체 값(엑셀 수식 입력줄처럼, 10/23 사장님)
   let pending = {}, picked = new Set();          // 주문 시트: 아직 저장 안 한 칸 {tab:row:col → edit}, 고른 줄 {tab:row}
   const isSheet = () => cur.table === 'sheet_rows';
   const rid = (r) => `${r.tab}:${r.row}`;
@@ -46,7 +47,7 @@
     const card = E('div', 'card');
     const h = E('div', 'card-h'); h.append(E('h2', null, '데이터'), E('span', 'desc', '전용 장부(barun.db)예요. 주문 시트는 칸을 눌러 바로 고치고, 줄을 누르면 자세히 보고 조치할 수 있어요 — 바꾸는 일은 누른 사람 이름으로 일지에 남아요.'));
     card.append(h, E('div', 'dt-tables', null), E('div', 'dt-tools', null), E('div', 'dt-presets', null), E('div', 'dt-facets', null), E('div', 'dt-stock', null),
-      E('div', 'dt-wrap', null), E('div', 'dt-more', null));
+      Object.assign(E('div', 'dt-fx'), { hidden: true }), E('div', 'dt-wrap', null), E('div', 'dt-more', null));
     root.append(card, Object.assign(E('div', 'dt-bar'), { id: 'dt-bar', hidden: true }), Object.assign(E('div', 'card dt-detail'), { id: 'dt-detail', hidden: true }));
     const tools = card.querySelector('.dt-tools');
     const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '찾기 — 받는 분·상품·주문번호·송장·공홈주문번호'; q.setAttribute('aria-label', '찾기');
@@ -376,6 +377,7 @@
       for (const c of cols) {
         const td = E('td');
         if (cur.pin.includes(c)) td.classList.add('pin');
+        if (ed && cell && cell.k === rid(r) && cell.c === c) td.classList.add('cur');
         const pk = ed && pending[`${rid(r)}:${c}`];
         const v = pk ? pk.new : fmt(c, r[c]);
         if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
@@ -386,19 +388,70 @@
           td.append(E('span', 'note-dot', '◥'));
         }
         if (ed && canEdit(c, r)) {
-          td.classList.add('ed'); if (!nt) td.title = '눌러서 고치기 · 엑셀에서 복사한 여러 칸은 칸을 누른 뒤 붙여넣기';
+          td.classList.add('ed'); if (!nt) td.title = '두 번 누르거나 Enter로 고치기 · 엑셀에서 복사한 여러 칸은 칸을 고르고 붙여넣기';
           if (pk) td.classList.add('dirty');
-          td.onclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
+          td.ondblclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
+        }
+        if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용. '행' 칸은 줄 자세히·조치
+          if (c === 'row') { td.classList.add('rowh'); td.title = '눌러서 줄 자세히·조치'; }
+          td.onclick = (e) => { e.stopPropagation(); pickCell(r, c); if (c === 'row') openRow(r); };
         }
         row.append(td);
       }
-      const open = () => { sel = r; detail(); document.querySelectorAll('.dt tbody tr').forEach((x) => x.classList.remove('on')); row.classList.add('on'); };
+      const open = () => openRow(r);
       row.onclick = open; row.onkeydown = (e) => { if (e.key === 'Enter' && e.target === row) open(); };
       tb.append(row);
     }
     if (!last.rows.length) { const e = E('tr'); const td = E('td', 'empty', '맞는 줄이 없어요'); td.colSpan = cols.length + (ed ? 1 : 0); e.append(td); tb.append(e); }
     tbl.append(tb); wrap.append(tbl);
     pinLeft(tbl);
+    if (ed) tbl.onkeydown = gridKey;
+    fx();
+  }
+  function openRow(r) {
+    sel = r; detail();
+    const i = last.rows.indexOf(r);
+    document.querySelectorAll('.dt tbody tr').forEach((x, j) => x.classList.toggle('on', j === i));
+  }
+  const cellTd = (r, c) => { const tr = document.querySelectorAll('.dt tbody tr')[last.rows.indexOf(r)]; return tr && tr.children[visCols().indexOf(c) + 1]; };
+  function pickCell(r, c) {
+    cell = { k: rid(r), c };
+    document.querySelectorAll('.dt td.cur').forEach((x) => x.classList.remove('cur'));
+    const td = cellTd(r, c); if (td) { td.classList.add('cur'); td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    fx();
+  }
+  function gridKey(e) {          // 화살표로 칸 옮기기 · Enter/F2 고치기 · Esc 고르기 풀기(시트처럼)
+    if (!cell || e.target.closest('input,select')) return;
+    const vc = visCols(), ri = last.rows.findIndex((x) => rid(x) === cell.k), ci = vc.indexOf(cell.c);
+    if (ri < 0 || ci < 0) return;
+    const mv = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+    if (mv) {
+      e.preventDefault();
+      const r2 = last.rows[Math.max(0, Math.min(last.rows.length - 1, ri + mv[0]))], c2 = vc[Math.max(0, Math.min(vc.length - 1, ci + mv[1]))];
+      pickCell(r2, c2);
+    } else if ((e.key === 'Enter' || e.key === 'F2') && canEdit(cell.c, last.rows[ri])) { e.preventDefault(); const td = cellTd(last.rows[ri], cell.c); if (td) cellEdit(td, last.rows[ri], cell.c); }
+    else if (e.key === 'Escape') { cell = null; document.querySelectorAll('.dt td.cur').forEach((x) => x.classList.remove('cur')); fx(); }
+  }
+  // 칸 내용 줄(엑셀 위 수식 입력줄) — 고른 칸의 이름과 잘리지 않은 전체 값, 고칠 수 있는 칸은 여기서 바로 고침
+  function fx() {
+    const box = document.querySelector('.dt-fx'); if (!box) return;
+    const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
+    box.hidden = !isSheet(); box.textContent = '';
+    if (box.hidden) return;
+    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 누르면 전체 내용이 여기 나와요 · 두 번 누르거나 Enter로 고치기 · 화살표로 옮기기 · 행 번호를 누르면 줄 자세히')); return; }
+    const c = cell.c, v = cellVal(r, c);
+    box.append(E('span', 'fx-name', `${r.tab} ${r.row}행 · ${cname(c)}`));
+    if (canEdit(c, r)) {
+      const opts = dropOpts(r, c); let el;
+      if (opts) { el = E('select'); for (const o of ['', ...opts, ...(v && !opts.includes(v) ? [v] : [])]) { const x = E('option', null, o || '(비움)'); x.value = o; if (o === v) x.selected = true; el.append(x); } el.onchange = () => { stage(r, c, el.value.trim()); render(); bar(); }; }
+      else {
+        el = E('input'); el.value = v;
+        el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); stage(r, c, el.value.trim()); render(); bar(); } else if (e.key === 'Escape') { el.value = v; el.blur(); } };
+        el.onblur = () => { if (el.value.trim() !== v) { stage(r, c, el.value.trim()); render(); bar(); } };
+      }
+      el.className = 'fx-val fx-in'; el.setAttribute('aria-label', `${cname(c)} 값`); box.append(el);
+    } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸(고칠 수 없음)'));
+    const go = E('button', 'btn sm ghost', '줄 자세히 ›'); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
   }
   function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky)
     const hs = [...tbl.querySelectorAll('thead th')]; let left = 0; const at = {};
