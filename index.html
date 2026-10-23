@@ -473,9 +473,12 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
 .dt-facet { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 8px; }
 .chipbtn { border: 0; background: var(--fill); color: var(--sub); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 30px; }
 .chipbtn.on { background: var(--blue); color: #fff; }
-.dt-wrap { overflow-x: auto; border-radius: 12px; }
+.dt-wrap { overflow: auto; border-radius: 12px; max-height: calc(100vh - 200px); min-height: 320px; box-shadow: inset 0 0 0 1px var(--line); }   /* 표 안에서 위아래·좌우로 넘김 — 가로 막대가 늘 화면 안에(10/23) */
+.dt-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
+.dt-wrap::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 6px; border: 3px solid var(--card); }
+.dt-wrap::-webkit-scrollbar-track { background: var(--fill2); }
 table.dt { font-size: 13px; min-width: 720px; }
-table.dt th { position: sticky; top: 0; background: var(--card); white-space: nowrap; }
+table.dt th { position: sticky; top: 0; z-index: 2; background: var(--card); white-space: nowrap; }
 table.dt td { white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
 table.dt tbody tr { cursor: pointer; }
 table.dt tbody tr:hover, table.dt tbody tr:focus-visible { background: var(--hover); outline: none; }
@@ -484,6 +487,12 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-detail .kv pre { background: transparent; padding: 0; margin: 0; max-height: 140px; }
 .dt-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
 .dt-form { background: var(--fill2); border-radius: 14px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+.dt-tool { padding: 0; gap: 0; }
+.dt-tool > summary { cursor: pointer; padding: 12px 14px; display: grid; gap: 2px; list-style: none; }
+.dt-tool > summary::-webkit-details-marker { display: none; }
+.dt-tool > summary b::before { content: '▸ '; color: var(--muted); }
+.dt-tool[open] > summary b::before { content: '▾ '; }
+.dt-tool[open] { padding: 0 14px 14px; gap: 8px; } .dt-tool[open] > summary { padding: 12px 0 4px; }
 .dt-field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 .dt-field input, .dt-field select { font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 40px; }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
@@ -581,6 +590,44 @@ table.dt.sheet tbody tr.on { background: var(--blue-bg); }
 .dt-bar .btn.ghost { color: inherit; } .dt-bar .btn { min-height: 36px; }
 .dt-bar-msg { white-space: pre-wrap; font-size: 14px; }
 .dt-hist { margin-top: 16px; } .dt-ev { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--sub); display: grid; gap: 2px; max-height: 260px; overflow: auto; }
+/* 데이터 탭 정렬·열 필터(2026-10-23) */
+table.dt th { padding-right: 2px; }
+table.dt th .th-sort { border: 0; background: none; color: inherit; font: inherit; font-weight: inherit; padding: 4px 2px; cursor: pointer; white-space: nowrap; min-height: 32px; }
+table.dt th .th-sort:hover { color: var(--blue-ink); }
+table.dt th .th-ar { color: var(--blue-ink); font-size: 11px; font-variant-numeric: tabular-nums; }
+table.dt th .th-filt { border: 0; background: none; color: var(--muted); font-size: 11px; padding: 4px; cursor: pointer; min-width: 26px; min-height: 32px; border-radius: 8px; }
+table.dt th .th-filt.on { color: #fff; background: var(--blue); }
+.dt-fpanel { margin: 0 0 10px; background: var(--fill2); border-radius: 12px; padding: 4px 12px; }
+.dt-fpanel > summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 8px 0; min-height: 36px; }
+.dt-fp { display: grid; gap: 10px; padding-bottom: 10px; }
+.dt-fp .dt-form { background: var(--card); }
+.dt-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dt-fp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.dt-fp-row .dt-field { flex: 1 1 160px; min-width: 0; }
+.dt-vals { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 2px 10px; max-height: 280px; overflow: auto; }
+.dt-val { display: flex; gap: 8px; align-items: center; font-size: 14px; min-height: 32px; cursor: pointer; }
+.dt-val > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-val input { width: 18px; height: 18px; accent-color: var(--blue); }
+@media (max-width: 560px) { .dt-fp-row .dt-field { flex-basis: 100%; } .dt-fp-row > .btn { flex: 1 1 auto; } }
+/* 데이터 탭 편집 고도화(2026-10-23): 열 고정·시트 색·칸 메모·붙여넣기 미리보기·바꾼 기록 */
+.dt-tools { display: flex; gap: 8px; align-items: flex-start; } .dt-tools .dt-q { flex: 1; } .dt-tools .dt-audit-btn { min-height: 44px; white-space: nowrap; }
+table.dt th.pin, table.dt td.pin { position: sticky; z-index: 1; background: inherit; }
+table.dt th.pin { z-index: 3; background: var(--card); box-shadow: inset -1px 0 0 var(--line); }
+table.dt.sheet tbody tr.painted { background: var(--row-bg); color: #17191e; }
+table.dt.sheet td.has-note { position: relative; }
+.note-dot { position: absolute; top: 0; right: 1px; font-size: 9px; line-height: 1; color: #d97706; pointer-events: none; }
+.dt-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 2px 12px; max-height: 280px; overflow: auto; }
+.dt-col { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; min-height: 34px; }
+.dt-col label { display: flex; gap: 8px; align-items: center; cursor: pointer; min-width: 0; }
+.dt-col input { width: 18px; height: 18px; accent-color: var(--blue); }
+.dt-audit { margin: 0 0 10px; } .dt-audit[hidden] { display: none; }
+.dt-batch { border-top: 1px solid var(--line); padding: 8px 0; } .dt-batch-h { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dt-ev li .btn { min-height: 28px; padding: 2px 8px; }
+.dt-ev.warn { color: var(--orange-ink); }
+dialog.dt-prev { border: 0; padding: 0; border-radius: 20px; width: min(720px, calc(100vw - 24px)); background: var(--card); color: var(--ink); box-shadow: var(--pop); }
+dialog.dt-prev::backdrop { background: rgba(0, 0, 0, .35); }
+.dt-prev-box { padding: 20px; display: grid; gap: 10px; } .dt-prev-box h3 { margin: 0; font-size: 17px; } .dt-prev-box .dt-ev { max-height: 46vh; }
+.dt-prev-box .btns { display: flex; gap: 8px; justify-content: flex-end; }
 
 @media (max-width: 1023px) { .dt-bar { bottom: calc(var(--tab-h) + 12px + env(safe-area-inset-bottom)); } #toast { bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom)) !important; } }
 </style>
@@ -834,7 +881,7 @@ function showTab(name, push = true) {
   $('page-title').textContent = PAGES[name].label; $('page-desc').textContent = PAGES[name].desc;
   document.title = name === 'home' ? '바른청년 운영 현황' : `${PAGES[name].label} · 바른청년`;
   try { localStorage.setItem('barun.tab', name); } catch (e) { /* 무시 */ }
-  if (push && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  if (push && location.hash.split('?')[0] !== '#' + name) history.replaceState(null, '', '#' + name);   // '#data?…' = 데이터 탭 보기 상태(data.js)
   drawer(false);
   if (name === 'activity') window.dispatchEvent(new Event('resize'));   // 숨어 있던 타임라인을 지금 폭으로 다시 그림
   if (name === 'home' && window.barunOfficeRepaint) window.barunOfficeRepaint();
@@ -1266,7 +1313,7 @@ probe().then((ok) => {
 });
 // 첫 화면: 주소의 #화면 → 마지막으로 본 화면 → 한눈에. '#ev-…'(타임라인에서 알림 기록으로 가는 고리)는 일지·알림으로.
 function route() {
-  const h = location.hash.slice(1);
+  const h = location.hash.slice(1).split('?')[0];
   if (h.startsWith('ev-')) { showTab('records', false); setTimeout(() => focusEl(h), 300); return; }
   let last = ''; try { last = localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
   showTab(TABS.includes(h) ? h : (TABS.includes(last) ? last : 'home'), false);
