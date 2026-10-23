@@ -91,6 +91,11 @@ button { font: inherit; color: inherit; }
 .health:focus-visible { outline: 2px solid var(--blue); }
 .topbar .ask-btn { display: none; }
 main.pages { max-width: 1240px; padding: 8px 28px 72px; }
+/* 주문 데이터 화면만 오른쪽 끝까지(여백 없이) — 표 칸을 한 번에 많이(10/24 사장님) */
+@media (min-width: 1024px) {
+  main.pages:has(> #p-data:not([hidden])) { max-width: none; padding-right: 0; }
+  #p-data > .card { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+}
 .page { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 .page[hidden] { display: none; }
 
