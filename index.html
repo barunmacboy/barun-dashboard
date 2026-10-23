@@ -495,6 +495,7 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-tool { padding: 0; gap: 0; }
 .dt-tool > summary { cursor: pointer; padding: 12px 14px; display: grid; gap: 2px; list-style: none; }
 .dt-tool > summary::-webkit-details-marker { display: none; }
+.dt-tool > summary::before { content: none; }   /* 전역 '›'가 grid 한 줄을 따로 차지해 빈 줄이 생기던 것(10/24 감사) — 제목 앞 ▸/▾만 */
 .dt-tool > summary b::before { content: '▸ '; color: var(--muted); }
 .dt-tool[open] > summary b::before { content: '▾ '; }
 .dt-tool[open] { padding: 0 14px 14px; gap: 8px; } .dt-tool[open] > summary { padding: 12px 0 4px; }
@@ -573,7 +574,8 @@ table.rep td.ed { background: #fff8db; padding: 3px 6px; }
 #dt-detail .dt-acts { grid-template-columns: 1fr; }
 /* 주문 한 줄 보기(orderView, 10/23 새로) — 넓은 서랍, 일 순서대로 카드 */
 #dt-detail.od-sheet:not([hidden]) { width: min(760px, 100%); background: var(--bg, var(--fill2)); }
-.ov-head { align-items: flex-start; background: var(--bg); padding: 12px 0 10px; border-bottom: 1px solid var(--line); }
+#dt-detail.od-sheet .ov-head { align-items: flex-start; background: var(--bg); margin: -20px -20px 0; padding: 16px 20px 12px; top: -20px; border-bottom: 1px solid var(--line); }   /* 서랍 폭 끝까지(흰 띠가 모자라던 것) */
+#dt-detail:focus { outline: none; }
 .ov-who { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
 .ov-what { font-size: 14px; color: var(--ink2); margin-top: 2px; line-height: 1.4; }
 .ov-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
@@ -596,15 +598,16 @@ table.rep td.ed { background: #fff8db; padding: 3px 6px; }
 .ov-card h3 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
 .ov-kv { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); font-size: 14px; min-width: 0; }
 .ov-card h3 + .ov-kv { border-top: 0; }
-.ov-k { flex: none; width: 84px; color: var(--muted); font-size: 12px; }
-.ov-v { flex: 1; min-width: 0; word-break: break-all; color: var(--ink); }
+.ov-k { flex: none; width: 78px; color: var(--muted); font-size: 12px; }
+.ov-v { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-variant-numeric: tabular-nums; }
 .ov-v.copy { cursor: copy; border-radius: 4px; } .ov-v.copy:hover { background: var(--hover); }
 .ov-v.copied { background: var(--green-bg) !important; } .ov-v.copied::after { content: ' 복사됨'; color: var(--green-ink); font-size: 11px; }
 .ov-v.big { font-size: 17px; font-weight: 800; } .ov-v.neg { color: var(--red-ink); }
 .ov-link { flex: none; font-size: 12px; color: var(--blue-ink); text-decoration: none; }
 .ov-ed { flex: none; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 13px; border-radius: 6px; }
 .ov-ed:hover { color: var(--blue-ink); background: var(--blue-bg); }
-.ov-kv.editing { align-items: center; } .ov-in { flex: 1; min-width: 0; font: inherit; padding: 6px 8px; border: 2px solid var(--blue); border-radius: 8px; background: var(--card); color: var(--ink); }
+.ov-kv.editing { align-items: center; flex-wrap: wrap; } .ov-kv.editing .ov-in { flex: 1 1 100%; order: 2; } .ov-kv.editing .btn { order: 3; } .ov-kv.editing .ov-k { width: auto; flex: 1 1 100%; }   /* 고칠 때는 입력칸을 한 줄 전체로(좁은 카드에서 값이 잘리던 것) */
+.ov-in { flex: 1; min-width: 0; font: inherit; padding: 6px 8px; border: 2px solid var(--blue); border-radius: 8px; background: var(--card); color: var(--ink); }
 .ov-fold { margin-top: 10px; background: var(--card); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); padding: 0 14px; }
 .ov-fold > summary { cursor: pointer; padding: 12px 0; font-weight: 700; font-size: 14px; }
 .ov-fold[open] { padding-bottom: 12px; }

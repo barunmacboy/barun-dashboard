@@ -38,9 +38,10 @@
     if (['profit', 'cost_krw', 'market_krw', 'price', 'paid', 'settle'].includes(k) && !isNaN(+v) && String(v).trim() !== '') return won(v);
     if (typeof v === 'string' && (v.startsWith('[') || v.startsWith('{'))) { try { const j = JSON.parse(v); return Array.isArray(j) ? j.join(', ') : Object.entries(j).map(([a, b]) => `${a === 'naver' ? '네이버' : a === 'coupang' ? '쿠팡' : a} ${typeof b === 'number' ? b.toLocaleString('ko-KR') : (typeof b === 'object' ? JSON.stringify(b) : b)}`).join(' · '); } catch (e) { /* 그대로 */ } }
     if (/^\d{4}-\d\d-\d\dT/.test(String(v))) return String(v).slice(5, 16).replace('T', ' ');
+    if (CODE_COLS.includes(k)) return ko(v);     // 플랫폼 상태 코드·플랫폼 이름은 사람 말로(값·필터는 원래 코드 그대로)
     return String(v);
   };
-  const badgeCls = (v) => /탈락|반려|실패|SUSPENSION|PROHIBITION|CANCEL|취소|반품|미정/.test(v) ? 'bad' : /정밀확인|등록준비|대기|심사|OUTOFSTOCK|요청중|필요/.test(v) ? 'warn' : /등록|승인완료|SALE|ok|끝|발송완료|해외구매|재고발송/.test(v) ? 'ok' : '';
+  const badgeCls = (v) => /탈락|반려|실패|SUSPENSION|PROHIBITION|CANCEL|취소|반품|미정/.test(v) ? 'bad' : /정밀확인|등록준비|대기|심사|OUTOFSTOCK|요청중|필요/.test(v) ? 'warn' : /등록|승인완료|SALE|ok|끝|발송완료|배송완료|구매확정|해외구매|재고발송/.test(v) ? 'ok' : '';
 
   function build() {
     const root = $('p-data'); if (!root || built) return; built = true;
@@ -92,7 +93,7 @@
   const cname = (c) => COLNAME[c] || (last && last.heads && last.heads[c]) || c;
   // 화면에 그릴 칸 = 숨긴 칸 빼고, 고정한 칸을 앞으로(시트 열 구조는 그대로 — 보기만)
   const visCols = () => { const cs = last.cols.filter((c) => !cur.hide.includes(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
-  const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동(빈칸)' : '(빈칸)') : String(v));
+  const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동(빈칸)' : '(빈칸)') : CODE_COLS.includes(c) ? ko(v) : String(v));
   function setFilter(c, f) { cur.filters = cur.filters.filter((x) => x.c !== c); if (f) cur.filters.push(f); cur.offset = 0; }
   function toggleVal(c, v) {        // 칩: 같은 칸에서 여러 값 고르기(누르면 넣고, 다시 누르면 뺌)
     const f = cur.filters.find((x) => x.c === c && x.op === 'in');
@@ -770,7 +771,7 @@
     const more = E('details', 'dt-all'); more.append(E('summary', null, '모든 칸 보기'), dl); box.append(more);
     if (isSheet() && rowName(r)) { const ab = E('div', 'dt-hist'); ab.append(E('div', 'od-t', '이 줄 바꾼 기록(현황판)')); box.append(ab); auditList(ab, { tab: r.tab, key: rowName(r), limit: 50 }); }
     if (r.key && !isStock(r) && (isSheet() || ['orders', 'order_ledger'].includes(cur.table))) historyBox(box, r);
-    box.scrollTop = 0; x.focus();
+    box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true });
   }
 
   // ── 주문 한 줄 보기(주문 시트) — 2026-10-23 사장님 "한 행을 눌렀을 때 그 주문 정보가 보기 좋게, 지금 상세보기는 최악이라 갈아엎자" ──
@@ -822,7 +823,7 @@
       if (raw) { val.classList.add('copy'); val.title = '눌러서 복사'; val.onclick = async () => { try { await navigator.clipboard.writeText(raw); val.classList.add('copied'); setTimeout(() => val.classList.remove('copied'), 900); } catch (e) { /* 막힘 */ } }; }
       if (raw && /^-|^약\s*-/.test(raw) && NUMC.includes(c)) val.classList.add('neg');
       row.append(val);
-      if (opt.link && raw) { const a = E('a', 'ov-link', opt.link[0]); a.href = opt.link[1](raw); a.target = '_blank'; a.rel = 'noopener'; row.append(a); }
+      if (opt.link && raw) { const a = E('a', 'ov-link', opt.link[0]); a.title = opt.link[0].replace(' ↗', '') + ' (새 창)'; a.href = opt.link[1](raw); a.target = '_blank'; a.rel = 'noopener'; row.append(a); }
       if (canEdit(c, r)) {
         const ed = E('button', 'ov-ed', '✎'); ed.type = 'button'; ed.title = '고치기'; ed.setAttribute('aria-label', cname(c) + ' 고치기');
         ed.onclick = () => {
@@ -841,7 +842,7 @@
     const card = (title, items, wide) => { const ks = items.filter(Boolean); if (!ks.length) return; const g = E('section', 'ov-card' + (wide ? ' wide' : '')); g.append(E('h3', null, title), ...ks); grid.append(g); };
     const grid = E('div', 'ov-grid'); box.append(grid);
     const domain = (v) => /^https?:\/\//.test(v) ? v : /^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(v) ? 'https://' + v : '';
-    const track = ['조회 ↗', trackUrl];
+    const track = ['조회↗', trackUrl];
     if (!stock) card('고객·배송지', [kv('receiver', { always: true }), kv('tel'), kv('pccc'), kv('zip'), kv('addr'), kv('ship_memo')], true);
     if (!stock) card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due'), kv('qty'), kv('send_qty')]);
     card('구매(해외)', [kv('shop', { link: domain(String(r.shop || '')) ? ['열기 ↗', domain] : null }), kv('shop_price'), kv('shop_order'), kv('intl_carrier'), kv('intl_tracking', { link: track }), stock ? kv('send_qty') : null]);
@@ -850,11 +851,11 @@
     card('메모', [kv('memo', { always: true }), kv('stock_note'), kv('problem')], true);
     // 접어 둔 것: 플랫폼 기록 · 조치 · 바꾼 기록 · 모든 칸
     const fold = (title, fill, open, eager) => { const d = E('details', 'ov-fold'); d.append(E('summary', null, title)); let done = false; const go = () => { if (!done) { done = true; fill(d); } }; d.ontoggle = () => { if (d.open) go(); }; if (open) d.open = true; if (open || eager) go(); box.append(d); };
-    if (r.key && !stock) fold('플랫폼 주문·처리 기록', (d) => historyBox(d, r), true);
+    if (r.key && !stock) fold('플랫폼 주문·처리 기록', (d) => historyBox(d, r, true), true);
     fold('조치 — 문제 표시·메모·색·줄 나누기·옮기기·지우기', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
     if (rowName(r)) fold('이 줄 바꾼 기록(되돌리기)', (d) => auditList(d, { tab: r.tab, key: rowName(r), limit: 50 }));
     fold('모든 칸 보기', (d) => { const dl = E('dl', 'kv'); for (const [k, v] of Object.entries(r)) { if (v == null || v === '' || k === '_meta') continue; dl.append(E('dt', null, COLNAME[k] || k)); const dd = E('dd'); dd.append(E('pre', null, fmt(k, v))); dl.append(dd); } d.append(dl); }, false, true);
-    box.scrollTop = 0; x.focus();
+    box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true });   // ✕에 포커스를 주면 파란 테두리가 크게 떠서(10/24 감사) 서랍 자체에
   }
   document.addEventListener('keydown', (e) => {      // 자세히가 열려 있으면 [ ] 로 위·아래 줄
     if (!sel || !isSheet() || e.target.closest('input,select,textarea') || (e.key !== '[' && e.key !== ']')) return;
@@ -985,17 +986,23 @@
       btn('이 재고 줄 지우기', 'danger', (b) => doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: '', ident: ident(r), confirm: `재고 '${name}'(${r.tab} ${r.row}행) 줄을 지울까요?` }, b, out))));
   }
 
-  async function historyBox(box, r) {
-    const h = E('div', 'dt-hist'); h.append(E('div', 'od-t', '이 주문 기록')); box.append(h);
+  // 플랫폼 상태 코드를 사람 말로(10/24 감사: 'CANCELED · 클레임 CANCEL'·'RETURNS_COMPLETED'가 그대로 보임)
+  const CODE_COLS = ['status', 'claim', 'claim_status', 'platform', 'type'];
+  const ST_KO = { coupang: '쿠팡', naver: '네이버', CANCELED_BY_NOPAYMENT: '미입금 취소', PURCHASE_DECIDE: '구매확정', PAYED: '결제완료', ACCEPT: '결제완료', INSTRUCT: '상품준비중', PLACE: '발주확인', DEPARTURE: '출고', DELIVERING: '배송중', DELIVERED: '배송완료',
+    FINAL_DELIVERY: '배송완료', NONE_TRACKING: '송장 없이 배송', PURCHASE_DECIDED: '구매확정', CANCELED: '취소됨', CANCEL: '취소', CANCEL_REQUEST: '취소요청',
+    RETURN: '반품', RETURNED: '반품됨', RETURNS_COMPLETED: '반품완료', RETURN_REQUEST: '반품요청', EXCHANGE: '교환', EXCHANGE_REQUEST: '교환요청', DISPATCHED: '발송' };
+  const ko = (t) => { const v = String(t == null ? '' : t); return ST_KO[v] || v.replace(/\b[A-Z][A-Z_]{3,}\b/g, (m) => ST_KO[m] || m); };
+  async function historyBox(box, r, bare) {
+    const h = E('div', 'dt-hist'); if (!bare) h.append(E('div', 'od-t', '이 주문 기록')); box.append(h);
     try {
       const j = await fetchJ('/api/db/history?key=' + encodeURIComponent(r.key));
       const o = j.order, l = j.ledger;
       const p = E('p', 'small'); p.style.whiteSpace = 'pre-wrap';
-      p.textContent = [o ? `${o.platform === 'naver' ? '네이버' : '쿠팡'} · ${o.status || ''}${o.claim_status ? ' · 클레임 ' + o.claim_status : ''} · 결제 ${o.paid ? won(o.paid) : '-'} · 송장 ${o.invoice || '없음'}` : '플랫폼 주문 없음',
+      p.textContent = [o ? `${o.platform === 'naver' ? '네이버' : '쿠팡'} · ${ko(o.status)}${o.claim_status ? ' · 클레임 ' + ko(o.claim_status) : ''} · 결제 ${o.paid ? won(o.paid) : '-'} · 송장 ${o.invoice || '없음'}` : '플랫폼 주문 없음',
         l ? `처리 방식 ${l.handling}${l.memo ? ' (' + l.memo + ')' : ''}` : '', j.rows.length > 1 ? `시트 ${j.rows.length}줄: ` + j.rows.map((x) => `${x.tab} ${x.row}행`).join(', ') : ''].filter(Boolean).join('\n');
       h.append(p);
       const ul = E('ul', 'dt-ev');
-      for (const e of j.events.slice(0, 30)) ul.append(E('li', null, `${fmt('at', e.at)} · ${e.src} · ${COLNAME[e.field] || e.field}: ${e.old || '빈칸'} → ${e.new || '빈칸'}`));
+      for (const e of j.events.slice(0, 30)) ul.append(E('li', null, `${fmt('at', e.at)} · ${e.src} · ${COLNAME[e.field] || e.field}: ${ko(e.old) || '빈칸'} → ${ko(e.new) || '빈칸'}`));
       if (!j.events.length) ul.append(E('li', 'muted', '바뀐 기록이 아직 없어요'));
       h.append(ul);
     } catch (e) { h.append(E('p', 'muted small', '기록을 불러오지 못했어요: ' + e.message)); }
