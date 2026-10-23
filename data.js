@@ -27,6 +27,7 @@
   // 바꾼 기록에서 되돌릴 수 있는 일(ops/orderedit.undo와 같게)
   const UNDO_OPS = ['칸', '일괄', '붙여넣기', '채우기', '되돌리기', '설정', '메모', '색', '지우기'];
   let cur = DEF('sheet_rows'), last = null, sel = null, built = false;
+  let cell2 = null, drag = false;   // 범위 고르기 끝 칸(Shift·끌기) — 합계·복사용
   let cell = null;       // 주문 시트에서 고른 칸 {k: 탭:행, c} — 위 '칸 내용' 줄에 전체 값(엑셀 수식 입력줄처럼, 10/23 사장님)
   let pending = {}, picked = new Set();          // 주문 시트: 아직 저장 안 한 칸 {tab:row:col → edit}, 고른 줄 {tab:row}
   const isSheet = () => cur.table === 'sheet_rows';
@@ -287,7 +288,7 @@
   let seq = 0;
   async function load() {
     const wrap = document.querySelector('.dt-wrap'); if (!wrap) return;
-    const ps = params(); ps.set('offset', cur.offset); ps.set('limit', isSheet() ? 100 : 50);
+    const ps = params(); ps.set('offset', cur.offset); ps.set('limit', isSheet() ? 500 : 50);   // 주문 시트는 한 번에 500줄(엑셀처럼 넘기며 보게)
     if (cur.sort.length) ps.set('sort', cur.sort.join(','));
     const my = ++seq;          // 빨리 여러 번 누르면 마지막 요청만 그림
     let j; try { j = await fetchJ('/api/db/rows?' + ps.toString()); } catch (e) { wrap.textContent = '불러오지 못했어요: ' + e.message; return; }
@@ -310,10 +311,11 @@
     }
     panel();
     stockForm();
+    if (sel && isSheet()) { const n = last.rows.find((x) => rid(x) === rid(sel)); if (n && n !== sel) { const st = ($('dt-detail') || {}).scrollTop; sel = n; detail(); if (st) $('dt-detail').scrollTop = st; } }
     render();
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
-    const step = isSheet() ? 100 : 50;
+    const step = isSheet() ? 500 : 50;
     if (cur.offset > 0) { const b = E('button', 'btn sm ghost', '‹ 앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
     if (cur.offset + last.rows.length < last.total) { const b = E('button', 'btn sm ghost', '다음 ›'); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
     bar();
@@ -357,7 +359,14 @@
       const fb = E('button', 'th-filt' + (cur.filters.some((x) => x.c === c) ? ' on' : ''), '⏷'); fb.type = 'button';
       fb.setAttribute('aria-label', `${cname(c)} 필터`); fb.title = '이 칸 필터';
       fb.onclick = () => openFilter(c);
-      th.append(sb, fb); tr.append(th);
+      th.append(sb, fb);
+      if (ed) {         // 칸 너비 끌어서 바꾸기(이 브라우저에 기억) · 두 번 누르면 원래대로
+        if (colW[c]) th.style.width = th.style.minWidth = th.style.maxWidth = colW[c] + 'px';
+        const rz = E('span', 'rz'); rz.title = '끌어서 칸 너비 · 두 번 누르면 원래대로';
+        rz.onmousedown = (e) => resizeStart(e, c, th); rz.ondblclick = (e) => { e.stopPropagation(); delete colW[c]; saveW(); render(); };
+        th.append(rz);
+      }
+      tr.append(th);
     }
     thead.append(tr); tbl.append(thead);
     const tb = E('tbody');
@@ -377,11 +386,12 @@
       for (const c of cols) {
         const td = E('td');
         if (cur.pin.includes(c)) td.classList.add('pin');
-        if (ed && cell && cell.k === rid(r) && cell.c === c) td.classList.add('cur');
+        if (ed && colW[c]) td.style.maxWidth = td.style.minWidth = colW[c] + 'px';
         const pk = ed && pending[`${rid(r)}:${c}`];
         const v = pk ? pk.new : fmt(c, r[c]);
         if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
         else td.textContent = v.length > 60 ? v.slice(0, 59) + '…' : v;
+        if (ed && NUMC.includes(c)) { td.classList.add('num'); if (/^\s*(약\s*)?-\d/.test(v)) td.classList.add('neg'); }
         const nt = ed && noteOf(r, c);
         if (nt) {           // 칸 메모(시트의 메모 대신) — 오른쪽 위 세모, 마우스를 올리면 내용
           td.classList.add('has-note'); td.title = `메모: ${nt.text}${nt.by ? ` — ${nt.by}` : ''}`;
@@ -394,7 +404,9 @@
         }
         if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용. '행' 칸은 줄 자세히·조치
           if (c === 'row') { td.classList.add('rowh'); td.title = '눌러서 줄 자세히·조치'; }
-          td.onclick = (e) => { e.stopPropagation(); pickCell(r, c); if (c === 'row') openRow(r); };
+          td.onmousedown = (e) => { if (e.button || e.target.closest('input,select')) return; e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true; };
+          td.onmouseenter = () => { if (drag && cell) { cell2 = { k: rid(r), c }; paintSel(); fx(); } };
+          td.onclick = (e) => { e.stopPropagation(); if (c === 'row' && !e.shiftKey && !cell2) openRow(r); };
         }
         row.append(td);
       }
@@ -405,7 +417,7 @@
     if (!last.rows.length) { const e = E('tr'); const td = E('td', 'empty', '맞는 줄이 없어요'); td.colSpan = cols.length + (ed ? 1 : 0); e.append(td); tb.append(e); }
     tbl.append(tb); wrap.append(tbl);
     pinLeft(tbl);
-    if (ed) tbl.onkeydown = gridKey;
+    if (ed) { tbl.onkeydown = gridKey; paintSel(); }
     fx();
   }
   function openRow(r) {
@@ -414,24 +426,84 @@
     document.querySelectorAll('.dt tbody tr').forEach((x, j) => x.classList.toggle('on', j === i));
   }
   const cellTd = (r, c) => { const tr = document.querySelectorAll('.dt tbody tr')[last.rows.indexOf(r)]; return tr && tr.children[visCols().indexOf(c) + 1]; };
-  function pickCell(r, c) {
-    cell = { k: rid(r), c };
-    document.querySelectorAll('.dt td.cur').forEach((x) => x.classList.remove('cur'));
-    const td = cellTd(r, c); if (td) { td.classList.add('cur'); td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  // ── 시트처럼 고르기: 칸 하나(cell) 또는 범위(cell~cell2) — 복사(⌘C, 탭 구분이라 엑셀·사이트 입력칸에 그대로)·붙여넣기(⌘V)·합계 ──
+  const NUMC = ['qty', 'send_qty', 'shop_price', 'ship_cost', 'profit', 'point', 'margin', 'settle', 'cost', 'tax_rate'];
+  let colW = {}; try { colW = JSON.parse(localStorage.getItem('barun.dt.w') || '{}') || {}; } catch (e) { colW = {}; }
+  const saveW = () => { try { localStorage.setItem('barun.dt.w', JSON.stringify(colW)); } catch (e) { /* 저장소 없음 */ } };
+  function resizeStart(e, c, th) {
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, w0 = th.offsetWidth, i = [...th.parentNode.children].indexOf(th), tbl = th.closest('table');
+    const mv = (ev) => {
+      const w = Math.max(36, w0 + ev.clientX - x0); colW[c] = w;
+      th.style.width = th.style.minWidth = th.style.maxWidth = w + 'px';
+      for (const tr of tbl.tBodies[0].rows) { const td = tr.children[i]; if (td) td.style.maxWidth = td.style.minWidth = w + 'px'; }
+    };
+    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); saveW(); pinLeft(tbl); };
+    document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+  }
+  document.addEventListener('mouseup', () => { drag = false; });
+  const rowIdx = (k) => last.rows.findIndex((x) => rid(x) === k);
+  function rangeOf() {
+    if (!cell || !last) return null;
+    const vc = visCols(), e = cell2 || cell;
+    const a = rowIdx(cell.k), b = rowIdx(e.k), ac = vc.indexOf(cell.c), bc = vc.indexOf(e.c);
+    if (a < 0 || b < 0 || ac < 0 || bc < 0) return null;
+    return { r0: Math.min(a, b), r1: Math.max(a, b), c0: Math.min(ac, bc), c1: Math.max(ac, bc), vc };
+  }
+  function* rangeCells() { const g = rangeOf(); if (!g) return; for (let i = g.r0; i <= g.r1; i++) for (let j = g.c0; j <= g.c1; j++) yield [last.rows[i], g.vc[j], i, j]; }
+  function paintSel() {
+    document.querySelectorAll('.dt td.cur, .dt td.insel').forEach((x) => x.classList.remove('cur', 'insel'));
+    const g = rangeOf(); if (!g) return;
+    const trs = document.querySelectorAll('.dt tbody tr');
+    for (let i = g.r0; i <= g.r1; i++) for (let j = g.c0; j <= g.c1; j++) { const td = trs[i] && trs[i].children[j + 1]; if (td) td.classList.add('insel'); }
+    const td = cellTd(last.rows[rowIdx(cell.k)], cell.c); if (td) td.classList.add('cur');
+  }
+  function pickCell(r, c, extend) {
+    if (extend && cell) cell2 = { k: rid(r), c }; else { cell = { k: rid(r), c }; cell2 = null; }
+    paintSel();
+    const td = cellTd(r, c); if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
     fx();
   }
-  function gridKey(e) {          // 화살표로 칸 옮기기 · Enter/F2 고치기 · Esc 고르기 풀기(시트처럼)
+  const rangeText = () => { const g = rangeOf(); if (!g) return ''; const out = []; for (let i = g.r0; i <= g.r1; i++) { const l = []; for (let j = g.c0; j <= g.c1; j++) l.push(cellVal(last.rows[i], g.vc[j]).replace(/[\t\n]/g, ' ')); out.push(l.join('\t')); } return out.join('\n'); };
+  async function copySel() {
+    const t = rangeText(); let ok = true;
+    try { await navigator.clipboard.writeText(t); } catch (e) { ok = false; }
+    flash(ok ? `복사했어요 — ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '복사하지 못했어요(브라우저가 막음)');
+  }
+  function flash(msg) { const box = document.querySelector('.dt-fx'); if (!box) return; const m = E('span', 'fx-flash', msg); box.append(m); setTimeout(() => m.remove(), 1800); }
+  document.addEventListener('paste', (e) => {      // 칸을 고른 채 ⌘V — 엑셀·시트에서 복사한 여러 칸도 이 칸부터(미리보기)
+    if (!cell || !isSheet() || !document.activeElement || !document.activeElement.closest('table.dt') || document.activeElement.closest('input,select')) return;
+    const r = last.rows[rowIdx(cell.k)]; if (!r) return;
+    const t = (e.clipboardData || window.clipboardData).getData('text'); e.preventDefault();
+    if (/[\t\n]/.test(t.replace(/\n+$/, ''))) return pasteGrid(r, cell.c, t);
+    if (!canEdit(cell.c, r)) return flash('고칠 수 없는 칸이에요(자동 계산·플랫폼 값)');
+    stage(r, cell.c, t.trim()); render(); bar();
+  });
+  function gridKey(e) {          // 화살표 옮기기(Shift = 범위) · Enter/F2 고치기 · 글자 치면 바로 고치기 · Delete 비우기 · ⌘C 복사 · Esc 풀기(시트처럼)
     if (!cell || e.target.closest('input,select')) return;
-    const vc = visCols(), ri = last.rows.findIndex((x) => rid(x) === cell.k), ci = vc.indexOf(cell.c);
-    if (ri < 0 || ci < 0) return;
-    const mv = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+    const vc = visCols(), end = cell2 || cell, ri = rowIdx(end.k), ci = vc.indexOf(end.c), r0 = last.rows[rowIdx(cell.k)];
+    if (ri < 0 || ci < 0 || !r0) return;
+    const mv = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }[e.key];
     if (mv) {
       e.preventDefault();
-      const r2 = last.rows[Math.max(0, Math.min(last.rows.length - 1, ri + mv[0]))], c2 = vc[Math.max(0, Math.min(vc.length - 1, ci + mv[1]))];
-      pickCell(r2, c2);
-    } else if ((e.key === 'Enter' || e.key === 'F2') && canEdit(cell.c, last.rows[ri])) { e.preventDefault(); const td = cellTd(last.rows[ri], cell.c); if (td) cellEdit(td, last.rows[ri], cell.c); }
-    else if (e.key === 'Escape') { cell = null; document.querySelectorAll('.dt td.cur').forEach((x) => x.classList.remove('cur')); fx(); }
+      const ext = e.shiftKey && e.key !== 'Tab';
+      const base = ext ? [ri, ci] : [rowIdx(cell.k), vc.indexOf(cell.c)];
+      const r2 = last.rows[Math.max(0, Math.min(last.rows.length - 1, base[0] + mv[0]))], c2 = vc[Math.max(0, Math.min(vc.length - 1, base[1] + mv[1]))];
+      pickCell(r2, c2, ext);
+    } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); copySel(); }
+    else if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); cell = { k: rid(last.rows[0]), c: vc[0] }; cell2 = { k: rid(last.rows[last.rows.length - 1]), c: vc[vc.length - 1] }; paintSel(); fx(); }
+    else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); if (canEdit(cell.c, r0)) { const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c); } else flash('고칠 수 없는 칸이에요'); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault(); let n = 0;
+      for (const [r, c] of rangeCells()) if (canEdit(c, r) && cellVal(r, c) !== '') { stage(r, c, '', '일괄'); n++; }
+      if (n) { render(); bar(); } else flash('비울 칸이 없어요(고칠 수 없는 칸이거나 이미 빈칸)');
+    } else if (e.key === 'Escape') { cell = cell2 = null; paintSel(); fx(); }
+    else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing && canEdit(cell.c, r0) && !dropOpts(r0, cell.c)) {
+      e.preventDefault(); const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c, e.key);
+    }
   }
+  const numOf = (v) => { const m = String(v).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m && !/[A-Za-z]{2}/.test(String(v)) ? +m[0] : null; };
+  const trackUrl = (v) => `https://t.17track.net/ko#nums=${encodeURIComponent(v)}`;
   // 칸 내용 줄(엑셀 위 수식 입력줄) — 고른 칸의 이름과 잘리지 않은 전체 값, 고칠 수 있는 칸은 여기서 바로 고침
   function fx() {
     const box = document.querySelector('.dt-fx'); if (!box) return;
@@ -439,6 +511,14 @@
     box.hidden = !isSheet(); box.textContent = '';
     if (box.hidden) return;
     if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 누르면 전체 내용이 여기 나와요 · 두 번 누르거나 Enter로 고치기 · 화살표로 옮기기 · 행 번호를 누르면 줄 자세히')); return; }
+    const g = rangeOf();
+    if (g && (g.r1 > g.r0 || g.c1 > g.c0)) {      // 범위: 칸 수 · 숫자 합계·평균(엑셀 아래 상태줄처럼 — 수익·배송비 더해 보기)
+      const nums = []; let n = 0; for (const [rr, cc] of rangeCells()) { n++; const x = numOf(cellVal(rr, cc)); if (x != null && NUMC.includes(cc)) nums.push(x); }
+      const sum = nums.reduce((a, b) => a + b, 0);
+      box.append(E('span', 'fx-name', `${g.r1 - g.r0 + 1}줄 × ${g.c1 - g.c0 + 1}칸`),
+        E('span', 'fx-val', nums.length ? `합계 ${Math.round(sum).toLocaleString('ko-KR')} · 평균 ${Math.round(sum / nums.length).toLocaleString('ko-KR')} · 숫자 ${nums.length}칸 / ${n}칸` : `${n}칸 (숫자 칸 없음)`));
+      const cp = E('button', 'btn sm ghost', '복사 ⌘C'); cp.type = 'button'; cp.onclick = copySel; box.append(cp); return;
+    }
     const c = cell.c, v = cellVal(r, c);
     box.append(E('span', 'fx-name', `${r.tab} ${r.row}행 · ${cname(c)}`));
     if (canEdit(c, r)) {
@@ -451,6 +531,8 @@
       }
       el.className = 'fx-val fx-in'; el.setAttribute('aria-label', `${cname(c)} 값`); box.append(el);
     } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸(고칠 수 없음)'));
+    if (v) { const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C도 돼요'; cp.onclick = copySel; box.append(cp); }
+    if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = E('a', 'btn sm ghost', '배송 조회 ↗'); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
     const go = E('button', 'btn sm ghost', '줄 자세히 ›'); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
   }
   function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky)
@@ -513,7 +595,7 @@
   }
   const dropOpts = (r, c) => { const d = ((last.dropdowns || {})[r.tab] || {})[c]; return d || (c === 'ship_mode' ? last.edit.methods : null); };
 
-  function cellEdit(td, r, c) {
+  function cellEdit(td, r, c, init) {
     if (td.querySelector('input,select')) return;
     const k = `${rid(r)}:${c}`, now = pending[k] ? pending[k].new : (r[c] == null ? '' : String(r[c]));
     let el;
@@ -528,12 +610,12 @@
       };
     }
     el.className = 'cell-in'; el.setAttribute('aria-label', `${r.tab} ${r.row}행 ${cname(c)}`);
-    td.textContent = ''; td.append(el); el.focus(); if (el.select) el.select();
+    td.textContent = ''; td.append(el); el.focus(); if (init != null && !opts) el.value = init; else if (el.select) el.select();   // 글자를 치며 시작하면 그 글자로 바꿈(엑셀처럼)
     let done = false;
     const finish = (save, then) => { if (done) return; done = true; if (save) stage(r, c, el.value.trim()); render(); bar(); if (then) then(); };
     el.onkeydown = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') finish(false);
+      if (e.key === 'Enter') { e.preventDefault(); finish(true, () => { const nx = last.rows[last.rows.indexOf(r) + 1]; pickCell(nx || r, c); }); }   // 저장 칸에 넣고 아래 칸으로
+      else if (e.key === 'Escape') finish(false, () => pickCell(r, c));
       else if (e.key === 'Tab') { e.preventDefault(); finish(true, () => nextCell(r, c, e.shiftKey ? -1 : 1)); }
     };
     el.onblur = () => finish(true);
@@ -642,8 +724,9 @@
   // ── 줄 자세히 + 조치 ──
   function detail() {
     const box = $('dt-detail'); if (!box) return;
-    box.hidden = !sel; box.textContent = ''; if (!sel) return;
+    box.hidden = !sel; box.textContent = ''; box.classList.toggle('od-sheet', !!sel && isSheet()); if (!sel) return;
     const r = sel;
+    if (isSheet()) return orderView(box, r);
     const head = E('div', 'od-head'); const tt = E('div', 'od-title');
     const ttl = isSheet() ? `${r.receiver || '(재고)'} · ${r.name || ''}` : (r.title || r.name || r.receiver || r.key || r.lead_id || r.source_key || '줄');
     tt.append(E('div', 'od-name', ttl), E('div', 'od-role', isSheet() ? `${r.tab} ${r.row}행 · ${r.progress || ''}` : `${last.label} · ${r.lead_id || r.key || r.listing_id || r.source_key || ''}`));
@@ -689,6 +772,95 @@
     if (r.key && !isStock(r) && (isSheet() || ['orders', 'order_ledger'].includes(cur.table))) historyBox(box, r);
     box.scrollTop = 0; x.focus();
   }
+
+  // ── 주문 한 줄 보기(주문 시트) — 2026-10-23 사장님 "한 행을 눌렀을 때 그 주문 정보가 보기 좋게, 지금 상세보기는 최악이라 갈아엎자" ──
+  // 위: 누구·무엇·지금 어디(진행 단계) → 가운데: 일의 순서대로 묶은 카드(고객·배송 / 주문 / 구매 / 배대지 / 돈) — 값 누르면 복사, ✎로 바로 고침
+  // 아래: 플랫폼 기록·조치·바꾼 기록·모든 칸은 접어 둠
+  const DONE_RE = /배송완료|거래완료|구매확정/, SENT_RE = /발송완료|배송중|배송완료|거래완료|구매확정/, STOP_RE = /취소|반품|교환|출고중지/;
+  function stepsOf(r) {
+    const pg = String(r.progress || '');
+    return [['결제', !!r.order_no || !!r.ordered], ['구매', !!r.shop_order], ['해외송장', !!r.intl_tracking], ['배대지 신청', !!r.fwd_request],
+      ['국내송장', !!r.kr_invoice], ['발송', SENT_RE.test(pg)], ['배송완료', DONE_RE.test(pg)]];
+  }
+  function dday(v) {
+    const m = String(v || '').match(/(\d{4})-(\d\d)-(\d\d)/); if (!m) return '';
+    const d = Math.round((new Date(+m[1], m[2] - 1, +m[3]) - new Date(new Date().toDateString())) / 864e5);
+    return d === 0 ? ' (오늘)' : d > 0 ? ` (D-${d})` : ` (${-d}일 지남)`;
+  }
+  function orderView(box, r) {
+    const stock = isStock(r), pg = String(r.progress || '');
+    const out = E('div', 'what'); out.hidden = true; out.setAttribute('role', 'status');
+    // 머리: 받는 분 · 상품 · 탭/행 · 진행상태
+    const head = E('div', 'od-head ov-head'); const tt = E('div', 'od-title');
+    const chips = E('div', 'ov-chips');
+    for (const [t, cls] of [[r.tab, ''], [r.platform || (stock ? '재고' : ''), ''], [r.ship_mode, ''], [pg, 'badge ' + badgeCls(pg)]]) if (t) chips.append(E('span', cls || 'ov-chip', t));
+    tt.append(E('div', 'ov-who', stock ? '재고 줄' : (r.receiver || '(받는 분 없음)')), E('div', 'ov-what', [r.name, r.option].filter(Boolean).join(' · ')), chips);
+    const x = E('button', 'icon-btn', '✕'); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = () => { sel = null; detail(); render(); };
+    const nav = E('div', 'ov-nav');
+    const i = last.rows.indexOf(r);
+    const pv = btn('‹', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('›', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); });
+    pv.title = '위 줄(↑ 대신 [)'; nx.title = '아래 줄(])'; pv.disabled = i <= 0; nx.disabled = i >= last.rows.length - 1;
+    nav.append(E('span', 'muted small', `${r.tab} ${r.row}행`), pv, nx, x);
+    head.append(tt, nav); box.append(head);
+    if (r.problem) box.append(Object.assign(E('div', 'ov-alert bad'), { textContent: '⚠ 문제: ' + r.problem }));
+    if (STOP_RE.test(pg)) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: `취소·반품 흐름이에요 — ${pg}` }));
+    // 진행 단계
+    if (!stock) {
+      const st = stepsOf(r), curI = st.findIndex((s) => !s[1]);
+      const ol = E('ol', 'ov-steps');
+      st.forEach(([n, ok], j) => ol.append(E('li', ok ? 'done' : j === curI ? 'now' : '', n)));
+      box.append(ol);
+      if (curI >= 0) box.append(E('p', 'ov-next', `지금: ${st[curI][0]} 기다리는 중` + (r.due && curI <= 5 ? ` · 발송기한 ${String(r.due).slice(0, 10)}${dday(r.due)}` : '')));
+    }
+    box.append(out);
+    // 칸: 값 누르면 복사, 고칠 수 있는 칸은 ✎
+    const kv = (c, opt = {}) => {
+      const raw = r[c] == null ? '' : String(r[c]); if (!raw && !opt.always && !canEdit(c, r)) return null;
+      const row = E('div', 'ov-kv'); row.append(E('span', 'ov-k', opt.label || cname(c)));
+      const val = E('span', 'ov-v' + (opt.cls ? ' ' + opt.cls : '')); const shown = (opt.fmt ? opt.fmt(raw) : fmt(c, raw)) || '—';
+      val.textContent = shown + (c === 'due' && raw ? dday(raw) : '');
+      if (raw) { val.classList.add('copy'); val.title = '눌러서 복사'; val.onclick = async () => { try { await navigator.clipboard.writeText(raw); val.classList.add('copied'); setTimeout(() => val.classList.remove('copied'), 900); } catch (e) { /* 막힘 */ } }; }
+      if (raw && /^-|^약\s*-/.test(raw) && NUMC.includes(c)) val.classList.add('neg');
+      row.append(val);
+      if (opt.link && raw) { const a = E('a', 'ov-link', opt.link[0]); a.href = opt.link[1](raw); a.target = '_blank'; a.rel = 'noopener'; row.append(a); }
+      if (canEdit(c, r)) {
+        const ed = E('button', 'ov-ed', '✎'); ed.type = 'button'; ed.title = '고치기'; ed.setAttribute('aria-label', cname(c) + ' 고치기');
+        ed.onclick = () => {
+          const opts = dropOpts(r, c); let el;
+          if (opts) { el = select(['', ...opts, ...(raw && !opts.includes(raw) ? [raw] : [])], raw); } else { el = inp('', raw); }
+          el.className = 'ov-in';
+          const save = btn('저장', 'primary', (b) => doAct({ kind: 'sheet_edit', edits: [{ tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old: raw, new: el.value.trim(), ident: ident(r) }] }, b, out));
+          const no = btn('취소', 'ghost', () => detail());
+          el.onkeydown = (e) => { if (e.key === 'Enter') save.click(); else if (e.key === 'Escape') { e.stopPropagation(); detail(); } };
+          row.textContent = ''; row.classList.add('editing'); row.append(E('span', 'ov-k', opt.label || cname(c)), el, save, no); el.focus();
+        };
+        row.append(ed);
+      }
+      return row;
+    };
+    const card = (title, items, wide) => { const ks = items.filter(Boolean); if (!ks.length) return; const g = E('section', 'ov-card' + (wide ? ' wide' : '')); g.append(E('h3', null, title), ...ks); grid.append(g); };
+    const grid = E('div', 'ov-grid'); box.append(grid);
+    const domain = (v) => /^https?:\/\//.test(v) ? v : /^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(v) ? 'https://' + v : '';
+    const track = ['조회 ↗', trackUrl];
+    if (!stock) card('고객·배송지', [kv('receiver', { always: true }), kv('tel'), kv('pccc'), kv('zip'), kv('addr'), kv('ship_memo')], true);
+    if (!stock) card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due'), kv('qty'), kv('send_qty')]);
+    card('구매(해외)', [kv('shop', { link: domain(String(r.shop || '')) ? ['열기 ↗', domain] : null }), kv('shop_price'), kv('shop_order'), kv('intl_carrier'), kv('intl_tracking', { link: track }), stock ? kv('send_qty') : null]);
+    card('배대지·국내', [kv('ship_mode'), kv('fwd_center'), kv('fwd_request'), kv('kr_invoice', { link: track })]);
+    if (!stock) card('돈', [kv('settle'), kv('cost'), kv('ship_cost'), kv('profit', { cls: 'big' }), kv('margin'), kv('point'), kv('tax_rate')]);
+    card('메모', [kv('memo', { always: true }), kv('stock_note'), kv('problem')], true);
+    // 접어 둔 것: 플랫폼 기록 · 조치 · 바꾼 기록 · 모든 칸
+    const fold = (title, fill, open, eager) => { const d = E('details', 'ov-fold'); d.append(E('summary', null, title)); let done = false; const go = () => { if (!done) { done = true; fill(d); } }; d.ontoggle = () => { if (d.open) go(); }; if (open) d.open = true; if (open || eager) go(); box.append(d); };
+    if (r.key && !stock) fold('플랫폼 주문·처리 기록', (d) => historyBox(d, r), true);
+    fold('조치 — 문제 표시·메모·색·줄 나누기·옮기기·지우기', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
+    if (rowName(r)) fold('이 줄 바꾼 기록(되돌리기)', (d) => auditList(d, { tab: r.tab, key: rowName(r), limit: 50 }));
+    fold('모든 칸 보기', (d) => { const dl = E('dl', 'kv'); for (const [k, v] of Object.entries(r)) { if (v == null || v === '' || k === '_meta') continue; dl.append(E('dt', null, COLNAME[k] || k)); const dd = E('dd'); dd.append(E('pre', null, fmt(k, v))); dl.append(dd); } d.append(dl); }, false, true);
+    box.scrollTop = 0; x.focus();
+  }
+  document.addEventListener('keydown', (e) => {      // 자세히가 열려 있으면 [ ] 로 위·아래 줄
+    if (!sel || !isSheet() || e.target.closest('input,select,textarea') || (e.key !== '[' && e.key !== ']')) return;
+    const i = last.rows.findIndex((x) => rid(x) === rid(sel)), j = i + (e.key === ']' ? 1 : -1);
+    if (j >= 0 && j < last.rows.length) { e.preventDefault(); openRow(last.rows[j]); }
+  });
 
   // ── 바꾼 기록(grid_audit) · 되돌리기 · 지운 줄 되살리기 ──
   async function auditList(box, q) {
@@ -756,13 +928,13 @@
     const d = E('details', 'dt-form dt-tool'); const sm = E('summary');
     sm.append(E('b', null, title), E('span', 'muted small', why)); d.append(sm, ...kids); d.open = title === '문제 줄'; return d;
   };
-  function sheetActs(r, acts, out) {
+  function sheetActs(r, acts, out, noEdit) {
     const ordered = r.key && !isStock(r);
     // 칸 고치기(표에서 누르기 어려운 휴대폰용 — 같은 저장 길)
     const cols = (last.edit.editable || []).concat(isStock(r) ? last.edit.stock_only : []);
     const c = select(cols.map((x) => COLNAME[x] || x)), v = inp('새 값');
     const syncV = () => { const k = cols[c.selectedIndex]; v.value = r[k] == null ? '' : r[k]; }; c.onchange = syncV; syncV();
-    acts.append(tool('칸 고치기', '표에서 칸을 누르기 어려울 때(휴대폰) 값 고치기', field('칸', c), field('값', v), btn('시트에 저장', 'primary', (b) => {
+    if (!noEdit) acts.append(tool('칸 고치기', '표에서 칸을 누르기 어려울 때(휴대폰) 값 고치기', field('칸', c), field('값', v), btn('시트에 저장', 'primary', (b) => {
       const k = cols[c.selectedIndex];
       doAct({ kind: 'sheet_edit', edits: [{ tab: r.tab, row: r.row, key: r.key, col: sheetCol(k), old: r[k] == null ? '' : String(r[k]), new: v.value.trim(), ident: ident(r) }] }, b, out);
     })));
