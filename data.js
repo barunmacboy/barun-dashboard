@@ -1300,17 +1300,17 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     // 서버 미리보기 — 탭·주문번호가 바뀌면(적는 동안은 0.4초 기다렸다가). 다른 칸은 화면에서만 확인
     function preview(now) {
       clearTimeout(pvT);
-      if (!tab) { showPrev('', 'ⓘ', '탭을 고르면 몇 행에 들어갈지 보여 드려요'); return; }
+      if (!tab) { showPrev('', 'info', '탭을 고르면 몇 행에 들어갈지 보여 드려요'); return; }
       pvT = setTimeout(async () => {
         const my = ++pv;
-        showPrev('', '…', '확인하는 중…');
+        showPrev('', 'refresh', '확인하는 중…');
         let j; try { j = await post({ kind: 'sheet_row', op: 'stock', dry: true, tab, name: val('name') || '확인', qty: '1', order_no: val('order_no') }); } catch (e) { j = { ok: false, msg: e.message }; }
         if (my !== pv) return;
         dup = null;
         const m = String(j.msg || '');
         if (j.ok) {
           const [t, r] = m.split(' ');
-          showPrev('ok', 'pin', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄' + (val('order_no') ? ' · 중복 없음' : ''))]);
+          showPrev('ok', 'check', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄' + (val('order_no') ? ' · 중복 없음' : ''))]);
           setMsg('order_no', val('order_no') ? '중복 없음' : null);
         } else if (/이미 있음/.test(m)) {
           const at = (m.split('→')[1] || '').trim(); dup = at;
