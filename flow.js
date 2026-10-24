@@ -10,12 +10,15 @@
   const AST = { running: ['일하는 중', 'run'], watching: ['지켜보는 중', 'watch'], queued: ['차례 기다림', 'wait'], paused: ['멈춤', 'stop'], idle: ['쉬는 중', ''] };
   const KIND = { agent: '🤖', script: '⚙️', hub: '📡' };
   const CST = { waiting_human: '사람 확인', waiting_approval: '승인 대기', snoozed: '미룸' };
-  const LIMIT = () => (NARROW.matches ? 5 : 14);
+  const LIMIT = () => (NARROW.matches ? 20 : 40);       // 칸마다 따로 스크롤 — 그 아래는 '더 보기'
   const NARROW = matchMedia('(max-width: 760px)');
   let data = null, timer = 0, busy = false, shown = false, openObj = null, lastFocus = null;
   const flt = { q: '', only: '', plat: '' };
   const more = {};            // 단계 → 다 보기
   let prevStage = {};         // 객체 → 지난번 단계(옮겨 온 것 반짝)
+  const opened = {};          // 빈 단계 칸 → 펼침
+  let lane = 'order'; try { lane = localStorage.getItem('barun.flowLane') || 'order'; } catch (e) { /* 무시 */ }
+  const setLane = (id) => { lane = id; try { localStorage.setItem('barun.flowLane', id); } catch (e) { /* 무시 */ } };
 
   const won = (n) => `${(+n || 0).toLocaleString('ko-KR')}원`;
   const T = (iso) => { if (!iso) return null; const d = new Date(String(iso).slice(0, 19)); return isNaN(d) ? null : d; };
@@ -77,23 +80,49 @@
       @keyframes fl-ping { from { opacity: .9; transform: scale(.85); } to { opacity: 0; transform: scale(1.25); } }
       @keyframes fl-move { from { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } to { left: calc(100% - 8px); opacity: 0; } }
 
-      /* 레인 → 단계 칸 → 객체 카드 */
-      .fl-lane { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 0 6px; min-width: 0; }
-      .fl-lane > h2 { margin: 0 16px 2px; font-size: 16px; display: flex; align-items: baseline; gap: 8px; }
-      .fl-lane > h2 small { font-size: 12.5px; color: var(--muted); font-weight: 400; }
-      .fl-cols { display: flex; gap: 10px; overflow-x: auto; padding: 10px 16px 12px; scroll-snap-type: x proximity; align-items: flex-start; }
-      .fl-col { flex: 0 0 272px; width: 272px; background: var(--fill2); border-radius: var(--r-sm); padding: 10px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+      /* 칸반 — 레인 탭 → 단계 칸(머리 고정·칸마다 스크롤) → 카드 (2026-10-25 사장님 "칸반의 형태를 더 발전") */
+      .fl-board { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+      .fl-bh { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 12px 16px 0; }
+      .fl-tabs { display: inline-flex; background: var(--fill); border-radius: 12px; padding: 3px; gap: 2px; max-width: 100%; overflow-x: auto; }
+      .fl-tab { all: unset; box-sizing: border-box; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--sub); cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+      .fl-tab b { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); }
+      .fl-tab .h { color: var(--blue-ink); font-size: 12px; font-weight: 650; }
+      .fl-tab:hover { color: var(--ink); } .fl-tab:focus-visible { outline: 2px solid var(--blue); }
+      .fl-tab[aria-selected="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); } .fl-tab[aria-selected="true"] b { color: var(--blue-ink); }
+      .fl-bh .d { font-size: 12.5px; color: var(--muted); }
+      .fl-cols { position: relative; display: flex; gap: 10px; overflow-x: auto; padding: 12px 16px 14px; scroll-snap-type: x proximity; align-items: stretch;
+        height: clamp(520px, calc(100dvh - 190px), 1000px); }
+      .fl-col { flex: 1 0 272px; max-width: 440px; background: var(--fill2); border-radius: var(--r-sm); scroll-snap-align: start; display: flex; flex-direction: column;
+        min-width: 0; min-height: 0; box-shadow: inset 0 3px 0 transparent; overflow: hidden; }
+      .fl-col.late { box-shadow: inset 0 3px 0 var(--st-crit); } .fl-col.stuck { box-shadow: inset 0 3px 0 var(--st-warn); } .fl-col.run { box-shadow: inset 0 3px 0 var(--st-run); }
       .fl-col.flash { animation: fl-flash 1.6s ease-out; }
-      @keyframes fl-flash { from { box-shadow: 0 0 0 3px var(--blue); } to { box-shadow: 0 0 0 0 transparent; } }
-      .fl-ch { display: flex; align-items: center; gap: 8px; }
+      @keyframes fl-flash { from { outline: 3px solid var(--blue); } to { outline: 3px solid transparent; } }
+      .fl-col.shut { all: unset; box-sizing: border-box; flex: 0 0 48px; background: var(--fill2); border-radius: var(--r-sm); display: flex; flex-direction: column; align-items: center;
+        gap: 8px; padding: 10px 0; cursor: pointer; scroll-snap-align: start; }
+      .fl-col.shut:hover { background: var(--hover); } .fl-col.shut:focus-visible { outline: 2px solid var(--blue); }
+      .fl-col.shut .vn { writing-mode: vertical-rl; font-size: 12.5px; color: var(--muted); letter-spacing: .06em; white-space: nowrap; }
+      .fl-col.shut .fl-ct { color: var(--muted); }
+      .fl-ch { padding: 11px 10px 9px; display: grid; gap: 7px; border-bottom: 1px solid var(--line); flex: none; }
+      .fl-ch .t { display: flex; align-items: center; gap: 8px; min-width: 0; }
+      .fl-ct { flex: none; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; background: var(--card); border-radius: 10px; padding: 0 8px; line-height: 22px; color: var(--ink2); }
+      .fl-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+      .fl-who { display: grid; gap: 3px; }
+      .fl-ac { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--sub); min-width: 0; }
+      .fl-ac .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fl-ac .w { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .fl-ac.run { color: var(--blue-ink); font-weight: 650; } .fl-ac.run .w { color: var(--blue-ink); }
+      .fl-ac.fail .w { color: var(--red-ink); }
+      .fl-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 10px; display: flex; flex-direction: column; gap: 6px; overscroll-behavior: contain; }
+      .fl-body > details { background: var(--card); border-radius: 10px; padding: 6px 9px; font-size: 12px; }
+      .fl-body > details > summary { cursor: pointer; color: var(--sub); font-weight: 650; list-style: none; display: flex; gap: 6px; align-items: center; }
+      .fl-body > details > summary::-webkit-details-marker { display: none; }
+      .fl-body > details > summary::before { content: "▸"; color: var(--muted); } .fl-body > details[open] > summary::before { content: "▾"; }
+      .fl-body > details[open] { display: grid; gap: 6px; } .fl-body > details .fl-ag { background: var(--fill2); }
       .fl-ch .no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: var(--sub); }
-      .fl-ch h3 { margin: 0; font-size: 14.5px; flex: 1; min-width: 0; }
+      .fl-ch h3 { margin: 0; font-size: 14.5px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .fl-lv { font-size: 11px; color: var(--sub); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
       .fl-lv i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-      .fl-what { font-size: 12px; color: var(--muted); line-height: 1.4; }
-      .fl-cnt { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-      .fl-cnt .big { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-      .fl-cnt .u { font-size: 12px; color: var(--muted); }
       .fl-tag { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--card); color: var(--sub); white-space: nowrap; }
       .fl-tag.l { background: var(--red-bg); color: var(--red-ink); } .fl-tag.s { background: var(--orange-bg); color: var(--orange-ink); }
       .fl-tag.h { background: var(--blue-bg); color: var(--blue-ink); } .fl-tag.g { background: var(--green-bg); color: var(--green-ink); }
@@ -101,7 +130,7 @@
       .fl-bar b { display: block; height: 100%; }
       .fl-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; color: var(--sub); }
       .fl-legend span { display: inline-flex; align-items: center; gap: 4px; } .fl-legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
-      .fl-sec { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; margin-top: 2px; }
+      .fl-sec { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; margin: 4px 2px 0; }
       .fl-ag { background: var(--card); border-radius: 10px; padding: 7px 9px; font-size: 12px; line-height: 1.4; min-width: 0; }
       .fl-ag .t { display: flex; align-items: center; gap: 6px; font-weight: 650; color: var(--ink2); min-width: 0; }
       .fl-ag .t span.nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -116,7 +145,6 @@
         box-shadow: inset 3px 0 0 var(--blue); line-height: 1.4; }
       .fl-hc:hover { background: var(--hover); } .fl-hc:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
       .fl-hc .m { font-size: 11px; color: var(--muted); margin-top: 1px; } .fl-hc .m b { color: var(--blue-ink); font-weight: 650; }
-      .fl-list { display: flex; flex-direction: column; gap: 6px; max-height: 560px; overflow-y: auto; margin: 0 -4px; padding: 2px 4px; }
       .fl-ob { all: unset; box-sizing: border-box; display: block; width: 100%; background: var(--card); border-radius: 10px; padding: 8px 10px 8px 12px; cursor: pointer;
         font-size: 12.5px; line-height: 1.4; position: relative; border: 1px solid transparent; }
       .fl-ob:hover { border-color: var(--line); background: var(--hover); } .fl-ob:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
@@ -181,8 +209,9 @@
       @media (max-width: 760px) {
         .fl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .fl-kpi { padding: 10px 12px; } .fl-kpi .v { font-size: 20px; }
         .fl-map { padding: 12px 10px 8px; }
-        .fl-cols { flex-direction: column; align-items: stretch; overflow: visible; padding: 10px 12px 12px; scroll-snap-type: none; }
-        .fl-col { width: auto; flex: none; min-width: 0; } .fl-list { max-height: none; }
+        .fl-bh { padding: 10px 12px 0; } .fl-bh .d { display: none; }
+        .fl-cols { padding: 10px 12px 12px; gap: 8px; scroll-snap-type: x mandatory; height: calc(100dvh - 150px); }
+        .fl-col { flex: 0 0 84vw; max-width: none; }
         .fl-dr { width: 100vw; }
       }
       @media (prefers-reduced-motion: reduce) { .fl-link i, .fl-node.run .c::after, .fl-st.run::before { animation: none; } .fl-link i { display: none; } .fl-ob.moved, .fl-col.flash { animation: none; } }
@@ -197,7 +226,7 @@
         <span class="fl-upd" id="fl-upd" aria-live="polite"></span>
       </div>
       <nav class="fl-map" id="fl-map" aria-label="흐름 지도 — 누르면 그 단계로"></nav>
-      <div id="fl-lanes" style="display:grid;gap:14px;min-width:0"></div>
+      <div id="fl-lanes" style="min-width:0;scroll-margin-top:72px"></div>
       <div class="fl-low">
         <section class="card fl-feed"><h2 class="card-t" style="margin:0 0 8px;font-size:16px">오늘 움직인 주문</h2><ul id="fl-feed"></ul></section>
         <section class="card fl-next"><h2 class="card-t" style="margin:0 0 8px;font-size:16px">지금·다음 일정</h2><ul id="fl-next"></ul></section>
@@ -325,77 +354,110 @@
     return b;
   }
   function go(sid) {
+    const s = data && data.stages.find((x) => x.id === sid); if (!s) return;
+    if (s.lane !== lane) setLane(s.lane);
+    opened[sid] = true; render();
     const col = document.querySelector(`.fl-col[data-sid="${sid}"]`); if (!col) return;
-    col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-    const ln = col.closest('.fl-lane'); if (ln) ln.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('fl-lanes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    col.parentElement.scrollTo({ left: Math.max(0, col.offsetLeft - 16), behavior: 'smooth' });
     col.classList.remove('flash'); void col.offsetWidth; col.classList.add('flash');
   }
 
   function lanes(st, by, cards) {
     const box = $('fl-lanes');
-    const keep = {}; box.querySelectorAll('.fl-cols').forEach((c) => { keep['c' + c.dataset.lane] = c.scrollLeft; });
-    box.querySelectorAll('.fl-list').forEach((l) => { keep['l' + l.dataset.sid] = l.scrollTop; });
+    if (!data.lanes.some((l) => l.id === lane)) setLane('order');
+    const old = box.querySelector('.fl-cols'), keepL = old && old.dataset.lane === lane ? old.scrollLeft : 0;
+    const keepT = {}; box.querySelectorAll('.fl-body').forEach((l) => { keepT[l.dataset.sid] = l.scrollTop; });
     box.textContent = '';
+    const wrap = E('section', 'fl-board'); wrap.setAttribute('aria-label', '업무 칸반');
+    const bh = E('div', 'fl-bh'), tabs = E('div', 'fl-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '흐름');
     for (const ln of data.lanes) {
-      const sec = E('section', 'fl-lane'); sec.setAttribute('aria-label', `${ln.name} 흐름`);
       const ss = data.stages.filter((s) => s.lane === ln.id);
       const tot = ss.reduce((a, s) => a + (by[s.id] || []).length, 0), hum = ss.reduce((a, s) => a + s.human, 0);
-      const h = E('h2', null, ln.name); h.append(E('small', null, `${ln.desc} · ${tot}건${hum ? ` · 사람 차례 ${hum}` : ''}`));
-      const cols = E('div', 'fl-cols'); cols.dataset.lane = ln.id;
-      for (const s of ss) cols.append(column(s, by[s.id] || [], cards));
-      sec.append(h, cols); box.append(sec);
+      const b = E('button', 'fl-tab'); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(ln.id === lane));
+      b.append(document.createTextNode(ln.name), E('b', null, String(tot))); if (hum) b.append(E('span', 'h', `🙋${hum}`));
+      b.title = ln.desc; b.onclick = () => { setLane(ln.id); render(); }; tabs.append(b);
     }
-    box.querySelectorAll('.fl-cols').forEach((c) => { if (keep['c' + c.dataset.lane]) c.scrollLeft = keep['c' + c.dataset.lane]; });
-    box.querySelectorAll('.fl-list').forEach((l) => { if (keep['l' + l.dataset.sid]) l.scrollTop = keep['l' + l.dataset.sid]; });
+    const cur = data.lanes.find((l) => l.id === lane);
+    bh.append(tabs, E('span', 'd', `${cur.desc} — 빈 단계는 접혀 있어요(누르면 펼침)`));
+    const cols = E('div', 'fl-cols'); cols.dataset.lane = lane; cols.setAttribute('role', 'tabpanel');
+    for (const s of data.stages.filter((x) => x.lane === lane)) cols.append(column(s, by[s.id] || [], cards));
+    wrap.append(bh, cols); box.append(wrap);
+    cols.scrollLeft = keepL;
+    box.querySelectorAll('.fl-body').forEach((l) => { if (keepT[l.dataset.sid]) l.scrollTop = keepT[l.dataset.sid]; });
   }
 
   const PAL = ['var(--st-run)', 'var(--st-warn)', 'var(--st-serious)', 'var(--st-good)', 'var(--muted)', 'var(--st-crit)'];
   function column(s, list, cards) {
-    const col = E('div', 'fl-col'); col.dataset.sid = s.id;
-    const h = E('div', 'fl-ch');
-    h.append(E('span', 'no', s.n ? String(s.n) : '·'), E('h3', null, s.name));
-    if (s.level != null) { const lv = E('span', 'fl-lv'); const i = E('i'); i.style.background = LVC[s.level]; lv.append(i, document.createTextNode(LV[s.level])); lv.title = `자동화 수준 — ${s.how || ''}`; h.append(lv); }
-    col.append(h, E('div', 'fl-what', s.what));
-    const cnt = E('div', 'fl-cnt');
-    cnt.append(E('span', 'big', String(list.length)), E('span', 'u', filtering() && list.length !== s.count ? `/ ${s.count}건` : '건'));
-    if (s.late) cnt.append(E('span', 'fl-tag l', `기한 지남 ${s.late}`));
-    if (s.stuck) cnt.append(E('span', 'fl-tag s', `${s.sla}일 넘게 머묾 ${s.stuck}`));
-    if (s.into) cnt.append(E('span', 'fl-tag g', `오늘 +${s.into}`));
-    col.append(cnt);
-    if (s.groups.length) {
+    const cs = s.cards.map((id) => cards[id]).filter(Boolean);
+    const ags = s.jobs.map((j) => data.agents[j]).filter(Boolean).sort((x, y) => (y.state === 'running') - (x.state === 'running'));
+    const tks = data.tasks.filter((x) => x.stage === s.id);
+    const isRun = running(s), no = s.n ? String(s.n) : '·';
+    if (!list.length && !cs.length && !isRun && !opened[s.id]) {        // 빈 단계 — 좁게 접어 둠
+      const c = E('button', 'fl-col shut'); c.type = 'button'; c.dataset.sid = s.id;
+      c.append(E('span', 'no', no), E('span', 'fl-ct', '0'), E('span', 'vn', s.name));
+      c.title = `${s.n ? `${s.n}. ` : ''}${s.name} — ${filtering() ? '찾는 것이 없어요' : emptyText(s)} (누르면 펼침)`;
+      c.setAttribute('aria-label', `${s.name} 0건 — 펼치기`); c.onclick = () => { opened[s.id] = true; render(); };
+      return c;
+    }
+    const col = E('section', 'fl-col' + (s.late ? ' late' : s.stuck ? ' stuck' : isRun ? ' run' : '')); col.dataset.sid = s.id;
+    col.setAttribute('aria-label', `${s.n ? `${s.n}단계 ` : ''}${s.name} ${list.length}건`);
+    const h = E('header', 'fl-ch'), t = E('div', 't');
+    t.append(E('span', 'no', no), E('h3', null, s.name));
+    if (s.level != null) { const lv = E('span', 'fl-lv'); const i = E('i'); i.style.background = LVC[s.level]; lv.append(i, document.createTextNode(LV[s.level])); lv.title = `자동화 수준 — ${s.how || ''}`; t.append(lv); }
+    t.append(E('span', 'fl-ct', filtering() && list.length !== s.count ? `${list.length}/${s.count}` : String(list.length)));
+    h.title = s.what; h.append(t);
+    const fl = E('div', 'fl-flags');
+    if (cs.length) fl.append(E('span', 'fl-tag h', `🙋 사람 차례 ${cs.length}`));
+    if (s.late) fl.append(E('span', 'fl-tag l', `기한 지남 ${s.late}`));
+    if (s.stuck) fl.append(E('span', 'fl-tag s', `${s.sla}일 넘게 ${s.stuck}`));
+    if (s.into) fl.append(E('span', 'fl-tag g', `오늘 +${s.into}`));
+    if (fl.children.length) h.append(fl);
+    if (s.groups.length > 1) {                          // 칸 안 나눔(배대지별·상태별) — 하나뿐이면 생략
       const tot = s.groups.reduce((a, g) => a + g[1], 0), bar = E('div', 'fl-bar'), lg = E('div', 'fl-legend');
       s.groups.slice(0, 6).forEach(([g, n], i) => {
         const b = E('b'); b.style.width = `${n / tot * 100}%`; b.style.background = PAL[i % PAL.length]; b.title = `${g} ${n}`; bar.append(b);
-        const sp = E('span'); const d = E('i'); d.style.background = PAL[i % PAL.length]; sp.append(d, document.createTextNode(`${g} ${n}`)); lg.append(sp);
+        if (i < 4) { const sp = E('span'); const d = E('i'); d.style.background = PAL[i % PAL.length]; sp.append(d, document.createTextNode(`${g} ${n}`)); lg.append(sp); }
       });
-      col.append(bar, lg);
+      h.append(bar, lg);
     }
-    const info = extra(s); if (info) col.append(info);
-    // 담당
-    const ags = s.jobs.map((j) => data.agents[j]).filter(Boolean);
-    const tks = data.tasks.filter((x) => x.stage === s.id);
-    if (ags.length || tks.length) {
-      col.append(E('div', 'fl-sec', '담당'));
-      for (const a of ags.sort((x, y) => (y.state === 'running') - (x.state === 'running'))) col.append(agent(a, s));
-      for (const t of tks) col.append(task(t));
+    if (ags.length || tks.length) {                     // 담당 — 한 줄씩(자세한 건 칸 안 '담당')
+      const w = E('div', 'fl-who');
+      for (const a of ags.slice(0, 2)) w.append(agentLine(a));
+      for (const x of tks.slice(0, 1)) { const l = E('div', 'fl-ac' + (x.state === 'running' ? ' run' : '')); l.append(E('span', null, '💬'), E('span', 'nm', x.title || '맡긴 일'), E('span', 'w', x.state === 'running' ? '일하는 중' : '차례 기다림')); w.append(l); }
+      h.append(w);
     }
-    // 사람 차례
-    const cs = s.cards.map((id) => cards[id]).filter(Boolean);
+    col.append(h);
+    const body = E('div', 'fl-body'); body.dataset.sid = s.id;
+    const info = extra(s); if (info) body.append(info);
+    if (ags.length + tks.length) {
+      const d = E('details'); d.open = isRun;
+      d.append(E('summary', null, `담당 ${ags.length + tks.length} — 하는 일·다음 회차`));
+      for (const a of ags) d.append(agent(a, s));
+      for (const x of tks) d.append(task(x));
+      body.append(d);
+    }
     if (cs.length) {
-      col.append(E('div', 'fl-sec', `🙋 사람 차례 ${cs.length}`));
-      for (const c of cs.slice(0, more['c' + s.id] ? 99 : 3)) col.append(hcard(c));
-      if (cs.length > 3 && !more['c' + s.id]) { const m = E('button', 'fl-more', `카드 ${cs.length - 3}장 더`); m.type = 'button'; m.onclick = () => { more['c' + s.id] = true; render(); }; col.append(m); }
+      body.append(E('div', 'fl-sec', `🙋 사람 차례 ${cs.length}`));
+      for (const c of cs.slice(0, more['c' + s.id] ? 99 : 3)) body.append(hcard(c));
+      if (cs.length > 3 && !more['c' + s.id]) { const m = E('button', 'fl-more', `카드 ${cs.length - 3}장 더`); m.type = 'button'; m.onclick = () => { more['c' + s.id] = true; render(); }; body.append(m); }
     }
-    // 객체
-    if (list.length || s.count) col.append(E('div', 'fl-sec', s.lane === 'product' ? '상품' : s.id === 'asks' ? '문의' : '주문'));
-    const ul = E('div', 'fl-list'); ul.dataset.sid = s.id;
+    if (list.length) body.append(E('div', 'fl-sec', `${s.lane === 'product' ? '상품' : s.id === 'asks' ? '문의' : '주문'} ${list.length}`));
     const lim = more[s.id] ? 400 : LIMIT();
-    for (const o of list.slice(0, lim)) ul.append(obj(o));
-    if (!list.length) ul.append(E('div', 'fl-empty', filtering() ? '찾는 것이 없어요' : s.count ? '' : emptyText(s)));
-    col.append(ul);
-    if (list.length > lim) { const m = E('button', 'fl-more', `${list.length - lim}건 더 보기`); m.type = 'button'; m.onclick = () => { more[s.id] = true; render(); }; col.append(m); }
-    else if (more[s.id] && list.length > LIMIT()) { const m = E('button', 'fl-more', '접기'); m.type = 'button'; m.onclick = () => { more[s.id] = false; render(); }; col.append(m); }
+    for (const o of list.slice(0, lim)) body.append(obj(o));
+    if (!list.length) body.append(E('div', 'fl-empty', filtering() ? '찾는 것이 없어요' : emptyText(s)));
+    if (list.length > lim) { const m = E('button', 'fl-more', `${list.length - lim}건 더 보기`); m.type = 'button'; m.onclick = () => { more[s.id] = true; render(); }; body.append(m); }
+    else if (more[s.id] && list.length > LIMIT()) { const m = E('button', 'fl-more', '접기'); m.type = 'button'; m.onclick = () => { more[s.id] = false; render(); }; body.append(m); }
+    col.append(body);
     return col;
+  }
+  function agentLine(a) {
+    const [lab, cls] = AST[a.state] || AST.idle;
+    const fail = a.state !== 'running' && a.last_state === 'failed';
+    const l = E('div', 'fl-ac' + (a.state === 'running' ? ' run' : fail ? ' fail' : ''));
+    const w = a.state === 'running' ? (a.secs ? `일하는 중 · ${secs(a.secs)}` : '일하는 중') : fail ? '최근 실패' : a.next ? `다음 ${when(a.next)}` : a.on ? '신호 오면' : cls ? lab : '';
+    l.append(E('span', null, KIND[a.kind] || '🤖'), E('span', 'nm', a.name), E('span', 'w', w)); l.title = `${a.name} — ${a.doing || lab}`;
+    return l;
   }
   function emptyText(s) {
     return { new: '새 주문은 바로 다음 단계로 넘어가요', decide: '처리 방식이 정해지지 않은 주문이 없어요', ship: '국내송장을 기다리는 주문이 없어요', fwd: '신청할 차례인 주문이 없어요',
