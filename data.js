@@ -446,6 +446,7 @@
       }
       tr.append(th);
     }
+    if (ed) { const th = E('th', 'del'); th.setAttribute('aria-label', '지우기'); tr.append(th); }
     thead.append(tr); tbl.append(thead);
     const tb = E('tbody');
     for (const r of last.rows) {
@@ -488,10 +489,19 @@
             e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true;
             press = e.shiftKey || e.metaKey || e.ctrlKey ? null : { k: rid(r), c };
           };
-          td.onmouseenter = () => { if (drag && cell) { cell2 = { k: rid(r), c }; paintSel(); fx(); } };
+          td.onmouseenter = () => {   // 같은 칸이면 범위 아님 — 앞 칸 입력이 닫히며 표를 다시 그리면 누른 칸에 mouseenter가 또 와서 한 번 누르기가 범위 고르기로 바뀌던 것(2026-10-24 "더블클릭해야")
+            if (drag && cell && (cell.k !== rid(r) || cell.c !== c)) { cell2 = { k: rid(r), c }; paintSel(); fx(); }
+          };
           td.onclick = (e) => { e.stopPropagation(); if (c === 'row' && !e.shiftKey && !cell2) openRow(r); };
         }
         row.append(td);
+      }
+      if (ed) {          // 줄 끝 🗑 — 재고 줄은 한 번에(되살리기 버튼), 고객 주문 줄은 확인 한 번(나눈 줄일 수 있어서)
+        const td = E('td', 'del'), b = E('button', 'row-del', '🗑'); b.type = 'button';
+        b.title = isStock(r) || !r.key ? '이 재고 줄 지우기(되살릴 수 있어요)' : '이 주문 줄 지우기(확인 한 번 · 백업돼요)'; b.setAttribute('aria-label', `${r.tab} ${r.row}행 지우기`);
+        b.onmousedown = (e) => e.stopPropagation();
+        b.onclick = (e) => { e.stopPropagation(); rowDel(r, b); };
+        td.append(b); row.append(td);
       }
       const open = () => openRow(r);
       row.onclick = open; row.onkeydown = (e) => { if (e.key === 'Enter' && e.target === row) open(); };
@@ -499,7 +509,7 @@
     }
     tbl.append(tb);
     if (ed && last.rows.length) {      // '45행 밑에 재고줄 플러스'(사장님) — 고른 줄(없으면 맨 아래 줄)의 상품명·옵션·구매처·배송방식만 복사
-      const tf = E('tfoot'), ftr = E('tr'), ftd = E('td'); ftd.colSpan = cols.length + 1;
+      const tf = E('tfoot'), ftr = E('tr'), ftd = E('td'); ftd.colSpan = cols.length + 2;
       const box = E('div', 'dt-add');
       const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄(칸을 누른 줄)의 상품명·옵션·구매처·배송방식을 복사해 그 탭 맨 아래에 새 재고 줄 — 나머지 칸은 빈칸';
       a.onclick = (e) => { e.stopPropagation(); stockCopy(addRef(), a); };
@@ -508,6 +518,7 @@
       ftd.append(box); ftr.append(ftd); tf.append(ftr); tbl.append(tf);
     }
     wrap.append(tbl);
+    if (ed) snapCols(tbl);
     if (wrap.scrollTop !== sy || wrap.scrollLeft !== sx) { wrap.scrollTop = sy; wrap.scrollLeft = sx; }   // 다시 그려도 보던 자리 그대로(칸을 고친 뒤 표가 맨 위로 튀지 않게)
     if (!last.rows.length) wrap.append(emptyBox());
     pinLeft(tbl);
@@ -598,9 +609,11 @@
     e.preventDefault(); e.stopPropagation();
     const x0 = e.clientX, w0 = th.offsetWidth, i = [...th.parentNode.children].indexOf(th), tbl = th.closest('table');
     const mv = (ev) => {
-      const w = Math.max(36, w0 + ev.clientX - x0); colW[c] = w;
+      const w = Math.max(36, Math.round(w0 + ev.clientX - x0)); colW[c] = w;
       th.style.width = th.style.minWidth = th.style.maxWidth = w + 'px';
       for (const tr of tbl.tBodies[0].rows) { const td = tr.children[i]; if (td) td.style.maxWidth = td.style.minWidth = w + 'px'; }
+      const cs = [...tbl.querySelectorAll(':scope > colgroup > col')];   // 칸 너비를 고정해 둔 표(snapCols)는 col을 바꿔야 움직임
+      if (cs[i]) { cs[i].style.width = w + 'px'; tbl.style.width = cs.reduce((a, x) => a + parseInt(x.style.width, 10), 0) + 'px'; }
     };
     const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); saveW(); pinLeft(tbl); };
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
@@ -611,6 +624,7 @@
   document.addEventListener('mouseup', () => {
     drag = false;
     const p = press; press = null;
+    if (cell2 && cell && cell2.k === cell.k && cell2.c === cell.c) cell2 = null;      // 끌다가 제자리로 돌아옴 = 한 칸
     if (!p || cell2 || !cell || cell.k !== p.k || cell.c !== p.c || !last || !isSheet()) return;
     const r = last.rows.find((x) => rid(x) === p.k);
     if (!r || !canEdit(p.c, r)) return;
@@ -720,10 +734,25 @@
     if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = E('a', 'btn sm ghost', '배송 조회 ↗'); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
     const go = E('button', 'btn sm ghost', '줄 자세히 ›'); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
   }
-  function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky)
+  function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky) — 실제 너비(소수 포함)로, offsetWidth(반올림)면 넘길 때 고정 칸이 1px씩 밀림
     const hs = [...tbl.querySelectorAll('thead th')]; let left = 0; const at = {};
-    hs.forEach((th, i) => { if (th.classList.contains('pick') || th.classList.contains('pin')) { at[i] = left; left += th.offsetWidth; } });
+    hs.forEach((th, i) => { if (th.classList.contains('pick') || th.classList.contains('pin')) { at[i] = left; left += th.getBoundingClientRect().width; } });
     for (const tr of tbl.querySelectorAll('tr')) [...tr.children].forEach((td, i) => { if (i in at && (td.classList.contains('pin'))) td.style.left = at[i] + 'px'; });
+  }
+
+  // 칸 너비를 정수 px로 고정(2026-10-24 사장님 "열마다 살짝씩 틀어지는데 픽셀 단위로") — 저절로 정한 너비는 54.48px처럼 소수라
+  //   칸 경계·고정 칸 위치가 반 픽셀씩 어긋남. 저절로 정한 너비를 재서 경계를 반올림해 col에 박고 table-layout: fixed. 글꼴이 늦게 오면 다시 잼
+  function snapCols(tbl) {
+    const old = tbl.querySelector(':scope > colgroup'); if (old) old.remove();
+    tbl.style.tableLayout = tbl.style.width = tbl.style.minWidth = '';
+    const hs = tbl.tHead ? [...tbl.tHead.rows[0].cells] : []; if (!hs.length) return;
+    const x0 = hs[0].getBoundingClientRect().left, cg = E('colgroup'); let prev = 0;
+    hs.forEach((th, i) => {
+      const r = th.getBoundingClientRect().right - x0, x = Math.max(prev + 1, i === hs.length - 1 ? Math.floor(r + 0.01) : Math.round(r));   // 끝은 내림(표가 넘김 칸보다 0.5px 커져 가로 막대가 생기지 않게)
+      const col = E('col'); col.style.width = (x - prev) + 'px'; cg.append(col); prev = x;
+    });
+    tbl.insertBefore(cg, tbl.firstChild); tbl.style.width = prev + 'px'; tbl.style.minWidth = '0'; tbl.style.tableLayout = 'fixed';
+    if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { if (tbl.isConnected) { snapCols(tbl); pinLeft(tbl); } });
   }
 
   // 고친 칸 = 곧바로 저장(2026-10-24 사장님 "저장을 눌러야 저장돼? 그냥 입력하고 나가면 저장 안 되고?" — 시트처럼 넣으면 저장).
@@ -1031,7 +1060,7 @@
     const tr = document.querySelectorAll('.dt tbody tr')[i];
     if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('new'); }
     const c = ['shop_order', 'shop_price', 'send_qty', 'fwd_center'].find((x) => visCols().includes(x) && canEdit(x, r));
-    if (c) pickCell(r, c);
+    if (c) { pickCell(r, c); const td = cellTd(r, c); if (td) cellEdit(td, r, c, null, true); }     // 바로 입력 상태(사장님 "원클릭" — 넣은 뒤 칸을 또 누르지 않게)
   }
 
   const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 파미칼: '€', 영국: '£', 호주: 'A$' };
@@ -1583,29 +1612,36 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     }
     // 칸 카드: 값 누르면 복사, 고칠 수 있는 칸은 ✎, 지금 단계에서 비어 있는 칸은 '채울 칸'
     const kv = (c, opt = {}) => {
-      const raw = r[c] == null ? '' : String(r[c]); if (!raw && !opt.always && !canEdit(c, r)) return null;
+      const pk = pending[`${rid(r)}:${c}`], raw = pk ? pk.new : r[c] == null ? '' : String(r[c]); if (!raw && !opt.always && !canEdit(c, r)) return null;   // 저장 중인 칸은 보낸 값으로
       const row = E('div', 'ov-kv' + (need.has(c) ? ' need' : '')); row.append(E('span', 'ov-k', opt.label || cname(c)));
       const val = E('span', 'ov-v' + (opt.cls ? ' ' + opt.cls : '')); const shown = (opt.fmt ? opt.fmt(raw) : fmt(c, raw)) || (need.has(c) ? '채울 칸' : '—');
       val.textContent = shown + (c === 'due' && raw && dueState(r) ? dday(raw) : '');
-      if (raw) { val.classList.add('copy'); val.title = '눌러서 복사'; val.tabIndex = 0; val.setAttribute('role', 'button'); const cp = () => copyText(raw, cname(c) + ' 복사'); val.onclick = cp; val.onkeydown = (e) => { if (e.key === 'Enter') cp(); }; }
+      const editable = canEdit(c, r);
+      if (raw && !editable) { val.classList.add('copy'); val.title = '눌러서 복사'; val.tabIndex = 0; val.setAttribute('role', 'button'); const cp = () => copyText(raw, cname(c) + ' 복사'); val.onclick = cp; val.onkeydown = (e) => { if (e.key === 'Enter') cp(); }; }
       if (raw && /^-|^약\s*-/.test(raw) && NUMC.includes(c)) val.classList.add('neg');
       row.append(val);
       for (const [t, href, cls] of (opt.links || []).filter(() => raw)) { const a = E('a', 'ov-link' + (cls ? ' ' + cls : ''), t); a.href = href(raw); if (/^https?:/.test(a.href)) { a.target = '_blank'; a.rel = 'noopener'; a.title = t.replace(' ↗', '') + ' (새 창)'; } row.append(a); }
-      if (canEdit(c, r)) {
-        const ed = E('button', 'ov-ed', '✎'); ed.type = 'button'; ed.title = '고치기'; ed.setAttribute('aria-label', cname(c) + ' 고치기');
-        ed.onclick = () => {
+      if (editable) {      // 2026-10-24 사장님 "원클릭만으로 수정": 값을 한 번 누르면 그 자리 입력칸 — 벗어나거나 Enter면 바로 저장(표와 같은 자동 저장 길), Esc는 그대로
+        val.classList.add('ov-edv'); val.title = '눌러서 바로 고치기 — 벗어나면 저장돼요'; val.tabIndex = 0; val.setAttribute('role', 'button');
+        const go = () => {
           const opts = dropOpts(r, c); let el;
-          if (opts) { el = select(['', ...opts, ...(raw && !opts.includes(raw) ? [raw] : [])], raw); } else { el = inp(PH[c] || '', raw); }
+          if (opts) { el = select(['', ...opts, ...(raw && !opts.includes(raw) ? [raw] : [])], raw); } else { el = inp(PH[c] || '', raw); el.autocomplete = 'off'; if (NUMC.includes(c)) el.inputMode = 'decimal'; }
           el.className = 'ov-in';
-          const save = btn('저장', 'primary', (b) => {
-            if (el.value.trim() === raw) { detail(true); return; }
-            doAct({ kind: 'sheet_edit', edits: [{ tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old: raw, new: el.value.trim(), ident: ident(r) }] }, b, out);
-          });
-          const no = btn('취소', 'ghost', () => detail(true));
-          el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } else if (e.key === 'Escape') { e.stopPropagation(); detail(true); } };
-          row.textContent = ''; row.classList.add('editing'); row.append(E('span', 'ov-k', opt.label || cname(c)), el, save, no); el.focus();
+          let done = false;
+          const finish = (save) => {
+            if (done) return; done = true; editing = null;
+            if (save && el.value.trim() !== raw) { stage(r, c, el.value.trim()); toast(`${cname(c)} 저장 중…`); }
+            detail(true);
+          };
+          el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.stopPropagation(); finish(false); } };
+          el.onblur = () => finish(true);
+          if (opts) el.onchange = () => finish(true);
+          row.textContent = ''; row.classList.add('editing'); row.append(E('span', 'ov-k', opt.label || cname(c)), el);
+          editing = { el, now: raw }; el.focus(); if (el.select) el.select();
+          if (opts && el.showPicker) { try { el.showPicker(); } catch (e) { /* 목록을 못 펼치는 브라우저 — 한 번 더 누르면 열림 */ } }
         };
-        row.append(ed);
+        val.onclick = go; val.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+        if (raw) { const cp = E('button', 'ov-ed', '⧉'); cp.type = 'button'; cp.title = '복사'; cp.setAttribute('aria-label', cname(c) + ' 복사'); cp.onclick = () => copyText(raw, cname(c) + ' 복사'); row.append(cp); }
       }
       return row;
     };
@@ -1774,6 +1810,34 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
         if (t.trim() !== String(r.receiver || '').trim()) { out.hidden = false; out.textContent = '이름이 달라 지우지 않았어요'; return; }
         doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: r.key }, b, out);
       })));
+  }
+
+  // 표 줄 끝 🗑(2026-10-24 사장님 "원클릭만으로 삭제") — 서버 확인(줄 번호 + 상품명·공홈주문번호·수령인)·백업은 조치 칸 지우기와 같은 길
+  async function rowDel(r, b, force) {
+    const stock = isStock(r) || !r.key, name = r.name || r.shop_order || '재고';
+    if (!stock && !force && !confirm(`${r.receiver || '받는 분 없음'} 주문 줄(${r.tab} ${r.row}행 · ${name})을 지울까요?\n같은 주문의 나눈 줄인지 먼저 확인해 주세요. 지운 줄은 백업돼요.`)) return;
+    if (b) b.disabled = true;
+    const payload = { kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: stock ? '' : r.key, ident: ident(r) };
+    if (force) payload.force = true;
+    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+    if (b) b.disabled = false;
+    const m = String(j.msg || j.error || '');
+    if (!j.ok) {
+      if (/회차가 시트를 쓰는 중/.test(m) && confirm(m + '\n\n그래도 지울까요?')) { rowDel(r, b, true); return; }
+      toast('⚠ ' + m.split('\n')[0].slice(0, 120), true); return;
+    }
+    if (sel && rid(sel) === rid(r)) { sel = null; detail(); }
+    load(); loadTables();
+    let line = 0;          // 방금 지운 줄 백업 번호 → 되살리기 버튼
+    try { const d = await fetchJ('/api/db/deleted?limit=5'); const x = (d.rows || []).find((y) => y.tab === r.tab && String(y.row) === String(r.row) && (y.name || '') === (r.name || '')); if (x) line = x.line; } catch (e) { /* 버튼 없이 */ }
+    undoToast(`🗑 ${r.tab} ${r.row}행 ${stock ? '재고 ' + name : r.receiver || ''} 지웠어요`, line ? () => doAct({ kind: 'sheet_undo', line }, null, null) : null);
+  }
+  function undoToast(msg, fn) {
+    toast(msg, false, fn ? 8000 : 2400);
+    const t = $('dt-toast'); if (!t || !fn) return;
+    const u = E('button', 'dt-undo', '되살리기'); u.type = 'button'; u.title = '방금 지운 줄을 그 탭 맨 아래에 되살려요';
+    u.onclick = () => { t.classList.remove('show'); fn(); };
+    t.append(' ', u);
   }
 
   function stockActs(r, acts, out) {     // 재고 줄(key 없음): 옮기기·지우기 — 줄 번호 + 상품명·공홈주문번호·수령인이 화면과 같을 때만

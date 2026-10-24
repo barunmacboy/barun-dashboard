@@ -630,7 +630,8 @@ table.dt.sheet td { max-width: 180px; }
 table.dt.sheet th .th-sort { min-height: 24px; padding: 2px 0; } table.dt.sheet th .th-filt { min-height: 24px; min-width: 20px; padding: 2px; }
 table.dt.sheet td.pick input[type=checkbox] { width: 14px; height: 14px; margin: 0; vertical-align: middle; }
 table.dt.sheet td.pick, table.dt.sheet th.pick { padding-top: 0; padding-bottom: 0; }
-table.dt.sheet td.cur { outline: 2px solid var(--blue); outline-offset: -2px; }
+table.dt.sheet td:focus, table.dt.sheet td:focus-visible { outline: none; border-radius: 0; }   /* 전체 :focus-visible(3px 둥근 테)이 칸에 겹치지 않게 */
+table.dt.sheet td.cur, table.dt.sheet tr.prob td.cur:nth-child(2) { box-shadow: inset 0 0 0 2px var(--blue); }   /* 고른 칸 = 칸 안쪽 2px 한 겹, 사방 회색 선은 그대로(2026-10-24 "파란 선이 몇 겹") */
 table.dt.sheet td.insel { background: var(--blue-bg); }
 table.dt.sheet td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.dt.sheet td.neg { color: var(--red-ink, #c62828); }
@@ -646,7 +647,7 @@ table.dt.sheet .badge { padding: 0 6px; font-size: 11px; }
 .dt-fx .fx-name { flex: none; font-weight: 700; padding-right: 8px; border-right: 1px solid var(--line); white-space: nowrap; }
 .dt-fx .fx-val { flex: 1; min-width: 0; word-break: break-all; }
 .dt-fx .fx-in { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
-table.dt.sheet td.ed { cursor: text; box-shadow: inset 0 -1px 0 var(--line); }
+table.dt.sheet td.ed { cursor: text; }   /* 아래 선을 한 줄 더 그리면 고칠 칸만 선이 2px — 열마다 가로선이 어긋나 보임(2026-10-24) */
 table.dt.sheet td.ed:hover { background: var(--blue-bg); }
 table.dt.sheet td.dirty { background: var(--orange-bg); color: var(--orange-ink); font-weight: 600; }
 table.dt.sheet tr.stock { background: var(--fill2); }
@@ -655,6 +656,9 @@ table.dt.sheet tr.prob { background: var(--red-bg); }
 table.dt.sheet tbody tr { background: var(--card); }
 table.dt.sheet tbody tr.on { background: var(--blue-bg); }
 .cell-in { font: inherit; width: 100%; min-width: 120px; padding: 4px 6px; border: 2px solid var(--blue); border-radius: 6px; background: var(--card); color: var(--ink); }
+table.dt.sheet .cell-in, table.dt.sheet .cell-in:focus, table.dt.sheet .cell-in:focus-visible {   /* 칸 안 입력 = 칸 크기 그대로, 테 없음(고른 칸의 파란 한 겹만) — 줄 높이가 26→37px로 늘던 것 */
+  display: block; width: 100%; min-width: 0; height: 20px; margin: 0; padding: 0; border: 0; border-radius: 0; outline: none; box-shadow: none; background: transparent; color: inherit; font: inherit; line-height: 20px; }
+table.dt.sheet td:has(> .cell-in) { background: var(--card); color: var(--ink); }   /* 입력 중인 칸은 흰 바탕(색 줄·고른 칸 파랑 위에서도 글자가 잘 보이게) */
 .dt-bar { position: sticky; bottom: 12px; z-index: 20; margin: 12px 0; background: var(--ink); color: var(--card); border-radius: 16px; padding: 10px 14px;
   display: grid; gap: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .18); }
 .dt-bar-g { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -705,9 +709,10 @@ table.dt.sheet td.saved { animation: dt-saved 1.6s ease-out; }
 .dt-tb[aria-expanded="true"] { background: var(--fill); color: var(--ink); }
 table.dt th.pin, table.dt td.pin { position: sticky; z-index: 1; background: inherit; }
 table.dt th.pin { z-index: 3; background: var(--card); box-shadow: inset -1px 0 0 var(--line); }
+table.dt.sheet th.pin { box-shadow: none; }   /* 시트는 칸마다 오른쪽 선이 있어 겹치면 머리글만 2px */
 table.dt.sheet tbody tr.painted { background: var(--row-bg); color: #17191e; }
 table.dt.sheet tbody tr.painted td.rowh { color: #1b64da; }   /* 시트 색 줄(밝은 배경)은 어두운 화면에서도 진한 파랑 */
-table.dt.sheet td.has-note { position: relative; }
+table.dt.sheet td.has-note:not(.pin) { position: relative; }   /* 고정 칸은 sticky 그대로(relative면 넘길 때 안 붙음) */
 .note-dot { position: absolute; top: 0; right: 1px; font-size: 9px; line-height: 1; color: #d97706; pointer-events: none; }
 .dt-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 2px 12px; max-height: 280px; overflow: auto; }
 .dt-col { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; min-height: 34px; }
@@ -790,6 +795,12 @@ dl.kv pre.copy { cursor: copy; white-space: pre-wrap; overflow-wrap: anywhere; f
   max-width: min(92vw, 520px); background: #191f28; color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 28px rgba(0, 0, 0, .25);
   transition: opacity .15s, transform .15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dt-toast.show { opacity: 1; transform: translate(-50%, 0); } .dt-toast.bad { background: var(--red); }
+.dt-toast .dt-undo { font: inherit; color: #9ec5ff; background: none; border: 0; padding: 0 0 0 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.dt-toast.show .dt-undo { pointer-events: auto; }
+table.dt.sheet td.del, table.dt.sheet th.del { width: 28px; padding: 0 4px; text-align: center; }
+.row-del { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 6px; opacity: .35; }
+table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hover { background: var(--red-bg, #fdecec); }
+.ov-v.ov-edv { cursor: text; border-radius: 6px; } .ov-v.ov-edv:hover { background: var(--blue-bg); }
 @media (prefers-reduced-motion: reduce) { .dt-toast { transition: none; } }
 @media (max-width: 1023px) { html:not(.dt-open) .dt-toast { bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom)); } }
 /* 휴대폰 */
