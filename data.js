@@ -52,8 +52,7 @@
     const tools = E('div', 'dt-tools');
     const fp = E('div', 'dt-fpanel'); fp.id = 'dt-fpanel'; fp.hidden = true;
     const au = E('div', 'dt-form dt-audit'); au.hidden = true;
-    const st = E('div', 'dt-stock'); st.hidden = true;
-    card.append(E('div', 'dt-tables', null), tools, fp, au, st, E('div', 'dt-presets', null), E('div', 'dt-facets', null), E('div', 'dt-active', null),
+    card.append(E('div', 'dt-tables', null), tools, fp, au, E('div', 'dt-presets', null), E('div', 'dt-facets', null), E('div', 'dt-active', null),
       Object.assign(E('div', 'dt-fx'), { hidden: true }), E('div', 'dt-wrap', null), E('div', 'dt-more', null));
     root.append(card, Object.assign(E('div', 'dt-bar'), { id: 'dt-bar', hidden: true }), Object.assign(E('div', 'card dt-detail'), { id: 'dt-detail', hidden: true }));
     const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '찾기 — 받는 분·상품·주문번호·송장·전화'; q.setAttribute('aria-label', '찾기'); q.enterKeyHint = 'search';
@@ -68,7 +67,7 @@
     const bs = E('div', 'dt-tbtns');
     bs.append(tb('필터·정렬', 'dt-fbtn', () => { fp.hidden = !fp.hidden; panel(); if (!fp.hidden) fp.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }),
       tb('', 'dt-vbtn', () => setView(viewMode() === 'cards' ? 'grid' : 'cards')),
-      tb('＋ 재고 줄', 'dt-sbtn', () => { st.hidden = !st.hidden; stockForm(); }),
+      tb('＋ 재고 넣기', 'dt-sbtn', () => stockDialog()),
       tb('바꾼 기록', 'dt-abtn', () => auditPanel()));
     bs.querySelector('.dt-abtn').title = '현황판에서 바꾼 기록 · 되돌리기 · 지운 줄 되살리기';
     const sv = E('span', 'dt-save'); sv.hidden = true; sv.setAttribute('role', 'status'); sv.setAttribute('aria-live', 'polite');   // 바로 저장 상태(저장 중·저장됨·되돌리기)
@@ -339,7 +338,7 @@
     last = j;
     for (const [c, on] of [['.dt-sbtn', isSheet()], ['.dt-abtn', isSheet()]]) { const b = document.querySelector(c); if (b) b.hidden = !on; }
     saveUI();
-    if (!isSheet()) { for (const c of ['.dt-stock', '.dt-audit']) { const b = document.querySelector(c); if (b) b.hidden = true; } }
+    if (!isSheet()) { const b = document.querySelector('.dt-audit'); if (b) b.hidden = true; }
     const pb = document.querySelector('.dt-presets'); pb.textContent = '';
     if ((last.presets || []).length) chips(pb, '할 일', last.presets, (v) => cur.preset === v, (v) => { cur.preset = cur.preset === v ? '' : v; cur.offset = 0; load(); }, !cur.preset, () => { cur.preset = ''; cur.offset = 0; load(); });
     const fb = document.querySelector('.dt-facets'); fb.textContent = '';
@@ -349,13 +348,13 @@
       chips(fb, cname(f), vals, (v) => !!fin && fin.vs.includes(v == null ? '' : v), (v, e) => { pickVal(f, v == null ? '' : v, e && (e.metaKey || e.ctrlKey || e.shiftKey)); load(); }, !has, () => { setFilter(f, null); load(); }, f);
     }
     panel();
-    if (!document.querySelector('.dt-stock').hidden) stockForm();
     if (sel && isSheet()) { const n = last.rows.find((x) => rid(x) === rid(sel)); if (n && n !== sel) { const st = ($('dt-detail') || {}).scrollTop; sel = n; detail(true); if (st) $('dt-detail').scrollTop = st; } }
     render();
     const sig = ps.toString(); if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
+    if (isSheet()) { const b = E('button', 'btn sm weak', '＋ 재고 줄 추가'); b.type = 'button'; b.title = '고객 없이 들어온 물건을 이 탭 맨 아래 줄로'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
     if (cur.offset > 0) { const b = E('button', 'btn sm ghost', '‹ 앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
     if (cur.offset + last.rows.length < last.total) { const b = E('button', 'btn sm ghost', '다음 ›'); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
     bar();
@@ -963,19 +962,387 @@
   const tabsOf = () => ((last.tabs && last.tabs.length) ? last.tabs : ((last.facets || {}).tab || []).map((x) => x[0])).filter(Boolean);
   const tabPicked = () => { const f = cur.filters.find((x) => x.c === 'tab' && x.op === 'in' && x.vs.length === 1); return f ? f.vs[0] : undefined; };
 
-  // ── 재고 줄 추가(주문 시트 위) ──
-  function stockForm() {
-    const box = document.querySelector('.dt-stock'); if (!box) return; box.textContent = '';
-    if (!isSheet() || box.hidden) return;
-    const f = E('div', 'dt-acts');
-    const tab = select(tabsOf(), tabPicked()), shop = inp('예: 아마존·츄위·공홈'), no = inp('공홈 주문번호'), price = inp('공홈가(외화)'), qty = inp('보낼수량', '1'),
-      center = inp('배대지센터 예: 미국 NJ'), name = inp('상품명'), opt = inp('옵션(선택)'), tr = inp('해외송장(선택)'), car = inp('해외운송사(선택)'), memo = inp('메모(기본 오토쉽)');
-    const out = E('div', 'what'); out.hidden = true;
-    const go = btn('시트 맨 아래에 추가', 'primary', (b) => doAct({ kind: 'sheet_row', op: 'stock', tab: tab.value, shop: shop.value.trim(), order_no: no.value.trim(), price: price.value.trim(),
-      qty: qty.value.trim(), center: center.value.trim(), name: name.value.trim(), 옵션: opt.value.trim(), 해외송장: tr.value.trim(), 해외운송사: car.value.trim(), 메모: memo.value.trim() }, b, out));
-    f.append(form('재고 줄(수령인 빈칸 — 같은 공홈주문번호가 이미 있으면 넣지 않아요)', field('탭', tab), field('상품명', name), field('옵션', opt), field('구매처', shop), field('공홈주문번호', no),
-      field('공홈가', price), field('보낼수량', qty), field('배대지센터', center), field('해외송장', tr), field('해외운송사', car), field('메모', memo), go, out));
-    box.append(f);
+  // ── 재고 넣기 창(2026-10-24 사장님 "DB에 손으로 재고를 넣어야 할 때 시트 화면에서 행 추가가 안 됨", "UIUX 근본적으로 갈아엎어, HCI 기반") ──
+  //   꼭 필요한 것(탭·상품명·수량)만 먼저, 나머지는 '선택'으로 접음(점진적 공개) · 이 탭에서 쓰던 구매처·센터·상품명을 눌러 넣기(기억 대신 알아보기)
+  //   · 쓰기 전에 서버 미리보기(재고줄 --시험)로 '몇 행에 들어가는지 · 같은 공홈주문번호가 이미 있는지'를 바로 보여 줌 · 넣은 뒤 그 줄로 가기 / 이어서 하나 더
+  //   공홈가를 모르면 빈칸(0으로 채우지 않음 — 절대 규칙 11).
+  const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 파미칼: '€', 영국: '£', 호주: 'A$' };
+  const SK_KEEP = ['tab', 'shop', 'center'];      // '하나 더 넣기'에서 남겨 두는 칸(같은 상자에서 여러 개 넣을 때)
+  let sk = null;
+  function stockDialog(tab) {
+    if (!sk) sk = buildStock();
+    sk.open(tab);
+  }
+  function skCss() {
+    if ($('sk-css')) return;
+    const s = E('style'); s.id = 'sk-css';
+    s.textContent = `
+.dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); }
+dialog.sk { border: 0; padding: 0; border-radius: 20px; width: min(600px, calc(100vw - 24px)); max-height: min(880px, calc(100dvh - 32px)); background: var(--card); color: var(--ink); box-shadow: var(--pop); overflow: hidden; }
+dialog.sk[open] { display: flex; flex-direction: column; animation: sk-in .18s ease-out; }
+dialog.sk::backdrop { background: rgba(0, 0, 0, .42); }
+.sk-f { display: flex; flex-direction: column; min-height: 0; flex: 1; margin: 0; }
+.sk-grab { display: none; }
+.sk-h { display: flex; align-items: flex-start; gap: 12px; padding: 20px 20px 10px; }
+.sk-h h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.sk-h p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.sk-x { margin-left: auto; flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--fill); color: var(--sub); font-size: 16px; cursor: pointer; }
+.sk-x:hover { background: var(--hover); color: var(--ink); }
+.sk-body { overflow: auto; overscroll-behavior: contain; padding: 6px 20px 18px; display: grid; gap: 20px; }
+.sk-sec { display: grid; gap: 16px; min-width: 0; }
+.sk-sec.tabs { gap: 10px; }
+.sk-lab { font-size: 13px; font-weight: 700; color: var(--sub); display: flex; gap: 6px; align-items: baseline; }
+.sk-req { color: var(--blue-ink); font-weight: 600; font-size: 12px; }
+.sk-opt { color: var(--muted); font-weight: 500; font-size: 12px; }
+.sk-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sk-chip { border: 0; border-radius: 999px; padding: 0 15px; min-height: 38px; font: inherit; font-size: 14px; font-weight: 600; background: var(--fill); color: var(--ink2); cursor: pointer; transition: background .12s, color .12s; }
+.sk-chip:hover { background: var(--hover); }
+.sk-chip[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+.sk-chip.s { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 30px; padding: 0 11px; font-size: 13px; font-weight: 500; background: var(--fill2); box-shadow: inset 0 0 0 1px var(--line); color: var(--sub); }
+.sk-chip.s:hover { color: var(--ink); }
+.sk-chip:focus-visible, .sk-x:focus-visible, .sk-step button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sk-in { display: grid; gap: 6px; min-width: 0; }
+.sk-in > span { font-size: 13px; color: var(--sub); font-weight: 600; display: flex; gap: 6px; align-items: baseline; }
+.sk-in input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill2); border: 1.5px solid transparent; border-radius: 12px; padding: 0 14px; height: 48px; width: 100%; min-width: 0; transition: border-color .12s, background .12s, box-shadow .12s; }
+.sk-in input::placeholder { color: var(--muted); }
+.sk-in input:hover { background: var(--fill); }
+.sk-in input:focus { outline: none; background: var(--card); border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
+.sk-in input[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
+.sk-msg { font-size: 12.5px; color: var(--muted); min-height: 0; }
+.sk-msg.bad { color: var(--red-ink); }
+.sk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.sk-step { display: flex; align-items: center; background: var(--fill2); border-radius: 12px; min-height: 48px; }
+.sk-step button { width: 44px; height: 48px; border: 0; background: transparent; font-size: 20px; line-height: 1; color: var(--ink2); cursor: pointer; border-radius: 12px; }
+.sk-step button:hover:not(:disabled) { background: var(--fill); }
+.sk-step button:disabled { color: var(--line); cursor: default; }
+.sk-in .sk-step input { width: 44px; text-align: center; border: 0; background: transparent; font-size: 17px; font-weight: 700; padding: 0; box-shadow: none; }
+.sk-money { position: relative; display: block; }
+.sk-money b { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; font-size: 15px; pointer-events: none; }
+.sk-in .sk-money input { padding-left: 40px; }
+.sk-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; align-items: start; }
+.sk-grid2 > .full { grid-column: 1 / -1; }
+details.sk-more { border-top: 1px solid var(--line); padding-top: 4px; }
+details.sk-more > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; color: var(--ink2); font-size: 15px; font-weight: 700; cursor: pointer; list-style: none; padding: 0; }
+details.sk-more > summary::-webkit-details-marker { display: none; }
+details.sk-more > summary::before { content: none; }
+details.sk-more > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 20px; transform: rotate(90deg); transition: transform .15s; }
+details.sk-more[open] > summary::after { transform: rotate(-90deg); }
+.sk-sumv { color: var(--muted); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
+.sk-prev { margin: 0 20px 12px; padding: 12px 14px; border-radius: 12px; background: var(--fill2); color: var(--sub); font-size: 14px; display: flex; gap: 10px; align-items: center; min-height: 48px; line-height: 1.4; }
+.sk-prev .ic { flex: none; width: 24px; text-align: center; font-size: 16px; }
+.sk-prev .tx { flex: 1; min-width: 0; }
+.sk-prev b { color: inherit; }
+.sk-prev.ok { background: var(--blue-bg); color: var(--blue-ink); }
+.sk-prev.bad { background: var(--red-bg); color: var(--red-ink); }
+.sk-prev.warn { background: var(--orange-bg); color: var(--orange-ink); }
+.sk-foot { display: flex; gap: 8px; align-items: center; padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); }
+.sk-why { flex: 1; color: var(--muted); font-size: 13px; min-width: 0; }
+.sk-kbd { color: var(--muted); font-size: 12px; }
+.sk-foot .btn { min-height: 48px; padding: 0 20px; font-size: 15px; border-radius: 12px; }
+.sk-foot .btn.primary:disabled { opacity: 1; background: var(--fill); color: var(--muted); cursor: not-allowed; }
+.sk-body[hidden], .sk-prev[hidden], .sk-chips[hidden] { display: none; }
+.sk-done { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 24px 20px 20px; overflow: auto; }
+.sk-done .ok { width: 60px; height: 60px; border-radius: 50%; background: var(--green-bg); color: var(--green-ink); display: grid; place-items: center; font-size: 30px; font-weight: 700; animation: sk-pop .3s ease-out; }
+.sk-done h3 { margin: 0; font-size: 20px; }
+.sk-done p { margin: 0; color: var(--muted); font-size: 14px; }
+.sk-kv { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; text-align: left; background: var(--fill2); border-radius: 12px; padding: 14px 16px; font-size: 14px; margin: 4px 0 0; }
+.sk-kv dt { color: var(--muted); } .sk-kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+@keyframes sk-in { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+@keyframes sk-up { from { transform: translateY(100%); } }
+@keyframes sk-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.08); } }
+@media (max-width: 760px) {
+  dialog.sk { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 22px 22px 0 0; max-height: 94dvh; }
+  dialog.sk[open] { animation: sk-up .24s cubic-bezier(.2, .8, .2, 1); }
+  .sk-grab { display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 0; }
+  .sk-h { padding-top: 12px; }
+  .sk-grid2 { grid-template-columns: minmax(0, 1fr); }
+  .sk-kbd { display: none; }
+  .sk-foot .btn.primary { flex: 1; }
+  .sk-why { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { dialog.sk[open], .sk-done .ok { animation: none; } }
+`;
+    document.head.append(s);
+  }
+
+  function buildStock() {
+    skCss();
+    const d = E('dialog', 'sk'); d.setAttribute('aria-labelledby', 'sk-t'); d.setAttribute('aria-describedby', 'sk-d');
+    const f = E('form', 'sk-f'); f.noValidate = true; f.autocomplete = 'off';
+    const head = E('div', 'sk-h'); const ht = E('div');
+    const h2 = E('h2', null, '재고 넣기'); h2.id = 'sk-t';
+    const hp = E('p', null, '고객 없이 들어온 물건을 시트 맨 아래 줄로 남겨요. 상품명과 수량만 있어도 돼요.'); hp.id = 'sk-d';
+    ht.append(h2, hp);
+    const x = E('button', 'sk-x', '✕'); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = () => tryClose();
+    head.append(ht, x);
+    const body = E('div', 'sk-body'), prev = E('div', 'sk-prev'), foot = E('div', 'sk-foot');
+    prev.setAttribute('role', 'status'); prev.setAttribute('aria-live', 'polite');
+    f.append(E('div', 'sk-grab'), head, body, prev, foot);
+    d.append(f); document.body.append(d);
+
+    // 칸 만들기 — 라벨·입력·아래 한 줄 안내(오류도 여기)
+    const fld = {}, msg = {};
+    const mk = (k, label, o = {}) => {
+      const l = E('label', 'sk-in'); const t = E('span', null, label);
+      if (o.req) t.append(E('span', 'sk-req', '필수'));
+      const i = E('input'); i.name = k; i.placeholder = o.ph || ''; i.spellcheck = false;
+      if (o.mode) i.inputMode = o.mode;
+      if (o.list) i.setAttribute('list', o.list);
+      const m = E('div', 'sk-msg', o.hint || ''); m.id = 'sk-m-' + k; i.setAttribute('aria-describedby', m.id); m.dataset.hint = o.hint || '';
+      fld[k] = i; msg[k] = m;
+      l.append(t, o.wrap ? o.wrap(i) : i, m);
+      return l;
+    };
+    const dl = (id) => { const x = E('datalist'); x.id = id; d.append(x); return x; };
+    const dlName = dl('sk-l-name'), dlShop = dl('sk-l-shop'), dlCenter = dl('sk-l-center'), dlCar = dl('sk-l-car');
+
+    // 1) 어느 탭
+    const tabSec = E('div', 'sk-sec tabs'); const tabLab = E('div', 'sk-lab', '어느 탭에'); tabLab.append(E('span', 'sk-req', '필수'));
+    const tabBox = E('div', 'sk-chips'); tabBox.setAttribute('role', 'group'); tabBox.setAttribute('aria-label', '탭');
+    tabSec.append(tabLab, tabBox);
+
+    // 2) 무엇을 몇 개
+    const what = E('div', 'sk-sec');
+    const nameF = mk('name', '상품명', { req: true, ph: '예: 유세린 우레아 10% 로션 400ml', list: 'sk-l-name', hint: '이 탭에 있던 이름은 적기 시작하면 골라 넣을 수 있어요' });
+    const step = (i) => {
+      const w = E('div', 'sk-step');
+      const minus = E('button', null, '−'); minus.type = 'button'; minus.setAttribute('aria-label', '수량 하나 줄이기');
+      const plus = E('button', null, '+'); plus.type = 'button'; plus.setAttribute('aria-label', '수량 하나 늘리기');
+      const set = (n) => { i.value = String(Math.max(1, n)); changed('qty'); };
+      minus.onclick = () => set((parseInt(i.value, 10) || 1) - 1); plus.onclick = () => set((parseInt(i.value, 10) || 0) + 1);
+      i.addEventListener('input', () => { minus.disabled = !((parseInt(i.value, 10) || 0) > 1); });
+      w.append(minus, i, plus); w.sync = () => { minus.disabled = !((parseInt(i.value, 10) || 0) > 1); }; step.w = w;
+      return w;
+    };
+    const qtyF = mk('qty', '보낼수량', { req: true, mode: 'numeric', wrap: step });
+    const r1 = E('div', 'sk-row'); r1.append(mk('option', '옵션', { ph: '예: 3개입 · 무향' }), qtyF);
+    what.append(nameF, r1);
+
+    // 3) 어디서 샀나요(선택) · 4) 배송 정보(선택)
+    const chipsFor = (k) => { const c = E('div', 'sk-chips'); c.dataset.for = k; return c; };
+    const shopChips = chipsFor('shop'), centerChips = chipsFor('center');
+    const money = (i) => { const w = E('span', 'sk-money'); const b = E('b', null, '$'); w.append(b, i); money.b = b; return w; };
+    const buy = E('details', 'sk-more'); const bs = E('summary'); const bsv = E('span', 'sk-sumv');
+    bs.append(document.createTextNode('어디서 샀나요'), E('span', 'sk-opt', '선택'), bsv); buy.append(bs);
+    const bg = E('div', 'sk-grid2');
+    const shopF = mk('shop', '구매처', { ph: '예: 아마존 · 츄위 · 공홈', list: 'sk-l-shop' }); shopF.insertBefore(shopChips, shopF.lastChild); shopF.classList.add('full');
+    bg.append(shopF, mk('order_no', '공홈주문번호', { ph: '있으면 적어 주세요', hint: '같은 번호는 두 번 들어가지 않아요' }),
+      mk('price', '공홈가', { ph: '모르면 비워 두세요', mode: 'decimal', wrap: money, hint: '모르면 빈칸 — 0으로 채우지 않아요' }));
+    buy.append(bg);
+    const ship = E('details', 'sk-more'); const ss = E('summary'); const ssv = E('span', 'sk-sumv');
+    ss.append(document.createTextNode('배송 정보'), E('span', 'sk-opt', '선택'), ssv); ship.append(ss);
+    const sg = E('div', 'sk-grid2');
+    const centerF = mk('center', '배대지센터', { ph: '예: 미국 NJ', list: 'sk-l-center' }); centerF.insertBefore(centerChips, centerF.lastChild); centerF.classList.add('full');
+    sg.append(centerF, mk('tracking', '해외송장', { ph: '있으면' }), mk('carrier', '해외운송사', { ph: '예: UPS · ONTRAC', list: 'sk-l-car' }), Object.assign(mk('memo', '메모', { ph: '예: 오토쉽 남은 것 · 반품 재입고' }), { className: 'sk-in full' }));
+    ship.append(sg);
+    body.append(tabSec, what, buy, ship);
+
+    // 아래 막대 — 왜 못 넣는지(있으면) · 단축키 · 취소 · 넣기
+    const why = E('span', 'sk-why'); const kbd = E('span', 'sk-kbd', (/Mac|iP/.test(navigator.platform) ? '⌘' : 'Ctrl') + '+Enter');
+    const cancel = E('button', 'btn ghost', '취소'); cancel.type = 'button'; cancel.onclick = () => tryClose();
+    const go = E('button', 'btn primary', '넣기'); go.type = 'submit';
+    foot.append(why, kbd, cancel, go);
+
+    let tab = '', dup = null, busyTry = false, sending = false, done = null, pv = 0, pvT = 0;
+    const sug = {};        // 탭별 쓰던 값 {tab: {shop, center, name, car}}
+    const val = (k) => (fld[k].value || '').trim();
+    const dirty = () => ['name', 'option', 'shop', 'order_no', 'price', 'tracking', 'carrier', 'memo'].some((k) => val(k)) && !done;
+    const priceBad = () => { const p = val('price').replace(/,/g, ''); return !!p && !/^\d+(\.\d+)?$/.test(p); };
+    const qtyBad = () => !/^\d+$/.test(val('qty')) || +val('qty') < 1;
+    function setMsg(k, t, bad) { msg[k].textContent = t == null ? msg[k].dataset.hint : t; msg[k].classList.toggle('bad', !!bad); fld[k].setAttribute('aria-invalid', bad ? 'true' : 'false'); }
+    function blocker() {
+      if (!tab) return '탭을 골라 주세요';
+      if (!val('name')) return '상품명을 적어 주세요';
+      if (qtyBad()) return '보낼수량은 1 이상 숫자로';
+      if (priceBad()) return '공홈가는 숫자만(모르면 빈칸)';
+      if (dup) return '같은 공홈주문번호가 이미 있어요';
+      return '';
+    }
+    function sync() {
+      const b = blocker();
+      go.disabled = !!b || sending; why.textContent = b;
+      go.textContent = sending ? '넣는 중…' : tab ? `${tab} 탭에 넣기` : '넣기';
+      setMsg('price', priceBad() ? '숫자만 적어 주세요(예: 24.99) — 모르면 비워 두세요' : null, priceBad());
+      setMsg('qty', qtyBad() && val('qty') ? '1 이상 숫자' : '', qtyBad() && !!val('qty'));
+      money.b.textContent = CUR[tab] || '¤';
+      bsv.textContent = buy.open ? '' : [val('shop'), val('order_no'), val('price') && (CUR[tab] || '') + val('price')].filter(Boolean).join(' · ');
+      ssv.textContent = ship.open ? '' : [val('center'), val('tracking'), val('carrier'), val('memo')].filter(Boolean).join(' · ');
+      if (step.w) step.w.sync();
+    }
+    buy.ontoggle = sync; ship.ontoggle = sync;
+
+    function showPrev(kind, ic, html) { prev.className = 'sk-prev' + (kind ? ' ' + kind : ''); prev.textContent = ''; prev.append(E('span', 'ic', ic)); const t = E('span', 'tx'); if (typeof html === 'string') t.textContent = html; else t.append(...html); prev.append(t); }
+    // 서버 미리보기 — 탭·주문번호가 바뀌면(적는 동안은 0.4초 기다렸다가). 다른 칸은 화면에서만 확인
+    function preview(now) {
+      clearTimeout(pvT);
+      if (!tab) { showPrev('', 'ⓘ', '탭을 고르면 몇 행에 들어갈지 보여 드려요'); return; }
+      pvT = setTimeout(async () => {
+        const my = ++pv;
+        showPrev('', '…', '확인하는 중…');
+        let j; try { j = await post({ kind: 'sheet_row', op: 'stock', dry: true, tab, name: val('name') || '확인', qty: '1', order_no: val('order_no') }); } catch (e) { j = { ok: false, msg: e.message }; }
+        if (my !== pv) return;
+        dup = null;
+        const m = String(j.msg || '');
+        if (j.ok) {
+          const [t, r] = m.split(' ');
+          showPrev('ok', '📍', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄로 들어가요' + (val('order_no') ? ' — 같은 주문번호 없음 ✓' : ''))]);
+          setMsg('order_no', val('order_no') ? '✓ 이 번호는 아직 시트에 없어요' : null);
+        } else if (/이미 있음/.test(m)) {
+          const at = (m.split('→')[1] || '').trim(); dup = at;
+          const b = E('button', 'btn sm weak', '그 줄 보기'); b.type = 'button';
+          const pos = at.split(',')[0].trim().match(/^(\S+) (\d+)행$/);
+          b.onclick = () => { if (pos) goRow(pos[1], pos[2], val('order_no')); };
+          showPrev('bad', '⚠', [document.createTextNode('같은 공홈주문번호가 이미 '), E('b', null, at), document.createTextNode('에 있어요. '), ...(pos ? [b] : [])]);
+          setMsg('order_no', `이미 ${at}에 있어요 — 다른 물건이면 번호를 비워 두세요`, true);
+        } else {
+          showPrev('warn', '!', m.replace(/^⚠\s*/, ''));
+        }
+        sync();
+      }, now ? 0 : 400);
+    }
+
+    function changed(k) {
+      if (k === 'order_no') { dup = null; setMsg('order_no', null); preview(); }
+      sync();
+    }
+    for (const k of Object.keys(fld)) fld[k].addEventListener('input', () => changed(k));
+    fld.qty.addEventListener('blur', () => { if (!val('qty')) { fld.qty.value = '1'; sync(); } });
+    fld.price.addEventListener('blur', () => { const p = val('price').replace(/,/g, ''); if (p !== val('price')) { fld.price.value = p; sync(); } });
+
+    // 이 탭에서 쓰던 값(구매처·센터·상품명·운송사) — 눌러 넣는 칩 + 적을 때 고르기 목록
+    async function suggest(t) {
+      if (!sug[t]) {
+        const one = async (col, n) => {
+          const ps = new URLSearchParams({ table: 'sheet_rows', col, preset: '', limit: String(n), f: JSON.stringify([{ c: 'tab', op: 'in', vs: [t] }]) });
+          try { const j = await fetchJ('/api/db/values?' + ps.toString()); return (j.values || []).map((v) => String(v[0] || '').trim()).filter(Boolean); } catch (e) { return []; }
+        };
+        const [shop, center, name, car] = await Promise.all([one('shop', 30), one('fwd_center', 20), one('name', 400), one('intl_carrier', 15)]);
+        sug[t] = { shop, center, name, car };
+      }
+      if (t !== tab) return;
+      const s = sug[t];
+      const fillDl = (el, vs) => { el.textContent = ''; for (const v of vs) { const o = E('option'); o.value = v; el.append(o); } };
+      fillDl(dlName, s.name); fillDl(dlShop, s.shop); fillDl(dlCenter, s.center); fillDl(dlCar, s.car);
+      const chipRow = (box, k, vs) => {
+        box.textContent = '';
+        for (const v of vs.slice(0, 4)) {
+          const c = E('button', 'sk-chip s', v); c.type = 'button'; c.title = v; c.setAttribute('aria-label', `${v} 넣기`);
+          c.onclick = () => { fld[k].value = v; changed(k); fld[k].focus(); };
+          box.append(c);
+        }
+        box.hidden = !box.childElementCount;
+      };
+      chipRow(shopChips, 'shop', s.shop); chipRow(centerChips, 'center', s.center);
+    }
+
+    function pickTab(t, focus) {
+      tab = t || '';
+      for (const c of tabBox.children) c.setAttribute('aria-pressed', c.dataset.t === tab ? 'true' : 'false');
+      try { localStorage.setItem('barun.sk.tab', tab); } catch (e) { /* 없음 */ }
+      sync(); preview(true);
+      if (tab) suggest(tab);
+      if (focus) fld.name.focus();
+    }
+    function drawTabs() {
+      tabBox.textContent = '';
+      for (const t of tabsOf()) {
+        const c = E('button', 'sk-chip', t); c.type = 'button'; c.dataset.t = t;
+        c.onclick = () => pickTab(t, !val('name'));
+        tabBox.append(c);
+      }
+    }
+
+    // 넣기
+    async function submit() {
+      if (sending) return;
+      const b = blocker(); if (b) { why.textContent = b; (b.includes('상품명') ? fld.name : b.includes('수량') ? fld.qty : b.includes('공홈가') ? fld.price : b.includes('주문번호') ? fld.order_no : tabBox.firstChild || go).focus(); return; }
+      sending = true; sync();
+      const payload = { kind: 'sheet_row', op: 'stock', tab, name: val('name'), 옵션: val('option'), qty: val('qty'), shop: val('shop'), order_no: val('order_no'),
+        price: val('price').replace(/,/g, ''), center: val('center'), 해외송장: val('tracking'), 해외운송사: val('carrier'), 메모: val('memo') };
+      if (busyTry) payload.force = true;
+      let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+      sending = false; busyTry = false;
+      const m = String(j.msg || '');
+      if (j.ok) {
+        const pos = m.match(/(\S+) (\d+)행/);
+        done = { tab: pos ? pos[1] : tab, row: pos ? pos[2] : '', p: payload };
+        showDone(); load(); loadTables();
+        return;
+      }
+      sync();
+      if (/회차가 시트를 쓰는 중/.test(m)) {
+        const fb = E('button', 'btn sm weak', '그래도 넣기'); fb.type = 'button'; fb.onclick = () => { busyTry = true; submit(); };
+        showPrev('warn', '⏳', [document.createTextNode(m + ' '), fb]);
+      } else showPrev('bad', '⚠', m || '넣지 못했어요');
+    }
+    f.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+    f.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (done) again(); else submit(); return; }
+      // Enter = 다음 칸(고르기 목록에서 Enter로 고를 때 바로 넣어지지 않게) — 넣기는 버튼이나 ⌘/Ctrl+Enter
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && !e.isComposing) {
+        e.preventDefault();
+        const ins = [...f.querySelectorAll('input')].filter((i) => i.offsetParent !== null);
+        const n = ins[ins.indexOf(e.target) + 1];
+        if (n) n.focus(); else go.focus();
+      }
+    });
+
+    // 넣은 뒤 — 무엇이 들어갔는지 + 그 줄 보기 / 하나 더
+    function showDone() {
+      const p = done.p;
+      body.hidden = true; prev.hidden = true;
+      const box = E('div', 'sk-done'); box.id = 'sk-done';
+      const kv = E('dl', 'sk-kv');
+      const rows = [['상품', p.name + (p.옵션 ? ` · ${p.옵션}` : '')], ['수량', p.qty + '개'], ['구매처', p.shop], ['공홈주문번호', p.order_no], ['공홈가', p.price && (CUR[done.tab] || '') + p.price],
+        ['배대지센터', p.center], ['해외송장', [p.해외송장, p.해외운송사].filter(Boolean).join(' · ')], ['메모', p.메모]];
+      for (const [k, v] of rows) if (v) kv.append(E('dt', null, k), E('dd', null, v));
+      box.append(E('div', 'ok', '✓'), E('h3', null, `${done.tab} 탭 ${done.row ? done.row + '행' : ''}에 넣었어요`), E('p', null, '바로 표에 보여요. 칸은 표에서 눌러 고칠 수 있어요.'), kv);
+      f.insertBefore(box, prev);
+      foot.textContent = '';
+      const look = E('button', 'btn ghost', '그 줄 보기'); look.type = 'button'; look.onclick = () => goRow(done.tab, done.row, p.name);
+      const more = E('button', 'btn primary', '하나 더 넣기'); more.type = 'button'; more.onclick = again;
+      const sp = E('span', 'sk-why', `${done.tab} 탭·구매처·센터는 그대로 둬요`);
+      foot.append(sp, look, more);
+      more.focus();
+    }
+    function resetForm(keep) {
+      for (const k of Object.keys(fld)) if (!(keep && SK_KEEP.includes(k))) fld[k].value = '';
+      fld.qty.value = '1'; dup = null;
+      for (const k of Object.keys(msg)) setMsg(k, null, false);
+    }
+    function again() {
+      const box = $('sk-done'); if (box) box.remove();
+      body.hidden = false; prev.hidden = false; done = null;
+      foot.textContent = ''; foot.append(why, kbd, cancel, go);
+      resetForm(true); sync(); preview(true); fld.name.focus();
+    }
+    function goRow(t, row, q) {
+      d.close();
+      cur.q = q || ''; cur.preset = ''; cur.filters = [{ c: 'tab', op: 'in', vs: [t] }]; cur.sort = []; cur.offset = 0;
+      const qi = document.querySelector('.dt-q'); if (qi) qi.value = cur.q;
+      jump = row ? { tab: t, row: +row } : null; load();
+    }
+    function tryClose() {
+      if (dirty() && !confirm('적은 내용을 버리고 닫을까요?')) return;
+      d.close();
+    }
+    d.addEventListener('cancel', (e) => { e.preventDefault(); tryClose(); });       // Esc
+    d.addEventListener('click', (e) => { if (e.target === d) tryClose(); });         // 바깥(어두운 곳) 누르기
+    d.addEventListener('close', () => { if (done) again(); });
+
+    return {
+      open(t) {
+        drawTabs();
+        if (!$('sk-done')) resetForm(false);
+        let rem = ''; try { rem = localStorage.getItem('barun.sk.tab') || ''; } catch (e) { /* 없음 */ }
+        const tabs = tabsOf();
+        const want = [t, tabPicked(), tab, rem].find((x) => x && tabs.includes(x)) || '';
+        d.showModal();
+        pickTab(want, false);
+        fld.name.focus();
+      },
+    };
   }
 
   // ── 줄 자세히 + 조치 ──

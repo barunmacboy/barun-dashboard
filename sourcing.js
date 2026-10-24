@@ -41,7 +41,8 @@
         <div class="card"><div class="card-h"><h2>외부 대기</h2><span class="desc">답·조건을 기다리는 줄</span></div><ul class="list" id="sc-wait"></ul></div>
       </div>
       <div class="card"><div class="card-h"><h2>방금 바뀐 줄</h2><span class="desc">15초마다 새로 읽어요 · 줄 상태를 바꾸려면 주문 데이터 → 소싱 장부</span></div><ul class="list sc-feed" id="sc-feed"></ul></div>
-      <div class="card"><div class="card-h"><h2>다음 차례 10줄</h2></div><ul class="list" id="sc-next"></ul></div>`;
+      <div class="card"><div class="card-h"><h2>다음 차례 10줄</h2></div><ul class="list" id="sc-next"></ul></div>
+      <div class="card"><div class="card-h"><h2>원가 빈 판매 상품</h2><span class="desc" id="sc-gap-at">하루 1번 세요 · 팔린 순 · 1개 원가를 #할-일 카드 답글로 알려 주세요</span></div><ul class="list" id="sc-gap"></ul></div>`;
     // 보임·숨김은 index.html이 'barun:page'로 알려 줌(2026-10-22 리뉴얼 — 탭 덧붙이기·showTab 덮어쓰기 없앰)
     document.addEventListener('barun:page', (e) => { if (e.detail === 'sourcing') { load(); start(); } else stop(); });
     if (!sec.hidden) { load(); start(); }
@@ -70,6 +71,16 @@
       stat('등록', `${c['등록'] || 0}`, '플랫폼에 올라간 줄', ''), stat('등록 준비', `${d.ready.length}`, ap.status === 'pending' ? '승인 대기' : ap.status === 'approved' ? '승인됨' : '', d.ready.length ? 'warn' : ''),
       stat('남은 후보', `${d.open}`, `정밀확인 ${c['정밀확인'] || 0}`, ''), stat('외부 대기', `${c['외부대기'] || 0}`, '답 기다림', c['외부대기'] ? 'warn' : ''),
       stat('탈락', `${c['탈락'] || 0}`, '이익·원가 기준 미달', ''));
+    const gap = d.costgap;   // 2026-10-24 원가 원본(barun.db): 원가 빈 판매 상품 수(하루 1번)
+    if (gap) st.append(stat('원가 빈 판매상품', `${gap.products}`, `옵션 ${gap.options} · 쿠팡 ${gap.coupang} · 네이버 ${gap.naver}`, gap.products ? 'warn' : ''));
+    const ug = $('sc-gap'); ug.innerHTML = '';
+    if (!gap) empty(ug, '아직 세지 않았어요');
+    else if (!gap.list.length) empty(ug, '원가 빈 판매 상품이 없어요');
+    else {
+      $('sc-gap-at').textContent = `${hm(gap.at)} 기준 · 팔린 순 · 1개 원가를 #할-일 카드 답글로 알려 주세요`;
+      for (const g of gap.list) ug.append(li(g.name, `${g.platform === 'coupang' ? '쿠팡' : '네이버'} · 옵션 ${g.n}개${g.orders ? ' · 주문 ' + g.orders + '건' : ''}`, '', ''));
+      if (gap.products > gap.list.length) ug.append(E('li', 'muted small', `외 ${gap.products - gap.list.length}개`));
+    }
     const bar = $('sc-bar'), leg = $('sc-leg'); bar.innerHTML = ''; leg.innerHTML = '';
     bar.setAttribute('aria-label', d.order.map((s) => `${s} ${c[s] || 0}`).join(', '));
     for (const s of d.order) {
