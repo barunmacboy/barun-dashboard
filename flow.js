@@ -527,11 +527,12 @@
     const r3 = E('div', 'r3');
     const bits = [];
     if (o.k === 'o') { if (o.tab) bits.push(`${o.tab} ${o.row}행`); if (o.sub && !['', '해외구매'].includes(o.sub)) bits.push(o.sub); if (o.days != null) bits.push(stay(o.days)); }
-    else if (o.k === 'p') { if (o.sub && !['source', 'listing', 'selling'].includes(o.stage)) bits.push(o.sub); if (o.profit) bits.push(`이익 ${won(o.profit)}`); if (o.price) bits.push(won(o.price)); }
+    else if (o.k === 'p') { if (o.sub && !['listing', 'selling'].includes(o.stage) && !(o.stage === 'source' && o.wait)) bits.push(o.sub); if (o.days != null && o.stage === 'source') bits.push(stay(o.days)); if (o.profit) bits.push(`이익 ${won(o.profit)}`); if (o.price) bits.push(won(o.price)); }
     else bits.push(stay(o.days));
     r3.append(E('span', 'sub', bits.filter(Boolean).join(' · ')));
     for (const t of o.tags || []) r3.append(E('span', 'fl-tag' + (t === '문제' ? ' l' : t === '답 옴' ? ' h' : ''), t));
     if ((o.human || []).length) { const h = E('span', 'h', '🙋'); h.title = '이 주문에 사람 차례 카드가 있어요'; r3.append(h); }
+    else if ((o.zz || []).length) { const h = E('span', 'h', '💤'); h.title = '이 주문에 미뤄 둔 카드가 있어요(때가 되면 다시 올라와요)'; r3.append(h); }
     b.append(r3);
     b.setAttribute('aria-label', `${title} ${o.name} ${bits.join(' ')}${o.due_k === 'late' ? ' 발송기한 지남' : ''}`);
     b.onclick = () => openDr(o, b);
