@@ -1,6 +1,8 @@
 // 업무 흐름 화면 — 상품 소싱부터 배송·사후까지 14단계를 한 장에: 단계마다 무엇이(주문·상품 하나하나) 있고, 누가(에이전트·스크립트) 무엇을 하고,
 // 무엇이 사람을 기다리는지(2026-10-25 사장님: "개별 주문건이나 업무를 객체화해서 … 각 워크플로에서 지금 어떤 에이전트가 어떤 일을 하고 있고 펜딩중인게 뭔지 한눈에").
-// 읽기: GET /api/flow(dashboard/flow.py) · 객체 하나가 지나온 길 GET /api/flow/obj?k=&id= — 화면이 보이는 동안 20초마다. 고치기·버튼은 주문 데이터·할 일 화면으로.
+// 읽기: GET /api/flow(dashboard/flow.py) · 객체 하나가 지나온 길 GET /api/flow/obj?k=&id= — 화면이 보이는 동안 20초마다.
+// 버튼(2026-10-25 사장님 "개선해"): 사람 차례 카드 서랍(승인·선택·처리함·미룸·칸 옮기기) · 주문 서랍(이 단계 시트 칸 고치기·처리 방식) · 보낸 문의 상태
+// — 모두 할 일·주문 데이터 화면과 같은 POST /api/action(누른 사람 이름으로 기록, 시트는 회차 중이면 기다림).
 // 자리: index.html의 #p-flow를 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -13,9 +15,11 @@
   const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
   const hum = (tag, cls, n, label) => { const e = E(tag, cls); e.append(ic('hand'), document.createTextNode(`${label || ''}${n}`)); return e; };   // 사람 차례 n
   const CST = { waiting_human: '사람 확인', waiting_approval: '승인 대기', snoozed: '미룸' };
+  const PAST = { ...CST, done: '끝', resolved: '끝', running: '진행 중', queued: '대기', failed: '실패', cancelled: '거둠', open: '열림', ack: '보는 중' };
+  const NVS = { OUTOFSTOCK: '품절', SUSPENSION: '판매중지', PROHIBITION: '판매금지', SALE: '판매중' };
   const LIMIT = () => (NARROW.matches ? 20 : 40);       // 칸마다 따로 스크롤 — 그 아래는 '더 보기'
   const NARROW = matchMedia('(max-width: 760px)');
-  let data = null, timer = 0, busy = false, shown = false, openObj = null, lastFocus = null;
+  let data = null, timer = 0, busy = false, shown = false, openObj = null, lastFocus = null, seqN = 0, applied = 0;
   const flt = { q: '', only: '', plat: '' };
   const more = {};            // 단계 → 다 보기
   let prevStage = {};         // 객체 → 지난번 단계(옮겨 온 것 반짝)
@@ -33,7 +37,7 @@
     const hm = d.toTimeString().slice(0, 5), day = Math.round((new Date(new Date().toDateString()) - new Date(d.toDateString())) / 864e5);
     return day === 0 ? `오늘 ${hm}` : day === 1 ? `어제 ${hm}` : day === -1 ? `내일 ${hm}` : `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${hm}`;
   }
-  const stay = (d) => (d == null ? '' : d < 1 ? '오늘 들어옴' : `${Math.floor(d)}일째`);
+  const stay = (d) => (d == null ? '' : d < 1 ? '오늘 들어옴' : d >= 365 ? `${Math.floor(d / 365)}년 넘게` : `${Math.floor(d)}일째`);
   const secs = (s) => (s == null ? '' : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분째` : s >= 60 ? `${Math.floor(s / 60)}분째` : `${s}초째`);
 
   function install() {
@@ -189,7 +193,7 @@
       .fl-dr-h .sub { font-size: 13px; color: var(--sub); margin-top: 2px; font-weight: 400; }
       .fl-x { all: unset; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; font-size: 18px; color: var(--sub); }
       .fl-x:hover { background: var(--hover); } .fl-x:focus-visible { outline: 2px solid var(--blue); }
-      .fl-dr-b { overflow-y: auto; padding: 14px 16px 24px; display: grid; gap: 14px; align-content: start; }
+      .fl-dr-b { overflow-y: auto; padding: 14px 16px 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }   /* 줄임표 글(카드 안 주문)이 서랍을 넓히지 않게 */
       .fl-now { background: var(--blue-bg); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
       .fl-now b { color: var(--blue-ink); } .fl-now.late { background: var(--red-bg); } .fl-now.late b { color: var(--red-ink); }
       .fl-steps { list-style: none; margin: 0; padding: 0; }
@@ -208,6 +212,26 @@
       .fl-ev li { padding: 6px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px; }
       .fl-ev li:first-child { border-top: 0; } .fl-ev .tm { color: var(--muted); font-variant-numeric: tabular-nums; } .fl-ev .src { color: var(--muted); font-size: 11.5px; }
       .fl-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+      .fl-form { display: grid; gap: 8px; }
+      .fl-form label { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+      .fl-form input, .fl-form textarea, .fl-sel { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink);
+        font: inherit; font-size: 13.5px; padding: 7px 9px; }
+      .fl-form textarea { resize: vertical; min-height: 54px; line-height: 1.45; }
+      .fl-form input:focus, .fl-form textarea:focus, .fl-sel:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: transparent; }
+      .fl-form input.ch, .fl-form textarea.ch { border-color: var(--blue); background: var(--blue-bg); }
+      .fl-out { font-size: 12.5px; line-height: 1.5; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--ink2); display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+      .fl-out.ok { background: var(--green-bg); color: var(--green-ink); } .fl-out.bad { background: var(--red-bg); color: var(--red-ink); }
+      .fl-out[hidden] { display: none; }
+      .fl-pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 12.5px; line-height: 1.55; color: var(--ink2); background: var(--fill2);
+        border-radius: 10px; padding: 10px 12px; max-height: 280px; overflow-y: auto; }
+      .fl-todo { font-size: 13.5px; line-height: 1.5; background: var(--orange-bg); color: var(--orange-ink); border-radius: 10px; padding: 9px 12px; }
+      .fl-objs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; } .fl-objs .fl-ob { background: var(--fill2); }
+      .fl-mv { display: flex; gap: 8px; align-items: center; } .fl-mv .fl-sel { flex: 1; }
+      .fl-hs { display: flex; flex-wrap: wrap; gap: 6px; }
+      .fl-hs .btn[aria-pressed="true"] { background: var(--blue); color: #fff; }
+      .fl-hc .m .ap { color: var(--orange-ink); }
+      .fl-past { font-size: 12.5px; color: var(--sub); display: flex; gap: 6px; align-items: baseline; padding: 4px 2px; }
+      .fl-past a { color: var(--blue-ink); }
       .fl-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .25); z-index: 59; }
       .fl-scrim[hidden] { display: none; }
       @media (max-width: 1100px) { .fl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fl-low { grid-template-columns: minmax(0, 1fr); } }
@@ -218,6 +242,7 @@
         .fl-cols { padding: 10px 12px 12px; gap: 8px; scroll-snap-type: x mandatory; height: calc(100dvh - 150px); }
         .fl-col { flex: 0 0 84vw; max-width: none; }
         .fl-dr { width: 100vw; }
+        .fl-form label { grid-template-columns: minmax(0, 1fr); gap: 4px; }
       }
       @media (prefers-reduced-motion: reduce) { .fl-link i, .fl-node.run .c::after, .fl-st.run::before { animation: none; } .fl-link i { display: none; } .fl-ob.moved, .fl-col.flash { animation: none; } }
     `;
@@ -259,12 +284,32 @@
   function start() { stop(); timer = setInterval(load, 20000); }
   function stop() { clearInterval(timer); timer = 0; }
 
-  async function load() {
-    if (busy) return; busy = true;
+  async function load(fresh) {          // fresh = 버튼 뒤(서버 10초 모아 두기를 건너뜀) — 늦게 온 옛 답이 새 답을 덮지 않게 순번
+    if (busy && !fresh) return; busy = true;
+    const my = ++seqN;
     try {
-      const r = await (window.barunFetch || fetch)('/api/flow');
-      if (r.ok) { data = await r.json(); render(); $('fl-upd').textContent = `${when(data.at)} 갱신`; }
+      const r = await (window.barunFetch || fetch)('/api/flow' + (fresh ? '?fresh=1' : ''));
+      if (r.ok) { const j = await r.json(); if (my < applied) return; applied = my; data = j; render(); $('fl-upd').textContent = `${when(data.at)} 갱신`; }
     } catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+  }
+  // 버튼 — 할 일·주문 데이터 화면과 같은 길. out(결과 줄)이 있으면 거기에, 시트가 회차 중이면 '그래도 하기'
+  async function act(body, btn, out) {
+    if (body.action === 'reject' && !confirm('거절할까요?')) return null;
+    const lab = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; if (body.kind === 'sheet_edit') btn.textContent = '시트에 쓰는 중…'; }
+    try {
+      const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({ ok: false, msg: `응답을 읽지 못했어요(${r.status})` }));
+      const msg = noE(String(j.msg || ''));
+      if (window.toast) window.toast((j.ok ? '' : '실패: ') + msg.split('\n')[0].slice(0, 120));
+      if (out) {
+        out.textContent = ''; out.hidden = false; out.className = 'fl-out ' + (j.ok ? 'ok' : 'bad');
+        out.append(ic(j.ok ? 'check' : 'alert'), E('span', null, msg));
+        if (!j.ok && /회차가 시트를 쓰는 중/.test(msg)) { const b = E('button', 'btn sm weak', '그래도 하기'); b.type = 'button'; b.onclick = () => act(Object.assign({}, body, { force: true }), b, out); out.append(b); }
+      }
+      if (j.ok) await load(true);
+      return j;
+    } catch (e) { if (window.toast) window.toast('실패: ' + e.message); return null; } finally { if (btn) { btn.disabled = false; btn.textContent = lab; } }
   }
 
   // ── 거르기 ──
@@ -304,7 +349,7 @@
       ['지금 일하는 중', `${work.length}`, work.length ? work.map(noE).join(' · ') : '모두 쉬는 중', work.length ? 'run' : '', null],
       ['사람 차례', `${t.human}`, t.snoozed ? `미룬 것 ${t.snoozed}` : '#할-일·승인', t.human ? 'bad' : '', 'human'],
       ['흐르는 주문', `${flowing}`, `발송기한 지남 ${t.late}`, '', 'late'],
-      ['오래 머문 것', `${t.stuck}`, '기준 일수 넘김', t.stuck ? 'bad' : '', 'stuck'],
+      ['오래 머문 것', `${t.stuck}`, `주문 ${data.objs.filter((o) => o.stuck && o.k === 'o').length} · 상품 ${data.objs.filter((o) => o.stuck && o.k === 'p').length}`, t.stuck ? 'bad' : '', 'stuck'],
       ['오늘 주문', `${t.today.n}건`, `${won(t.today.paid)}${yday ? ` · 어제 ${yday.n}건` : ''}`, '', null],
       ['준비 중 상품', `${t.products}`, '소싱·등록·심사', '', null],
     ];
@@ -508,11 +553,14 @@
     return box;
   }
   function hcard(c) {
-    const b = E('button', 'fl-hc'); b.type = 'button';
+    const b = E('button', 'fl-hc'); b.type = 'button'; b.dataset.card = c.id;
     b.append(E('div', null, noE(c.title)));
-    const m = E('div', 'm'); m.append(E('b', null, CST[c.state] || c.state), document.createTextNode(` · ${when(c.at)}${(c.objs || []).length ? ` · 주문 ${c.objs.length}건` : ''}`)); b.append(m);
-    b.title = c.ref ? '디스코드에서 열기' : '할 일 화면에서 보기';
-    b.onclick = () => { if (/^https?:/.test(c.ref || '')) window.open(c.ref, '_blank', 'noopener'); else if (window.showTab) window.showTab('todo'); };
+    const m = E('div', 'm'); m.append(E('b', null, CST[c.state] || c.state));
+    const one = c.approval ? '승인 필요' : (c.choices || []).length ? '골라 주세요' : '';
+    if (one) m.append(document.createTextNode(' · '), E('span', 'ap', one));
+    m.append(document.createTextNode(` · ${when(c.at)}${(c.objs || []).length ? ` · 주문 ${c.objs.length}건` : ''}${c.moved ? ' · 옮김' : ''}`)); b.append(m);
+    b.title = '자세히·버튼';
+    b.onclick = () => openCard(c, b);
     return b;
   }
   function obj(o) {
@@ -525,13 +573,19 @@
     r1.append(E('span', 'who', title));
     if (o.due_t && o.due_k !== 'ok') r1.append(E('span', 'du ' + o.due_k, o.due_k === 'late' ? `기한 ${o.due_t}` : `기한 ${o.due_t}`));
     else if (o.days != null && o.k !== 'o') r1.append(E('span', 'du', stay(o.days)));
-    else if (o.changed) r1.append(E('span', 'du', `바뀜 ${when(o.changed)}`));
+    else if (o.changed && !['listing', 'selling'].includes(o.stage)) r1.append(E('span', 'du', `바뀜 ${when(o.changed)}`));   // 판매 목록 바뀐 때 = 따라 쓰기 시각이라 뺌
     b.append(r1);
     b.append(E('div', 'nm', `${o.name}${o.opt ? ` · ${o.opt}` : ''}${o.qty > 1 ? ` ×${o.qty}` : ''}`));
     const r3 = E('div', 'r3');
     const bits = [];
     if (o.k === 'o') { if (o.tab) bits.push(`${o.tab} ${o.row}행`); if (o.sub && !['', '해외구매'].includes(o.sub)) bits.push(o.sub); if (o.days != null) bits.push(stay(o.days)); }
-    else if (o.k === 'p') { if (o.sub && !['listing', 'selling'].includes(o.stage) && !(o.stage === 'source' && o.wait)) bits.push(o.sub); if (o.days != null && o.stage === 'source') bits.push(stay(o.days)); if (o.profit) bits.push(`이익 ${won(o.profit)}`); if (o.price) bits.push(won(o.price)); }
+    else if (o.k === 'p') {
+      if (o.sub && !['listing', 'selling'].includes(o.stage) && !(o.stage === 'source' && o.wait)) bits.push(o.sub);
+      if (o.days != null && o.stage === 'source') bits.push(stay(o.days));
+      if (o.opts > 1) bits.push(`옵션 ${o.opts}개`);
+      if (o.profit) bits.push(`이익 ${won(o.profit)}`); if (o.price) bits.push(won(o.price) + (o.opts > 1 ? '부터' : ''));
+      if (o.days == null && ['listing', 'selling'].includes(o.stage)) bits.push('들어온 때 모름');
+    }
     else bits.push(stay(o.days));
     r3.append(E('span', 'sub', bits.filter(Boolean).join(' · ')));
     for (const t of o.tags || []) r3.append(E('span', 'fl-tag' + (t === '문제' ? ' l' : t === '답 옴' ? ' h' : ''), t));
@@ -572,7 +626,11 @@
     const d = $('fl-dr'); if (!d || d.hidden) return;
     d.hidden = true; $('fl-scrim').hidden = true; openObj = null;
     if (lastFocus && lastFocus.isConnected) lastFocus.focus({ preventScroll: true });
-    else if (lastFocus) { const again = document.querySelector(`.fl-ob[data-id="${CSS.escape(lastFocus.dataset.id || '')}"]`); if (again) again.focus({ preventScroll: true }); }
+    else if (lastFocus) {                                // 다시 그려진 같은 카드·객체로
+      const again = lastFocus.dataset.card ? document.querySelector(`.fl-hc[data-card="${CSS.escape(lastFocus.dataset.card)}"]`)
+        : document.querySelector(`.fl-ob[data-id="${CSS.escape(lastFocus.dataset.id || '')}"]`);
+      if (again) again.focus({ preventScroll: true });
+    }
   }
   async function openDr(o, from) {
     lastFocus = from || document.activeElement; openObj = o;
@@ -586,7 +644,8 @@
     const s = st[o.stage] || {};
     const now = E('div', 'fl-now' + (o.due_k === 'late' ? ' late' : ''));
     now.append(E('b', null, `${s.n ? `${s.n}단계 ` : ''}${s.name || ''}`), document.createTextNode(` · ${s.what || ''}`));
-    const meta = [o.days != null ? stay(o.days) : o.changed ? `마지막으로 바뀐 때 ${when(o.changed)}` : '', o.due_t ? `${o.k === 'a' ? '답 기한' : '발송기한'} ${o.due_t}` : '', o.stuck ? `${s.sla}일 넘게 머묾` : ''].filter(Boolean);
+    const meta = [o.days != null ? `${stay(o.days)}${o.since ? `(${when(o.since)}부터)` : ''}` : o.changed && !['listing', 'selling'].includes(o.stage) ? `마지막으로 바뀐 때 ${when(o.changed)}` : '',
+      o.due_t ? `${o.k === 'a' ? '답 기한' : '발송기한'} ${o.due_t}` : '', o.stuck ? `${s.sla}일 넘게 머묾` : ''].filter(Boolean);
     if (meta.length) { now.append(E('br'), document.createTextNode(meta.join(' · '))); }
     const who = (s.jobs || []).map((j) => data.agents[j]).filter(Boolean);
     if (who.length) { now.append(E('br'), document.createTextNode(`담당: ${who.map((a) => `${noE(a.name)}${a.state === 'running' ? '(일하는 중)' : a.next ? `(다음 ${when(a.next)})` : ''}`).join(', ')}`)); }
@@ -610,21 +669,31 @@
     }
     if (j.stage === 'claim') { const li = E('li', 'now'); li.append(E('span', 'mk', '!'), E('span', 'nm', '취소·반품·교환 요청'), E('span', 'at', '지금')); ol.append(li); }
     body.append(sect('지나온 길', ol));
+    const live = data.cards.filter((c) => (c.objs || []).includes(o.id) || (j.cards || []).some((x) => x.id === c.id));
+    const past = (j.cards || []).filter((x) => !live.some((c) => c.id === x.id));
+    if (live.length || past.length) {
+      const box = E('div'); box.style.display = 'grid'; box.style.gap = '6px';
+      for (const c of live) box.append(hcard(c));
+      for (const c of past.slice(0, 6)) {
+        const l = E('div', 'fl-past'); l.append(E('span', 'tm', when(c.created)), E('span', null, `${noE(c.title)} · ${PAST[c.state] || c.state}`));
+        if (/^https?:/.test(c.ref || '')) { const a = E('a', null, '디스코드'); a.href = c.ref; a.target = '_blank'; a.rel = 'noopener'; l.append(a); }
+        box.append(l);
+      }
+      body.append(sect(live.length ? `이 주문 카드 · 사람 차례 ${live.length}` : '이 주문 카드', box));
+    }
+    if ((j.handlings || []).length) body.append(sect('처리 방식 정하기', handleBox(j, o)));
+    if (j.edit) body.append(sect(`시트 칸 고치기 · ${j.edit.tab} ${j.edit.row}행`, editBox(j, o)));
+    else if (o.stage === 'new') body.append(E('div', 'fl-info', '시트 줄이 아직 없어요 — ① 주문 회차가 만들어요.'));
     const od = j.order || {}, r = (j.rows || [])[0] || {}, l = j.ledger || {};
     body.append(sect('주문', kv([['플랫폼', o.plat], ['주문번호', od.order_id], ['주문 시각', (od.ordered_at || '').replace('T', ' ').slice(0, 16)], ['결제 금액', od.paid ? won(od.paid) : ''],
       ['발송기한', od.due ? `${String(od.due).slice(0, 10)}${j.due_t ? ` (${j.due_t})` : ''}` : ''], ['플랫폼 상태', od.status_label || od.status], ['처리 방식', l.handling], ['시트', r.tab ? `${r.tab} ${r.row}행${(j.rows || []).length > 1 ? ` 외 ${j.rows.length - 1}줄` : ''}` : '']])));
     body.append(sect('구매·배송', kv([['진행상태', r.progress], ['구매처', r.shop], ['공홈주문번호', r.shop_order], ['공홈가', r.shop_price], ['해외송장', [r.intl_carrier, r.intl_tracking].filter(Boolean).join(' ')],
       ['배대지', [r.fwd_center, r.fwd_request].filter(Boolean).join(' · ')], ['배송방식', r.ship_mode], ['국내송장', r.kr_invoice || od.invoice], ['택배사', od.courier], ['보낼수량', r.send_qty], ['문제', r.problem], ['메모', r.memo]])));
-    if ((j.cards || []).length) {
-      const box = E('div'); box.style.display = 'grid'; box.style.gap = '6px';
-      for (const c of j.cards) box.append(hcard({ ...c, at: c.created, objs: [] }));
-      body.append(sect('이 주문 카드', box));
-    }
     const acts = E('div', 'fl-acts');
     const a1 = E('button', 'btn sm', '주문 데이터에서 열기'); a1.type = 'button';
     a1.onclick = () => { closeDr(); location.hash = '#data?' + encodeURIComponent(JSON.stringify({ t: 'sheet_rows', p: '', q: o.id })); if (window.showTab) window.showTab('data'); };
-    acts.append(a1);
-    if (o.human && o.human.length) { const a2 = E('button', 'btn sm ghost', '할 일 화면'); a2.type = 'button'; a2.onclick = () => { closeDr(); window.showTab && window.showTab('todo'); }; acts.append(a2); }
+    const st = (data.stages.find((x) => x.id === o.stage) || {}).name || '';
+    acts.append(a1, assignBtn(`${o.who || '고객'} 주문(${o.plat || ''} ${od.order_id || o.id}${r.tab ? `, ${r.tab} ${r.row}행` : ''}) — 지금 '${st}'${o.sub ? ` · ${o.sub}` : ''}${o.due_t ? ` · 발송기한 ${o.due_t}` : ''}: `));
     body.append(acts);
     const ev = E('ul', 'fl-ev');
     for (const e of j.events || []) {
@@ -634,21 +703,148 @@
     if (!(j.events || []).length) ev.append(E('li', null, '기록 없음'));
     body.append(sect('바뀐 기록', ev));
   }
+  // 처리 방식(재고발송·해외구매·예외) — 장부에 남기면 ① 회차가 그대로(ops/orderdb.mark, 데이터 화면 '처리 방식'과 같음)
+  function handleBox(j, o) {
+    const w = E('div'), hs = E('div', 'fl-hs'), out = E('div', 'fl-out'); out.hidden = true;
+    const cur = (j.ledger || {}).handling || '';
+    for (const h of j.handlings) {
+      const b = E('button', 'btn sm' + (h === '해외구매' ? ' primary' : ''), h); b.type = 'button'; b.setAttribute('aria-pressed', String(cur === h));
+      b.onclick = async () => { const r = await act({ action: 'db', kind: 'order_mark', key: j.id, handling: h, memo: '업무 흐름에서' }, b, out); if (r && r.ok) reopen(o); };
+      hs.append(b);
+    }
+    w.append(hs, E('p', 'small muted', cur && cur !== '미정' ? `지금: ${cur}` : '아직 안 정함 — 고르면 장부에 남고 다음 회차가 그대로 처리해요.'), out);
+    return w;
+  }
+  // 이 단계를 넘기는 시트 칸 + 메모 — 바꾼 칸만 보냄(ops/orderedit: 줄·먼저 고친 사람·회차 확인)
+  function editBox(j, o) {
+    const ed = j.edit, f = E('div', 'fl-form'), out = E('div', 'fl-out'); out.hidden = true;
+    const ins = ed.fields.map(([col, k, v]) => {
+      const lab = E('label'); const i = k === 'memo' ? E('textarea') : E('input'); if (k !== 'memo') i.type = 'text';
+      i.value = v; i.dataset.old = v; i.autocomplete = 'off'; i.spellcheck = false;
+      i.oninput = () => i.classList.toggle('ch', i.value.trim() !== i.dataset.old);
+      lab.append(E('span', null, col), i); f.append(lab);
+      return [col, i];
+    });
+    const save = E('button', 'btn sm primary', '시트에 저장'); save.type = 'button';
+    save.onclick = async () => {
+      const edits = ins.filter(([, i]) => i.value.trim() !== i.dataset.old)
+        .map(([col, i]) => ({ tab: ed.tab, row: ed.row, key: ed.key, col, old: i.dataset.old, new: i.value.trim(), ident: ed.ident }));
+      if (!edits.length) { out.hidden = false; out.className = 'fl-out'; out.textContent = '바뀐 칸이 없어요.'; return; }
+      const r = await act({ action: 'db', kind: 'sheet_edit', edits }, save, out);
+      if (r && r.ok) reopen(o);
+    };
+    const row = E('div', 'fl-acts'); row.append(save); f.append(row, out);
+    f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save.click(); } });
+    return f;
+  }
+  // 에이전트에게 맡기기 — 공용 '맡기기' 창(index.html openAsk → #작업판 스레드)에 이 객체 설명을 미리 적어 둠, 할 말은 사람이 뒤에 이어 씀
+  function assignBtn(text) {
+    const b = E('button', 'btn sm ghost'); b.type = 'button'; b.append(ic('bot'), document.createTextNode(' 에이전트에게 맡기기'));
+    b.onclick = () => {
+      if (!window.openAsk) return;
+      window.openAsk();
+      const t = document.getElementById('task-text'); if (!t) return;
+      t.value = noE(text); setTimeout(() => { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 40);
+    };
+    return b;
+  }
+  // 버튼 뒤 서랍을 새 자료로(그 객체가 다른 단계로 옮겨 갔어도 같은 id로 다시 엶)
+  function reopen(o) {
+    if (!data || $('fl-dr').hidden) return;
+    const n = data.objs.find((x) => x.id === o.id);
+    setTimeout(() => openDr(n || o, lastFocus), 300);
+  }
+
+  // ── 사람 차례 카드(서랍) — 할 일 화면과 같은 버튼 + 이 카드가 말하는 주문 + 칸 옮기기 ──
+  function openCard(c, from) {
+    lastFocus = from || document.activeElement; openObj = c;
+    const d = $('fl-dr'); d.hidden = false; $('fl-scrim').hidden = false; d.textContent = '';
+    const st = Object.fromEntries(data.stages.map((s) => [s.id, s])), s = st[c.stage] || {};
+    const head = E('div', 'fl-dr-h'); const h = E('h2', null, noE(c.title)); h.tabIndex = -1;
+    h.append(E('div', 'sub', [CST[c.state] || c.state, c.ack ? '보는 중' : '', c.count > 1 ? `${c.count}번째 알림` : '', when(c.at)].filter(Boolean).join(' · ')));
+    const x = E('button', 'fl-x'); x.append(ic('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = closeDr;
+    head.append(h, x);
+    const body = E('div', 'fl-dr-b');
+    const now = E('div', 'fl-now'); now.append(E('b', null, `${s.n ? `${s.n}단계 ` : ''}${s.name || ''}`), document.createTextNode(' 칸'));
+    if (c.moved) now.append(document.createTextNode(` · ${noE(c.moved)}이 옮김`));
+    else if ((c.objs || []).length) now.append(document.createTextNode(' · 이 카드의 주문이 있는 단계'));
+    body.append(now);
+    if (c.todo) body.append(E('div', 'fl-todo', '할 일 · ' + noE(c.todo)));
+    const out = E('div', 'fl-out'); out.hidden = true;
+    const acts = E('div', 'fl-acts');
+    const B = (lab, a, cls, extra, close) => {
+      const b = E('button', 'btn sm ' + (cls || ''), lab); b.type = 'button';
+      b.onclick = async () => { const r = await act(Object.assign({ action: a, key: c.key }, extra || {}), b, out); if (r && r.ok) { if (close) closeDr(); else { const n = data.cards.find((y) => y.id === c.id); if (n) openCard(n, lastFocus); } } };
+      acts.append(b);
+    };
+    if (c.act) {
+      if (c.approval) { B('승인', 'approve', 'primary', null, true); B('거절', 'reject', 'danger', null, true); }
+      (c.choices || []).forEach((ch, k) => B(noE(ch), 'choose', k ? 'weak' : 'primary', { idx: k }, true));
+      if (c.key !== 'login-needed') B('처리했어요', 'done', c.approval || (c.choices || []).length ? '' : 'primary', null, true);   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦
+      if (!c.ack) B('보는 중', 'ack', 'ghost');
+      if (c.state !== 'snoozed') B('내일 아침 다시', 'snooze', 'ghost', null, true);
+    } else acts.append(E('span', 'small muted', '이 카드는 디스코드 스레드에서 답해요.'));
+    if (/^https?:/.test(c.ref || '')) { const a = E('a', 'btn sm ghost', '디스코드 '); a.append(ic('external')); a.href = c.ref; a.target = '_blank'; a.rel = 'noopener'; acts.append(a); }
+    body.append(acts, out);
+    if (c.body) body.append(sect('내용', E('pre', 'fl-pre', noE(c.body))));
+    const os = (c.objs || []).map((id) => data.objs.find((y) => y.id === id)).filter(Boolean);
+    if (os.length) { const box = E('div', 'fl-objs'); for (const y of os) box.append(obj(y)); body.append(sect(`이 카드의 주문 ${os.length}`, box)); }
+    // 칸 옮기기 — 낱말 규칙이 엉뚱한 칸에 두었으면 여기서(dashboard/flow.py set_card_stage)
+    const mv = E('div', 'fl-mv'), sel = E('select', 'fl-sel'); sel.setAttribute('aria-label', '이 카드를 둘 단계');
+    for (const x2 of data.stages) { const op = E('option', null, `${x2.n ? `${x2.n}. ` : ''}${x2.name}`); op.value = x2.id; op.selected = x2.id === c.stage; sel.append(op); }
+    const mb = E('button', 'btn sm', '옮기기'); mb.type = 'button';
+    mb.onclick = async () => { if (sel.value === c.stage) return; const r = await act({ action: 'flow_stage', key: c.id, stage: sel.value }, mb, out); if (r && r.ok) { const n = data.cards.find((y) => y.id === c.id); if (n) openCard(n, lastFocus); } };
+    mv.append(sel, mb);
+    if (c.moved) {
+      const back = E('button', 'btn sm ghost', `자동 칸으로(${(st[c.auto] || {}).name || ''})`); back.type = 'button';
+      back.onclick = async () => { const r = await act({ action: 'flow_stage', key: c.id, stage: '' }, back, out); if (r && r.ok) { const n = data.cards.find((y) => y.id === c.id); if (n) openCard(n, lastFocus); } };
+      mv.append(back);
+    }
+    body.append(sect('이 카드를 둘 단계', mv));
+    d.append(head, body); h.focus({ preventScroll: true });
+  }
+
   function productBody(body, j, o) {
     const ld = j.lead || {};
+    if (o.note) body.append(E('div', 'fl-todo', '반려 사유 · ' + noE(o.note)));
     if (ld.lead_id) body.append(sect('소싱', kv([['줄', ld.lead_id], ['상태', ld.state], ['수량', ld.quantity], ['원가', ld.cost_krw ? won(ld.cost_krw) : ''], ['시장 최저가', ld.market_krw ? won(ld.market_krw) : ''],
       ['예상 이익', ld.profit ? won(ld.profit) : ''], ['기다리는 것', ld.waiting], ['메모', ld.reason]])));
-    for (const x of j.listings || []) body.append(sect(`${x.platform === 'coupang' ? '쿠팡' : '네이버'} 판매 목록`, kv([['상태', x.status], ['상품명', x.name], ['가격', x.price ? won(x.price) : ''], ['수량', x.qty], ['번호', x.listing_id], ['바뀐 때', (x.updated || '').replace('T', ' ').slice(0, 16)]])));
+    const ls = j.listings || [];
+    if (ls.length) {                                    // 쿠팡은 옵션마다 한 줄 — 상품 정보 한 번 + 옵션 목록
+      const x = ls[0], cp = x.platform === 'coupang';
+      body.append(sect(`${cp ? '쿠팡' : '네이버'} 판매 목록`, kv([['상태', NVS[x.status] || x.status], ['상품명', cp ? (x.name || '').split(' · ')[0] : x.name], [cp ? '등록상품 번호' : '상품 번호', x.product_no || x.listing_id],
+        ['가격', !cp && x.price ? won(x.price) : ''], ['옵션', cp ? `${ls.length}개` : '']])));
+      if (cp) {
+        const ul = E('ul', 'fl-ev');
+        for (const y of ls.slice(0, 40)) { const li = E('li'); li.append(E('span', 'tm', y.price ? won(y.price) : ''), E('span', null, noE((y.name || '').split(' · ').slice(1).join(' · ') || y.listing_id))); ul.append(li); }
+        const dd = E('details'); dd.append(E('summary', 'small', `옵션 ${ls.length}개 보기`), ul); body.append(dd);
+      }
+    }
+    if ((j.states || []).length) {
+      const ul = E('ul', 'fl-ev');
+      for (const h of j.states) { const li = E('li'); const t = E('span'); t.append(document.createTextNode(h.label)); if (h.note) t.append(E('div', 'src', noE(h.note))); li.append(E('span', 'tm', when(h.at)), t); ul.append(li); }
+      body.append(sect('플랫폼 상태 이력', ul));
+    } else if (['listing', 'selling'].includes(o.stage)) body.append(E('div', 'fl-info', '상태 이력이 아직 없어요 — 매일 04:40 따라 쓰기 때부터 쌓여요.'));
     if (o.stage === 'cost') body.append(E('div', 'fl-info', '원가를 알려 주면 수익이 계산돼요.'));
     if ((j.regs || []).length) { const ul = E('ul', 'fl-ev'); for (const r of j.regs) { const li = E('li'); li.append(E('span', 'tm', when(r.at)), E('span', null, `${r.platform === 'coupang' ? '쿠팡' : '네이버'} ${r.action} ${r.ok ? '성공' : '실패'}${r.summary ? ` · ${noE(r.summary)}` : ''}`)); ul.append(li); } body.append(sect('등록 기록', ul)); }
     if ((j.history || []).length) { const ul = E('ul', 'fl-ev'); for (const h of j.history) { const li = E('li'); li.append(E('span', 'tm', when(h.at)), E('span', null, `${h.state}${h.memo ? ` · ${noE(h.memo)}` : ''}`)); ul.append(li); } body.append(sect('소싱 이력', ul)); }
     if (!ld.lead_id && !(j.listings || []).length && o.stage !== 'cost') body.append(E('div', 'fl-empty', '기록 없음'));
+    const pn = (j.listings || [])[0] || {}, st = (data.stages.find((x) => x.id === o.stage) || {}).name || '';
+    const acts = E('div', 'fl-acts');
+    acts.append(assignBtn(`${o.plat || ''} ${pn.product_no || ld.lead_id || o.id} '${o.name}' — 지금 '${st}' · ${o.sub || ''}${o.days != null ? ` · ${stay(o.days)}` : ''}: `));
+    body.append(acts);
   }
-  function askBody(body, j) {
+  function askBody(body, j, o) {
     const a = j.ask || {};
     body.append(sect('보낸 문의', kv([['곳', a.site], ['글번호', a.no], ['상태', a.state], ['보낸 때', (a.sent_at || '').replace('T', ' ').slice(0, 16)], ['답 기한', a.due], ['보낸 사람', a.by], ['답', a.answer], ['메모', a.memo]])));
-    if (a.url) { const l = E('a', 'btn sm', '문의 글 열기 '); l.append(ic('external')); l.href = a.url; l.target = '_blank'; l.rel = 'noopener'; body.append(l); }
-    const g = E('button', 'btn sm ghost', '보낸 문의 화면'); g.type = 'button'; g.onclick = () => { closeDr(); window.showTab && window.showTab('asks'); }; body.append(g);
+    const acts = E('div', 'fl-acts'), out = E('div', 'fl-out'); out.hidden = true;
+    const S = (lab, st, cls) => { const b = E('button', 'btn sm ' + cls, lab); b.type = 'button'; b.onclick = async () => { const r = await act({ action: 'ask', key: String(a.id), state: st }, b, out); if (r && r.ok) { if (st === '끝') closeDr(); else reopen(o); } }; acts.append(b); };
+    if (a.state === '답 옴') { S('답 확인함 · 끝', '끝', 'primary'); S('다시 기다림', '기다림', 'ghost'); }
+    else if (a.state === '기다림') { S('답 옴으로', '답 옴', ''); S('끝', '끝', 'ghost'); }
+    if (a.url) { const l = E('a', 'btn sm ghost', '문의 글 열기 '); l.append(ic('external')); l.href = a.url; l.target = '_blank'; l.rel = 'noopener'; acts.append(l); }
+    const g = E('button', 'btn sm ghost', '보낸 문의 화면'); g.type = 'button'; g.onclick = () => { closeDr(); window.showTab && window.showTab('asks'); }; acts.append(g);
+    acts.append(assignBtn(`${a.site || ''} 보낸 문의 ${a.no ? `#${a.no} ` : ''}'${noE(a.title || o.name || '')}' — ${a.state || ''}${o.days != null ? ` · ${stay(o.days)}` : ''}: `));
+    body.append(acts, out);
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);
