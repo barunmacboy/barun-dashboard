@@ -47,6 +47,7 @@
   //   걸린 필터는 늘 보이게, 휴대폰은 줄마다 카드(누가·무엇·지금 단계·기한) — 표가 필요하면 [표로 보기]
   function build() {
     const root = $('p-data'); if (!root || built) return; built = true;
+    skCss();
     root.innerHTML = '';
     const card = E('div', 'card dt-card');
     const tools = E('div', 'dt-tools');
@@ -354,11 +355,12 @@
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
-    if (isSheet()) { const b = E('button', 'btn sm weak', '＋ 재고 줄 추가'); b.type = 'button'; b.title = '고객 없이 들어온 물건을 이 탭 맨 아래 줄로'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
+    if (isSheet() && viewMode() === 'cards') { const b = E('button', 'btn sm weak', '＋ 재고 넣기'); b.type = 'button'; b.title = '고객 없이 들어온 물건을 이 탭 맨 아래 줄로'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
     if (cur.offset > 0) { const b = E('button', 'btn sm ghost', '‹ 앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
     if (cur.offset + last.rows.length < last.total) { const b = E('button', 'btn sm ghost', '다음 ›'); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
     bar();
     if (jump) { const r = last.rows.find((x) => x.tab === jump.tab && +x.row === +jump.row); jump = null; if (r) openRow(r); else toast('그 줄을 찾지 못했어요(지워졌거나 옮겨졌을 수 있어요)'); }
+    showFlash();
   }
   // 빈 화면·오류 = 무엇이 문제인지 + 바로 누를 버튼
   function stateBox(title, sub, acts) {
@@ -374,10 +376,10 @@
     return stateBox('맞는 줄이 없어요', acts.length ? '찾는 말이나 할 일·필터를 풀어 보세요.' : (isSheet() ? '' : '이 표는 아직 비어 있어요.'), acts);
   }
   // 짧은 알림(복사됨·저장됨) — 화면 아래 가운데, 휴대폰은 탭 막대 위
-  function toast(msg, bad) {
+  function toast(msg, bad, ms) {
     let t = $('dt-toast'); if (!t) { t = E('div', 'dt-toast'); t.id = 'dt-toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); document.body.append(t); }
     t.textContent = msg; t.classList.toggle('bad', !!bad); t.hidden = false; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
-    clearTimeout(toast.tm); toast.tm = setTimeout(() => { t.classList.remove('show'); }, bad ? 4200 : 1800);
+    clearTimeout(toast.tm); toast.tm = setTimeout(() => { t.classList.remove('show'); }, ms || (bad ? 4200 : 1800));
   }
   async function clip(v) {         // http 주소(테일스케일 IP)로 열면 navigator.clipboard가 없어서 옛 방식(execCommand)으로
     try {      // 권한 묻기 등으로 대답이 없으면 0.8초 뒤 옛 방식으로
@@ -495,7 +497,17 @@
       row.onclick = open; row.onkeydown = (e) => { if (e.key === 'Enter' && e.target === row) open(); };
       tb.append(row);
     }
-    tbl.append(tb); wrap.append(tbl);
+    tbl.append(tb);
+    if (ed && last.rows.length) {      // '45행 밑에 재고줄 플러스'(사장님) — 고른 줄(없으면 맨 아래 줄)의 상품명·옵션·구매처·배송방식만 복사
+      const tf = E('tfoot'), ftr = E('tr'), ftd = E('td'); ftd.colSpan = cols.length + 1;
+      const box = E('div', 'dt-add');
+      const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄(칸을 누른 줄)의 상품명·옵션·구매처·배송방식을 복사해 그 탭 맨 아래에 새 재고 줄 — 나머지 칸은 빈칸';
+      a.onclick = (e) => { e.stopPropagation(); stockCopy(addRef(), a); };
+      const more = E('button', 'btn sm ghost', '다 적어서 넣기'); more.type = 'button'; more.onclick = (e) => { e.stopPropagation(); const r = addRef(); stockDialog(r && r.tab); };
+      box.append(a, E('span', 'muted', '상품명·옵션·구매처·배송방식만 복사 — 다른 줄을 복사하려면 그 줄 칸을 먼저 누르세요'), more);
+      ftd.append(box); ftr.append(ftd); tf.append(ftr); tbl.append(tf);
+    }
+    wrap.append(tbl);
     if (wrap.scrollTop !== sy || wrap.scrollLeft !== sx) { wrap.scrollTop = sy; wrap.scrollLeft = sx; }   // 다시 그려도 보던 자리 그대로(칸을 고친 뒤 표가 맨 위로 튀지 않게)
     if (!last.rows.length) wrap.append(emptyBox());
     pinLeft(tbl);
@@ -678,6 +690,7 @@
   const trackUrl = (v) => `https://t.17track.net/ko#nums=${encodeURIComponent(v)}`;
   // 칸 내용 줄(엑셀 위 수식 입력줄) — 고른 칸의 이름과 잘리지 않은 전체 값, 고칠 수 있는 칸은 여기서 바로 고침
   function fx() {
+    syncAdd();
     const box = document.querySelector('.dt-fx'); if (!box) return;
     const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
     box.hidden = !isSheet() || viewMode() === 'cards'; box.textContent = '';
@@ -914,7 +927,9 @@
       const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '고른 줄 중 맨 위 줄의 이 칸 값을 나머지 고른 줄에(미리보기 뒤)';
       fill.onclick = () => fillDown(s.value);
       const clr = E('button', 'btn sm ghost', '고르기 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
-      g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr); b.append(g);
+      g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr);
+      if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = E('button', 'btn sm primary', '＋ 이 줄로 재고 추가'); cp.type = 'button'; cp.title = '상품명·옵션·구매처·배송방식만 복사해 그 탭 맨 아래에 새 재고 줄'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
+      b.append(g);
     }
     if (stuck) {
       const g = E('div', 'dt-bar-g dt-bar-err');
@@ -966,6 +981,59 @@
   //   꼭 필요한 것(탭·상품명·수량)만 먼저, 나머지는 '선택'으로 접음(점진적 공개) · 이 탭에서 쓰던 구매처·센터·상품명을 눌러 넣기(기억 대신 알아보기)
   //   · 쓰기 전에 서버 미리보기(재고줄 --시험)로 '몇 행에 들어가는지 · 같은 공홈주문번호가 이미 있는지'를 바로 보여 줌 · 넣은 뒤 그 줄로 가기 / 이어서 하나 더
   //   공홈가를 모르면 빈칸(0으로 채우지 않음 — 절대 규칙 11).
+  // ── 줄 골라 재고 추가(2026-10-24 사장님: "특정 행을 누르고 재고추가 누르면 상품명·옵션·공홈주소·배송방식 이 4개만 행에 추가되고 나머지는 빈칸",
+  //   "재고줄 플러스를 45행 밑에", "둘 다 살려") — 고른 줄(칸을 누른 줄 · 체크한 한 줄 · 없으면 맨 아래 줄)을 복사해 그 탭 맨 아래에 새 줄,
+  //   나머지 칸은 표에서 바로 채운다. 다 적어 넣는 길은 위 '재고 넣기' 창.
+  let newRow = null;     // 다 불러온 뒤 보여 줄 새 줄 {tab, row, tried}
+  function addRef() {
+    if (!last || !isSheet() || !last.rows.length) return null;
+    const by = (k) => last.rows.find((x) => rid(x) === k);
+    if (cell && by(cell.k)) return by(cell.k);
+    if (picked.size === 1) { const r = by([...picked][0]); if (r) return r; }
+    return last.rows[last.rows.length - 1];
+  }
+  function syncAdd() {
+    const b = document.querySelector('.dt-add .add'); if (!b) return;
+    const r = addRef();
+    b.textContent = r ? `＋ ${r.tab} ${r.row}행 복사해 재고 줄 추가` : '＋ 재고 줄 추가';
+    b.disabled = !r;
+  }
+  async function stockCopy(r, b, force) {
+    if (!r) return;
+    if (!String(r.name || '').trim()) { toast('상품명이 빈 줄이라 복사할 수 없어요 — [재고 넣기]로 적어 주세요', true); return; }
+    const label = b && b.textContent; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
+    const payload = { kind: 'sheet_row', op: 'stock_copy', tab: r.tab, row: r.row, key: r.key || '', ident: ident(r) };   // 값은 서버가 지금 시트에서 다시 읽어 복사
+    if (force) payload.force = true;
+    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+    if (b) { b.disabled = false; b.textContent = label; }
+    const m = String(j.msg || '');
+    if (j.ok) {
+      const pos = m.match(/(\S+) (\d+)행/);
+      newRow = pos ? { tab: pos[1], row: +pos[2] } : null;
+      toast(`✅ ${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 — ${r.row}행의 상품명·옵션·구매처·배송방식 복사, 나머지는 표에서 채우세요`, false, 3600);
+      load(); loadTables(); return;
+    }
+    if (/회차가 시트를 쓰는 중/.test(m) && confirm(m + '\n\n그래도 넣을까요?')) { stockCopy(r, b, true); return; }
+    toast('⚠ ' + m, true);
+  }
+  function showFlash() {        // load()가 그린 뒤 — 새 줄로 가서 반짝이고 빈 칸 하나를 골라 둠(바로 적기 시작하게). 지금 보기에 없으면 그 탭 전체로 한 번 바꿔 봄
+    if (!newRow || !last) return;
+    const f = newRow, i = last.rows.findIndex((x) => x.tab === f.tab && +x.row === +f.row);
+    if (i < 0) {
+      if (f.tried) { newRow = null; return; }
+      f.tried = true; cur.preset = ''; cur.q = ''; cur.filters = [{ c: 'tab', op: 'in', vs: [f.tab] }]; cur.offset = 0;
+      const qi = document.querySelector('.dt-q'); if (qi) qi.value = '';
+      load(); return;
+    }
+    newRow = null;
+    const r = last.rows[i];
+    if (viewMode() === 'cards') { openRow(r); return; }
+    const tr = document.querySelectorAll('.dt tbody tr')[i];
+    if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('new'); }
+    const c = ['shop_order', 'shop_price', 'send_qty', 'fwd_center'].find((x) => visCols().includes(x) && canEdit(x, r));
+    if (c) pickCell(r, c);
+  }
+
   const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 파미칼: '€', 영국: '£', 호주: 'A$' };
   const SK_KEEP = ['tab', 'shop', 'center'];      // '하나 더 넣기'에서 남겨 두는 칸(같은 상자에서 여러 개 넣을 때)
   let sk = null;
@@ -978,6 +1046,14 @@
     const s = E('style'); s.id = 'sk-css';
     s.textContent = `
 .dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); }
+table.dt.sheet tr.new > td { animation: dt-new 2.6s ease-out; }
+@keyframes dt-new { from { background: var(--green-bg); } }
+table.dt tfoot td { padding: 8px 0 4px; background: var(--card); border: 0; overflow: visible; max-width: none; }
+.dt-add { position: sticky; left: 8px; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 40px); }
+.dt-add .add { border: 1.5px dashed color-mix(in srgb, var(--blue) 55%, transparent); background: var(--blue-bg); color: var(--blue-ink); }
+.dt-add .add:hover { border-style: solid; }
+.dt-add .muted { font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { table.dt.sheet tr.new > td { animation: none; } }
 dialog.sk { border: 0; padding: 0; border-radius: 20px; width: min(600px, calc(100vw - 24px)); max-height: min(880px, calc(100dvh - 32px)); background: var(--card); color: var(--ink); box-shadow: var(--pop); overflow: hidden; }
 dialog.sk[open] { display: flex; flex-direction: column; animation: sk-in .18s ease-out; }
 dialog.sk::backdrop { background: rgba(0, 0, 0, .42); }
@@ -1653,6 +1729,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   };
   function sheetActs(r, acts, out, noEdit) {
     const ordered = r.key && !isStock(r);
+    acts.append(tool('재고 줄 추가', '이 줄의 상품명·옵션·구매처·배송방식만 복사해 같은 탭 맨 아래에 새 재고 줄 — 나머지 칸은 표에서 채워요', btn('＋ 이 줄로 재고 추가', 'primary', (b) => stockCopy(r, b))));
     // 칸 고치기(표에서 누르기 어려운 휴대폰용 — 같은 저장 길)
     const cols = (last.edit.editable || []).concat(isStock(r) ? last.edit.stock_only : []);
     const c = select(cols.map((x) => COLNAME[x] || x)), v = inp('새 값');
