@@ -516,13 +516,62 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .dt-detail .what { margin-top: 12px; white-space: pre-wrap; }
 .todo-fil { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 /* 절감 장부 */
-.sav-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
-@media (max-width: 600px) { .sav-tiles { grid-template-columns: minmax(0, 1fr); } }
-.sav-tile { background: var(--green-bg); border-radius: 14px; padding: 12px 14px; }
-.sav-tile .k { color: var(--green-ink); font-size: 13px; font-weight: 600; } .sav-tile .v { font-size: 22px; font-weight: 800; color: var(--ink); margin: 2px 0; } .sav-tile .d { color: var(--sub); font-size: 13px; }
-table.sav-t { width: 100%; font-size: 13px; border-collapse: collapse; } table.sav-t th { text-align: left; color: var(--sub); background: var(--fill2); padding: 8px 10px; white-space: nowrap; }
-table.sav-t td { padding: 7px 10px; border-top: 1px solid var(--line); } table.sav-t td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-#sav .od-t { margin-top: 14px; }
+/* 절감 장부 — 사람 시간(보라)·AI 시간(청록) 두 줄기 (2026-10-25 사장님 "훨씬 더 드라마틱하게") */
+:root { --sv-h: #7c4dff; --sv-a: #0e9f8f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sv-h: #8a68ff; --sv-a: #14a291; } }
+.sv { display: grid; gap: 14px; min-width: 0; }
+.sv-hero { position: relative; overflow: hidden; border-radius: 22px; padding: 28px 28px 22px; color: #fff;
+  background: radial-gradient(120% 140% at 0% 0%, #3b1f8f 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #08584f 0%, transparent 55%), #12131c; }
+.sv-kick { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, .72); letter-spacing: .01em; }
+.sv-big { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); gap: 28px; margin: 14px 0 18px; align-items: stretch; }
+.sv-big > i { background: rgba(255, 255, 255, .14); }
+.sv-n .lab { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.sv-n .lab b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.sv-n.h .lab b { background: #a48bff; } .sv-n.a .lab b { background: #3fd6c3; }
+.sv-n .num { font-size: clamp(40px, 6vw, 76px); font-weight: 850; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sv-n .num small { font-size: .42em; font-weight: 700; letter-spacing: -.01em; margin: 0 .18em 0 .06em; opacity: .85; }
+.sv-n.h .num { color: #c9b8ff; } .sv-n.a .num { color: #7ff0df; }
+.sv-n .eq { font-size: 14px; color: rgba(255, 255, 255, .82); line-height: 1.55; }
+.sv-n .eq b { color: #fff; }
+.sv-pace { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, .07); font-size: 14px; color: rgba(255, 255, 255, .86); }
+.sv-pace b { color: #fff; font-size: 16px; } .sv-pace .tag { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 8px; background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .8); }
+.sv-mini { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.sv-mini > div { border-radius: 12px; padding: 10px 14px; background: rgba(255, 255, 255, .05); font-size: 13px; color: rgba(255, 255, 255, .74); }
+.sv-mini b { color: #fff; font-size: 15px; font-variant-numeric: tabular-nums; }
+.sv-mini .h { color: #c9b8ff; } .sv-mini .a { color: #7ff0df; }
+@media (max-width: 760px) {
+  .sv-hero { padding: 22px 18px 18px; border-radius: 18px; }
+  .sv-big { grid-template-columns: minmax(0, 1fr); gap: 16px; } .sv-big > i { height: 1px; }
+  .sv-mini { grid-template-columns: minmax(0, 1fr); }
+}
+/* 날마다 */
+.sv-chart { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: 220px auto; gap: 0 8px; margin-top: 26px; }
+.sv-y { position: relative; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sv-y span { position: absolute; right: 0; transform: translateY(50%); }
+.sv-plot { position: relative; border-bottom: 1px solid var(--axis); display: flex; align-items: flex-end; gap: 4px; padding: 0 2px; }
+.sv-plot .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--grid); pointer-events: none; }
+.sv-day { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; position: relative; cursor: default; border-radius: 6px; }
+.sv-day:hover, .sv-day:focus-visible { background: var(--hover); outline: none; }
+.sv-day b { position: relative; width: min(26px, 38%); border-radius: 4px 4px 0 0; min-height: 2px; display: block; }
+.sv-day b.h { background: var(--sv-h); } .sv-day b.a { background: var(--sv-a); }
+.sv-day b em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10.5px; color: var(--ink2); white-space: nowrap; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.sv-x { grid-column: 2; display: flex; gap: 4px; padding: 6px 2px 0; font-size: 11.5px; color: var(--muted); }
+.sv-x span { flex: 1 1 0; text-align: center; min-width: 0; }
+.sv-legend { display: flex; gap: 14px; margin-top: 4px; font-size: 12.5px; color: var(--sub); flex-wrap: wrap; }
+.sv-legend span { display: inline-flex; align-items: center; gap: 6px; } .sv-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.sv-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--card); box-shadow: var(--pop); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; white-space: nowrap; }
+.sv-tip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+/* 무엇으로 아꼈나 */
+.sv-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.sv-rows li { display: grid; gap: 4px; }
+.sv-rows .t { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+.sv-rows .t span { flex: 1; min-width: 0; font-weight: 650; } .sv-rows .t b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sv-rows .s { font-size: 12.5px; color: var(--muted); }
+.sv-rows .bar { height: 8px; border-radius: 4px; background: var(--fill); overflow: hidden; } .sv-rows .bar i { display: block; height: 100%; border-radius: 4px; }
+.sv-note { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.5; }
+.sv-side { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-right: 6px; white-space: nowrap; }
+.sv-side.h { background: color-mix(in srgb, var(--sv-h) 16%, transparent); color: var(--sv-h); } .sv-side.a { background: color-mix(in srgb, var(--sv-a) 16%, transparent); color: var(--sv-a); }
+@media (prefers-reduced-motion: no-preference) { .sv-day b { transition: height .6s cubic-bezier(.2, .8, .2, 1); } }
 
 /* 시트 보고서(기록 탭) */
 .rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -926,10 +975,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     </section>
 
     <section class="page" id="p-savings" aria-label="절감 장부" hidden>
-      <div class="card" id="sav-sec">
-        <div class="card-h"><h2>누적 절감</h2><span class="desc">효율화로 아낀 시간·AI 비용이에요. 디스코드 #효율화에도 같은 내용이 쌓여요.</span></div>
-        <div id="sav"></div>
-      </div>
+      <div class="sv" id="sav"></div>
     </section>
 
     <section class="page" id="p-activity" aria-label="활동 기록" hidden>
@@ -1165,31 +1211,110 @@ const openTodos = new Set();
 let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 넘음)
 let lastState = null;
 
-// 절감 장부 — notify/savings.py: 종류별 누적·오늘, 개선 목록(디스코드 #효율화와 같은 내용)
+// 절감 장부 — notify/savings.py summary(): 사람 시간(손 안 탄 주문 단계 × 손으로 할 때 분)과 AI 시간(측정 종류·스크립트 회차)을 따로
+let svCounted = false;
 function renderSavings(sv) {
   const box = $('sav'); if (!box) return; box.textContent = '';
   if (sv.error) { box.append(el('p', 'muted', '절감 장부를 읽지 못했어요: ' + sv.error)); return; }
-  const a = sv.all || {}, w = sv.week || {}, t = sv.today || {}, won = (u) => `$${(u || 0).toFixed(2)} (약 ${(Math.round((u || 0) * (sv.usd_krw || 1330) / 100) * 100).toLocaleString('ko-KR')}원)`;
-  const head = el('div', 'sav-tiles');
-  for (const [k, x] of [[`${(sv.first || '').slice(5).replace('-', '/')}부터 누적`, a], ['최근 7일', w], ['오늘', t]]) {
-    const d = el('div', 'sav-tile'); d.append(el('div', 'k', k), el('div', 'v', durK(x.secs)), el('div', 'd', 'AI ' + won(x.cost))); head.append(d);
+  const a = sv.all || {}, w = sv.week || {}, t = sv.today || {}, hu = sv.human || {}, rate = sv.usd_krw || 1330;
+  const krw = (u) => { const v = Math.round((u || 0) * rate / 1000) * 1000; return v >= 1e8 ? `${(v / 1e8).toFixed(1)}억 원` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만 원` : `${v.toLocaleString('ko-KR')}원`; };
+  const hrs = (s) => (s || 0) / 3600, workdays = (s) => (hrs(s) / 8).toFixed(1);
+  const since = (sv.first || '').slice(5).replace('-', '/');
+  const elapsed = Math.max(0.5, (Date.now() - new Date(`${sv.first}T00:00:00`)) / 864e5);
+  const perH = (hu.all || 0) / elapsed, perA = (a.secs || 0) / elapsed, perC = (a.cost || 0) / elapsed;
+  // ① 큰 숫자
+  const hero = el('section', 'sv-hero'); hero.setAttribute('aria-label', '누적 절감');
+  hero.append(el('div', 'sv-kick', `${since}부터 ${Math.ceil(elapsed)}일 동안 자동화가 대신한 시간`));
+  const big = el('div', 'sv-big');
+  const num = (secs, cls) => {
+    const d = el('div', 'num'); d.dataset.secs = String(Math.round(secs || 0)); d.dataset.cls = cls;
+    const paint = (x) => { const h = Math.floor(x / 3600), m = Math.floor(x % 3600 / 60); d.innerHTML = h ? `${h}<small>시간</small>${m}<small>분</small>` : `${m}<small>분</small>`; };
+    paint(secs || 0); d._paint = paint; return d;
+  };
+  const H = el('div', 'sv-n h'), A = el('div', 'sv-n a');
+  const lh = el('div', 'lab'); lh.append(el('b'), document.createTextNode('👤 사람 시간 — 사장님 손 대신'));
+  const la = el('div', 'lab'); la.append(el('b'), document.createTextNode('🤖 AI 시간 — 에이전트 대신'));
+  const eh = el('div', 'eq'); eh.innerHTML = `근무일로 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b>, 단계 <b>${(hu.stages || []).reduce((s, x) => s + x.n, 0).toLocaleString('ko-KR')}번</b>을 손 안 대고`;
+  const ea = el('div', 'eq'); ea.innerHTML = `AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b>(약 ${krw(a.cost)}) · 에이전트를 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b> 안 띄움`;
+  H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
+  big.append(H, el('i'), A); hero.append(big);
+  const pace = el('div', 'sv-pace');
+  pace.innerHTML = `<span>하루 평균 사람 ${hrs(perH).toFixed(1)}시간 · AI ${hrs(perA).toFixed(1)}시간</span><span>→ 이 속도면 한 달에 <b>사람 ${Math.round(hrs(perH * 30))}시간(근무일 ${workdays(perH * 30)}일)</b> · <b>AI ${Math.round(hrs(perA * 30))}시간 · ${krw(perC * 30)}</b></span><span class="tag">예상</span>`;
+  hero.append(pace);
+  const mini = el('div', 'sv-mini');
+  for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], ['최근 7일', hu.week, w.secs, w.cost]]) {
+    const d = el('div'); d.innerHTML = `${k} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>$${(cc || 0).toFixed(2)}</b>`; mini.append(d);
   }
-  box.append(head);
-  if (sv.per_day && (sv.per_day.secs || sv.per_day.cost)) box.append(el('p', 'muted small', `지금 바뀐 것들로 하루 약 ${durK(sv.per_day.secs)} · $${(sv.per_day.cost || 0).toFixed(2)}씩 아껴요(개선 ${(sv.changes || []).length}건 추정 합)`));
+  hero.append(mini); box.append(hero);
+  if (!svCounted && !matchMedia('(prefers-reduced-motion: reduce)').matches) {      // 처음 열 때만 0에서 올라가게
+    svCounted = true;
+    const nums = hero.querySelectorAll('.num'), t0 = performance.now();
+    const step = (now) => { const p = Math.min(1, (now - t0) / 1400), e = 1 - Math.pow(1 - p, 3); nums.forEach((n) => n._paint(+n.dataset.secs * e)); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  // ② 날마다
+  const days = (sv.daily || []).slice(-14);
+  if (days.length) {
+    const c = el('section', 'card'); c.append(el('div', 'card-h'));
+    c.firstChild.append(el('h2', null, '날마다 아낀 시간'), el('span', 'desc', '막대를 누르거나 마우스를 올리면 그날 숫자가 보여요'));
+    const lg = el('div', 'sv-legend'); for (const [cls, nm] of [['--sv-h', '👤 사람 시간'], ['--sv-a', '🤖 AI 시간']]) { const s = el('span'); const i = el('i'); i.style.background = `var(${cls})`; s.append(i, document.createTextNode(nm)); lg.append(s); }
+    c.append(lg);
+    const max = Math.max(1, ...days.map((d) => Math.max(d.human, d.ai))) / 3600;
+    const top = max <= 4 ? Math.ceil(max) : max <= 12 ? Math.ceil(max / 2) * 2 : Math.ceil(max / 5) * 5;
+    const ch = el('div', 'sv-chart'), y = el('div', 'sv-y'), plot = el('div', 'sv-plot'), xs = el('div', 'sv-x');
+    for (let k = 0; k <= 4; k++) { const v = top * k / 4; const s = el('span', null, `${Number.isInteger(v) ? v : v.toFixed(1)}h`); s.style.bottom = `${k * 25}%`; y.append(s); if (k) { const g = el('div', 'gl'); g.style.bottom = `${k * 25}%`; plot.append(g); } }
+    const tip = el('div', 'sv-tip'); tip.hidden = true;
+    const peakH = Math.max(...days.map((d) => d.human)), peakA = Math.max(...days.map((d) => d.ai));
+    for (const d of days) {
+      const g = el('div', 'sv-day'); g.tabIndex = 0;
+      const lab = `${d.day.slice(5).replace('-', '/')} — 사람 ${durK(d.human)} · AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; g.setAttribute('aria-label', lab);
+      for (const [cls, v, peak] of [['h', d.human, peakH], ['a', d.ai, peakA]]) {
+        const b = el('b', cls); b.style.height = `${Math.min(100, v / 3600 / top * 100)}%`;
+        if (days.length <= 7 || v === peak) b.append(el('em', null, `${(v / 3600).toFixed(1)}`));      // 일주일 이하면 다, 길면 가장 큰 날만
+        g.append(b);
+      }
+      const show = () => { tip.innerHTML = `<b>${d.day.slice(5).replace('-', '/')}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; tip.hidden = false;
+        const r = g.getBoundingClientRect(), pr = ch.getBoundingClientRect(); tip.style.left = `${Math.min(pr.width - 170, Math.max(0, r.left - pr.left + r.width / 2 - 60))}px`; tip.style.top = '4px'; };
+      g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('click', show); g.addEventListener('mouseleave', () => { tip.hidden = true; }); g.addEventListener('blur', () => { tip.hidden = true; });
+      plot.append(g); xs.append(el('span', null, d.day.slice(5).replace('-', '/')));
+    }
+    ch.append(y, plot, xs, tip); c.append(ch); box.append(c);
+  }
+  // ③ 무엇으로 아꼈나 — 사람 · AI
+  const two = el('div', 'grid2');
+  const rowsCard = (title, desc, items, color, note) => {
+    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, title), el('span', 'desc', desc)); c.append(h);
+    const ul = el('ul', 'sv-rows'); const mx = Math.max(1, ...items.map((x) => x.secs));
+    for (const x of items) {
+      const li = el('li'), tt = el('div', 't'); tt.append(el('span', null, x.name), el('b', null, durK(x.secs))); li.append(tt);
+      const bar = el('div', 'bar'), i = el('i'); i.style.width = `${x.secs / mx * 100}%`; i.style.background = `var(${color})`; bar.append(i); li.append(bar);
+      li.append(el('div', 's', x.sub)); ul.append(li);
+    }
+    if (!items.length) ul.append(el('li', 'muted small', '아직 쌓인 것이 없어요'));
+    c.append(ul); if (note) c.append(el('p', 'sv-note', note)); return c;
+  };
+  const hItems = (hu.stages || []).map((x) => ({ name: `${x.name}`, secs: x.secs, sub: `${x.what} — ${x.n.toLocaleString('ko-KR')}건 × ${x.min}분` }));
+  if (hu.changes > 60) hItems.push({ name: '사장님 손일 줄인 개선', secs: hu.changes, sub: '매입 대기열·공홈 주문 한 번에 채우기·도착점검 등(개선마다 하루분 × 지난 날수)' });
+  hItems.sort((p, q) => q.secs - p.secs);
   const L = sv.labels || {};
-  const rows = Object.entries(a.by || {}).sort((p, q) => (q[1].cost * 600 + q[1].secs) - (p[1].cost * 600 + p[1].secs));
-  if (rows.length) {
-    const tb = el('table', 'sav-t'); const hr = el('tr'); ['무엇으로', '횟수', '아낀 시간', 'AI 비용', '오늘'].forEach((h) => hr.append(el('th', null, h))); const th = el('thead'); th.append(hr); tb.append(th);
-    const bd = el('tbody');
-    for (const [k, b] of rows) { const tw = (t.by || {})[k] || { n: 0, secs: 0 }; const tr = el('tr'); [L[k] || (k === 'script' ? '스크립트 회차 — 에이전트 대신' : k), b.n.toLocaleString('ko-KR') + '번', durK(b.secs), '$' + b.cost.toFixed(2), `${tw.n}번 · ${durK(tw.secs)}`].forEach((v, i) => tr.append(el('td', i ? 'num' : null, v))); bd.append(tr); }
-    tb.append(bd); const wr = el('div', 'rep-wrap'); wr.append(tb); box.append(wr);
-  } else box.append(el('p', 'muted small', '아직 쌓인 절감이 없어요 — 회차가 돌면 쌓여요'));
+  const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · AI 비용 $${b.cost.toFixed(2)}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
+  two.append(
+    rowsCard('👤 사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '단계마다 사람 손 없이 지나간 주문만 세요(자동화율과 같은 판정, 손 탄 주문은 빼요). 1건에 드는 분은 손으로 할 때를 보수적으로 잡은 값이에요.'),
+    rowsCard('🤖 AI·기계 시간', `누적 ${durK(a.secs)} · $${(a.cost || 0).toFixed(2)}`, aItems, '--sv-a', '횟수는 실제로 일어난 것, 1번에 아끼는 양은 측정한 평균이에요. 스크립트 회차는 그 업무 에이전트 회차 평균과 비교해요.'));
+  box.append(two);
+  // ④ 바뀐 것
   const ch = sv.changes || [];
   if (ch.length) {
-    box.append(el('div', 'od-t', `바뀐 것 ${ch.length}건`));
+    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, `바뀐 것 ${ch.length}건`), el('span', 'desc', '디스코드 #효율화에도 하나씩 올라가요')); c.append(h);
     const ul = el('ul', 'log');
-    for (const x of ch) { const li = el('li'); li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + ' · ' + (x.by || '')), el('div', null, x.what), x.detail ? el('div', 'muted small', x.detail) : ''); ul.append(li); }
-    box.append(ul);
+    for (const x of ch) {
+      const li = el('li'), top = el('div');
+      top.append(el('span', 'sv-side ' + (x.side === 'human' ? 'h' : 'a'), x.side === 'human' ? '👤 사람' : '🤖 AI'), document.createTextNode(x.what));
+      const per = [x.day_secs ? `하루 ${durK(x.day_secs)}` : '', x.day_cost ? `$${x.day_cost.toFixed(2)}` : ''].filter(Boolean).join(' · ');
+      li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + (x.by ? ' · ' + x.by : '') + (per ? ' · ' + per : '')), top, x.detail ? el('div', 'muted small', x.detail) : '');
+      ul.append(li);
+    }
+    c.append(ul); box.append(c);
   }
 }
 
@@ -1241,7 +1366,7 @@ function render(s) {
   const us = (s.usage || {}).claude || {}, uw = us.windows || {};
   const pct = (w) => (uw[w] && uw[w].util != null) ? Math.round(uw[w].util * 100) : null;
   const p5 = pct('five_hour'), p7 = pct('seven_day');
-  const sv = s.savings || {}, svA = sv.all || {};
+  const sv = s.savings || {}, svA = sv.all || {}, svH = (sv.human || {}).all || 0;
   const H = (s.hub || {}).health || {};
   const hubBad = H.sources ? Object.values(H.sources).filter((v) => !v.ok).length : 0;
 
@@ -1270,7 +1395,7 @@ function render(s) {
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
-    ['아낀 것', svA.secs ? (svA.secs >= 3600 ? Math.round(svA.secs / 360) / 10 : Math.round(svA.secs / 60)) : '-', svA.secs ? (svA.secs >= 3600 ? '시간' : '분') : '', svA.secs || svA.cost ? `AI $${(svA.cost || 0).toFixed(2)} · 오늘 ${durK((sv.today || {}).secs || 0)}` : '효율화가 쌓이면 보여요', svA.secs ? 'ok' : '', 'savings'],
+    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간 · 사람' : '', svA.secs || svA.cost ? `AI ${Math.round(svA.secs / 360) / 10}시간 · $${(svA.cost || 0).toFixed(2)}` : '효율화가 쌓이면 보여요', svH || svA.secs ? 'ok' : '', 'savings'],
   ];
   const sg = $('stats'); sg.textContent = '';
   for (const [k, v, u, d, cls, go] of ST) {
