@@ -619,12 +619,13 @@ table.rep td.ed { background: #fff8db; padding: 3px 6px; }
 @media (max-width: 640px) { .ov-grid { grid-template-columns: 1fr; } .ov-steps li { font-size: 10px; } }
 @media (max-width: 560px) { #dt-detail:not([hidden]) { border-radius: 0; } }
 table.dt.sheet td.pick, table.dt.sheet th.pick { width: 36px; padding-left: 8px; padding-right: 4px; position: sticky; left: 0; background: inherit; z-index: 1; }
-table.dt.sheet th.pick { background: var(--card); z-index: 2; }
+table.dt.sheet th.pick { background: var(--card); z-index: 4; }   /* 왼쪽 위 모서리 — 옆으로 넘긴 머리글이 덮지 않게 */
 table.dt.sheet input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--blue); cursor: pointer; }
 table.dt.sheet th.edh { color: var(--blue-ink); }
 /* 주문 시트 = 스프레드시트처럼 촘촘히(한 화면에 칸이 많이) + 격자선 + 고른 칸 테두리(10/23 사장님 "엑셀의 장점은 정보가 길게 나온다") */
-table.dt.sheet { font-size: 12px; border-collapse: collapse; }
-table.dt.sheet th, table.dt.sheet td { padding: 2px 6px; border: 1px solid var(--line); vertical-align: middle; line-height: 20px; }
+/* 칸마다 오른쪽·아래 선(separate) — collapse면 선이 고정 칸을 따라오지 않아 옆으로 넘길 때 고정 칸 사이 1px 틈으로 뒤 글자가 비쳤음(10/24) */
+table.dt.sheet { font-size: 12px; border-collapse: separate; border-spacing: 0; }
+table.dt.sheet th, table.dt.sheet td { padding: 2px 6px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); vertical-align: middle; line-height: 20px; }
 table.dt.sheet td { max-width: 180px; }
 table.dt.sheet th .th-sort { min-height: 24px; padding: 2px 0; } table.dt.sheet th .th-filt { min-height: 24px; min-width: 20px; padding: 2px; }
 table.dt.sheet td.pick input[type=checkbox] { width: 14px; height: 14px; margin: 0; vertical-align: middle; }
@@ -688,6 +689,18 @@ table.dt th .th-filt.on { color: #fff; background: var(--blue); }
 .dt-tbtns { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
 .dt-tbtns::-webkit-scrollbar { display: none; }
 .dt-tb { flex: none; } .dt-tb[hidden] { display: none; }
+/* 바로 저장 상태(10/24 사장님 "저장 눌러야 저장돼?") — 저장 중·저장됨 시각·되돌리기 */
+.dt-save { flex: none; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 4px 12px; min-height: 32px; border-radius: 999px; background: var(--fill2); color: var(--muted); white-space: nowrap; }
+.dt-save[hidden] { display: none; }
+.dt-save.saving { background: var(--blue-bg); color: var(--blue-ink); }
+.dt-save.ok { background: var(--green-bg); color: var(--green-ink); }
+.dt-save.wait, .dt-save.net, .dt-save.bad { background: var(--orange-bg); color: var(--orange-ink); }
+.dt-save .dt-undo { font: inherit; color: inherit; background: none; border: 0; border-left: 1px solid currentColor; padding: 0 0 0 8px; min-height: 24px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.dt-save .dt-undo:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+table.dt.sheet td.saved { animation: dt-saved 1.6s ease-out; }
+@keyframes dt-saved { from { background: var(--green-bg); box-shadow: inset 0 0 0 2px var(--green); } }
+@media (prefers-reduced-motion: reduce) { table.dt.sheet td.saved { animation: none; } }
+.dt-bar-err .dt-bar-t { flex: 1 1 260px; min-width: 0; white-space: pre-wrap; font-size: 14px; }
 .dt-tb.on { background: var(--blue-bg); color: var(--blue-ink); }
 .dt-tb[aria-expanded="true"] { background: var(--fill); color: var(--ink); }
 table.dt th.pin, table.dt td.pin { position: sticky; z-index: 1; background: inherit; }

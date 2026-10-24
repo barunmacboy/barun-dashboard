@@ -3,7 +3,7 @@
 // 읽기: GET /api/db/tables · /api/db/rows?table=&q=&preset=&f=<필터 JSON>&sort=칸:asc,칸:desc&offset= · /api/db/values?col=&find= · /api/db/history?key=
 //   (dashboard/dbview.py, 읽기 전용 — 정렬·필터·맞물린 개수는 서버에서, 주문 시트는 DB 원본이면 격자의 지금 값)
 // 조치: POST /api/action {action:"db", kind, ...} → notify/actions.py → 주문 시트는 ops/orderedit.py(줄·먼저 고친 사람·회차 확인, 누른 사람 이름으로 일지)
-// 주문 시트: 칸을 눌러 고치기(여러 칸 모아 한 번에 저장) · 줄 여러 개 골라 같은 값 넣기 · 할 일 묶음 · 줄 나누기·옮기기·지우기·문제 표시 · 재고 줄 추가
+// 주문 시트: 칸을 한 번 눌러 고치기(고치면 바로 저장 — 2026-10-24, 잇단 칸은 0.4초 모아 한 번에) · 줄 여러 개 골라 같은 값 넣기 · 할 일 묶음 · 줄 나누기·옮기기·지우기·문제 표시 · 재고 줄 추가
 //   2026-10-23: 격자의 모든 열·열 숨김/고정 · 시트 색·칸 메모·선택 목록(grid_meta) · 여러 칸 붙여넣기·아래로 채우기(미리보기) · 바꾼 기록·되돌리기(/api/db/audit, sheet_undo)
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -29,7 +29,7 @@
   let cur = DEF('sheet_rows'), last = null, sel = null, built = false;
   let cell2 = null, drag = false;   // 범위 고르기 끝 칸(Shift·끌기) — 합계·복사용
   let cell = null;       // 주문 시트에서 고른 칸 {k: 탭:행, c} — 위 '칸 내용' 줄에 전체 값(엑셀 수식 입력줄처럼, 10/23 사장님)
-  let pending = {}, picked = new Set();          // 주문 시트: 아직 저장 안 한 칸 {tab:row:col → edit}, 고른 줄 {tab:row}
+  let pending = {}, picked = new Set();          // 주문 시트: 아직 저장 안 한 칸 {tab:row:col → edit}(고치면 곧바로 저장 — autoSave), 고른 줄 {tab:row}
   const isSheet = () => cur.table === 'sheet_rows';
   const rid = (r) => `${r.tab}:${r.row}`;
 
@@ -71,7 +71,8 @@
       tb('＋ 재고 줄', 'dt-sbtn', () => { st.hidden = !st.hidden; stockForm(); }),
       tb('바꾼 기록', 'dt-abtn', () => auditPanel()));
     bs.querySelector('.dt-abtn').title = '현황판에서 바꾼 기록 · 되돌리기 · 지운 줄 되살리기';
-    tools.append(q, bs);
+    const sv = E('span', 'dt-save'); sv.hidden = true; sv.setAttribute('role', 'status'); sv.setAttribute('aria-live', 'polite');   // 바로 저장 상태(저장 중·저장됨·되돌리기)
+    tools.append(q, bs, sv);
   }
   // 목록 모양: 표(엑셀처럼) · 카드(휴대폰) — 고르지 않았으면 화면 폭으로(760px 이하 = 카드)
   const NARROW = matchMedia('(max-width: 760px)');
@@ -110,6 +111,8 @@
   const isDate = (c) => ((last && last.dates) || []).includes(c);
   const cname = (c) => COLNAME[c] || (last && last.heads && last.heads[c]) || c;
   // 화면에 그릴 칸 = 숨긴 칸 빼고, 고정한 칸을 앞으로(시트 열 구조는 그대로 — 보기만)
+  // 휴대폰(760px 이하) 기본 고정은 탭·행만 — 받는 분까지 붙이면 넘겨 볼 칸이 화면의 30%뿐(10/24). 직접 고정을 바꿨으면 그대로
+  const pinned = (c) => cur.pin.includes(c) && !(NARROW.matches && c === 'receiver' && cur.pin.join() === DEF(cur.table).pin.join());
   const visCols = () => { const cs = last.cols.filter((c) => !cur.hide.includes(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
   const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동(빈칸)' : '(빈칸)') : CODE_COLS.includes(c) ? ko(v) : String(v));
   function setFilter(c, f) { cur.filters = cur.filters.filter((x) => x.c !== c); if (f) cur.filters.push(f); cur.offset = 0; }
@@ -291,8 +294,10 @@
         b.setAttribute('aria-selected', String(t.name === cur.table));
         b.append(document.createTextNode(t.label), E('span', 'dt-n', t.count.toLocaleString('ko-KR')));
         b.onclick = () => {
-          if (Object.keys(pending).length && !confirm('저장 안 한 칸이 있어요. 버리고 다른 표로 갈까요?')) return;
-          pending = {}; picked.clear();
+          const stuck = Object.keys(pending).length && ['wait', 'net'].includes(sv.k);      // 고친 칸은 바로 저장 — 못 보낸 칸이 남았을 때만 물음
+          if (stuck && !confirm('저장하지 못한 칸이 있어요. 버리고 다른 표로 갈까요?')) return;
+          if (stuck) { clearTimeout(retryT); pending = {}; sv = { k: '' }; } else flushNow();
+          picked.clear();
           cur = DEF(t.name); fcol = '';
           document.querySelector('.dt-q').value = ''; closeDetail(); loadTables(); load();
         };
@@ -312,7 +317,7 @@
     box.append(g);
   }
 
-  let seq = 0, jump = null;      // jump = 다 불러온 뒤 열 줄 {tab, row}(같은 주문의 다른 줄로 갈 때)
+  let seq = 0, jump = null, lastSig = '';      // jump = 다 불러온 뒤 열 줄 {tab, row}(같은 주문의 다른 줄로 갈 때) · lastSig = 지난 요청(같으면 보던 자리 그대로)
   async function load() {
     const wrap = document.querySelector('.dt-wrap'); if (!wrap) return;
     const ps = params(); ps.set('offset', cur.offset); ps.set('limit', isSheet() ? 500 : 50);   // 주문 시트는 한 번에 500줄(엑셀처럼 넘기며 보게)
@@ -333,6 +338,7 @@
     }
     last = j;
     for (const [c, on] of [['.dt-sbtn', isSheet()], ['.dt-abtn', isSheet()]]) { const b = document.querySelector(c); if (b) b.hidden = !on; }
+    saveUI();
     if (!isSheet()) { for (const c of ['.dt-stock', '.dt-audit']) { const b = document.querySelector(c); if (b) b.hidden = true; } }
     const pb = document.querySelector('.dt-presets'); pb.textContent = '';
     if ((last.presets || []).length) chips(pb, '할 일', last.presets, (v) => cur.preset === v, (v) => { cur.preset = cur.preset === v ? '' : v; cur.offset = 0; load(); }, !cur.preset, () => { cur.preset = ''; cur.offset = 0; load(); });
@@ -346,6 +352,7 @@
     if (!document.querySelector('.dt-stock').hidden) stockForm();
     if (sel && isSheet()) { const n = last.rows.find((x) => rid(x) === rid(sel)); if (n && n !== sel) { const st = ($('dt-detail') || {}).scrollTop; sel = n; detail(true); if (st) $('dt-detail').scrollTop = st; } }
     render();
+    const sig = ps.toString(); if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
@@ -403,7 +410,7 @@
   const rowColor = (r) => (r._meta || {}).ucolor || (r._meta || {}).color || '';
 
   function render() {
-    const wrap = document.querySelector('.dt-wrap'); wrap.textContent = '';
+    const wrap = document.querySelector('.dt-wrap'); const sx = wrap.scrollLeft, sy = wrap.scrollTop; wrap.textContent = '';
     const cardsOn = viewMode() === 'cards';
     wrap.classList.toggle('cards', cardsOn);
     const vb = document.querySelector('.dt-vbtn'); if (vb) { vb.textContent = cardsOn ? '표로 보기' : '카드로 보기'; vb.title = cardsOn ? '엑셀처럼 칸으로 보고 고치기' : '줄마다 카드로(휴대폰에서 보기 좋게)'; }
@@ -419,7 +426,7 @@
     }
     for (const c of cols) {
       const th = E('th'); if (ed && canEdit(c, null)) th.classList.add('edh');
-      if (cur.pin.includes(c)) th.classList.add('pin');
+      if (pinned(c)) th.classList.add('pin');
       const so = sortOf(c);
       th.setAttribute('aria-sort', so ? (so.d === 'asc' ? 'ascending' : 'descending') : 'none');
       const sb = E('button', 'th-sort', cname(c)); sb.type = 'button';
@@ -455,7 +462,7 @@
       }
       for (const c of cols) {
         const td = E('td');
-        if (cur.pin.includes(c)) td.classList.add('pin');
+        if (pinned(c)) td.classList.add('pin');
         if (ed && colW[c]) td.style.maxWidth = td.style.minWidth = colW[c] + 'px';
         const pk = ed && pending[`${rid(r)}:${c}`];
         const v = pk ? pk.new : fmt(c, r[c]);
@@ -469,13 +476,17 @@
           td.append(E('span', 'note-dot', '◥'));
         }
         if (ed && canEdit(c, r)) {
-          td.classList.add('ed'); if (!nt) td.title = '두 번 누르거나 Enter로 고치기 · 엑셀에서 복사한 여러 칸은 칸을 고르고 붙여넣기';
-          if (pk) td.classList.add('dirty');
+          td.classList.add('ed'); if (!nt) td.title = '누르면 바로 고쳐요 — 고치면 바로 저장돼요 · 엑셀에서 복사한 여러 칸은 칸을 고르고 붙여넣기';
+          if (pk) td.classList.add('dirty'); else if (justSaved.has(`${rid(r)}:${c}`)) td.classList.add('saved');
           td.ondblclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
         }
-        if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용. '행' 칸은 줄 자세히·조치
+        if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용 — 고칠 수 있는 칸은 뗄 때 바로 고치기(press). '행' 칸은 줄 자세히·조치
           if (c === 'row') { td.classList.add('rowh'); td.title = '눌러서 줄 자세히·조치'; }
-          td.onmousedown = (e) => { if (e.button || e.target.closest('input,select')) return; e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true; };
+          td.onmousedown = (e) => {
+            if (e.button || e.target.closest('input,select')) return;
+            e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true;
+            press = e.shiftKey || e.metaKey || e.ctrlKey ? null : { k: rid(r), c };
+          };
           td.onmouseenter = () => { if (drag && cell) { cell2 = { k: rid(r), c }; paintSel(); fx(); } };
           td.onclick = (e) => { e.stopPropagation(); if (c === 'row' && !e.shiftKey && !cell2) openRow(r); };
         }
@@ -486,6 +497,7 @@
       tb.append(row);
     }
     tbl.append(tb); wrap.append(tbl);
+    if (wrap.scrollTop !== sy || wrap.scrollLeft !== sx) { wrap.scrollTop = sy; wrap.scrollLeft = sx; }   // 다시 그려도 보던 자리 그대로(칸을 고친 뒤 표가 맨 위로 튀지 않게)
     if (!last.rows.length) wrap.append(emptyBox());
     pinLeft(tbl);
     if (ed) { tbl.onkeydown = gridKey; paintSel(); }
@@ -582,7 +594,17 @@
     const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); saveW(); pinLeft(tbl); };
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
   }
-  document.addEventListener('mouseup', () => { drag = false; });
+  // 2026-10-24 사장님 "엑셀에 뭘 넣으려면 꼭 2번 혹은 3번을 눌러야 — 한 번만 클릭해도 넣거나 수정": 고칠 수 있는 칸은 한 번 누르면(끌지 않고 떼면)
+  //   바로 입력칸(글자 전체 골라 둠 — 그대로 치거나 붙여넣으면 바뀜, 한 번 더 누르면 그 자리에 커서). 끌면 범위 고르기, Shift·⌘는 범위·고르기만
+  let press = null;
+  document.addEventListener('mouseup', () => {
+    drag = false;
+    const p = press; press = null;
+    if (!p || cell2 || !cell || cell.k !== p.k || cell.c !== p.c || !last || !isSheet()) return;
+    const r = last.rows.find((x) => rid(x) === p.k);
+    if (!r || !canEdit(p.c, r)) return;
+    const td = cellTd(r, p.c); if (td) cellEdit(td, r, p.c, null, true);     // 앞 칸 입력이 닫히며 표를 다시 그렸어도 새 칸을 찾아서
+  });
   const rowIdx = (k) => last.rows.findIndex((x) => rid(x) === k);
   function rangeOf() {
     if (!cell || !last) return null;
@@ -602,8 +624,16 @@
   function pickCell(r, c, extend) {
     if (extend && cell) cell2 = { k: rid(r), c }; else { cell = { k: rid(r), c }; cell2 = null; }
     paintSel();
-    const td = cellTd(r, c); if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    const td = cellTd(r, c); if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); unhide(td); }
     fx();
+  }
+  function unhide(td) {          // 고정 칸·머리글 밑에 가려진 칸은 옆·아래로 조금 넘겨 다 보이게(휴대폰에서 반쯤 가린 칸을 고칠 때)
+    const wrap = td.closest('.dt-wrap'); if (!wrap || td.classList.contains('pin') || td.classList.contains('pick')) return;
+    const b = td.getBoundingClientRect();
+    const edge = [...td.parentNode.children].filter((x) => x.classList.contains('pin') || x.classList.contains('pick')).reduce((m, x) => Math.max(m, x.getBoundingClientRect().right), -1e9);
+    if (edge > -1e9 && b.left < edge) wrap.scrollLeft -= edge - b.left + 2;
+    const th = wrap.querySelector('thead'), top = th ? th.getBoundingClientRect().bottom : -1e9;
+    if (b.top < top) wrap.scrollTop -= top - b.top + 2;
   }
   const rangeText = () => { const g = rangeOf(); if (!g) return ''; const out = []; for (let i = g.r0; i <= g.r1; i++) { const l = []; for (let j = g.c0; j <= g.c1; j++) l.push(cellVal(last.rows[i], g.vc[j]).replace(/[\t\n]/g, ' ')); out.push(l.join('\t')); } return out.join('\n'); };
   async function copySel() {
@@ -633,10 +663,13 @@
     } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); copySel(); }
     else if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); cell = { k: rid(last.rows[0]), c: vc[0] }; cell2 = { k: rid(last.rows[last.rows.length - 1]), c: vc[vc.length - 1] }; paintSel(); fx(); }
     else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); if (canEdit(cell.c, r0)) { const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c); } else flash('고칠 수 없는 칸이에요'); }
+    else if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) { e.preventDefault(); undoLast(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault(); let n = 0;
-      for (const [r, c] of rangeCells()) if (canEdit(c, r) && cellVal(r, c) !== '') { stage(r, c, '', '일괄'); n++; }
-      if (n) { render(); bar(); } else flash('비울 칸이 없어요(고칠 수 없는 칸이거나 이미 빈칸)');
+      e.preventDefault(); const plan = [];
+      for (const [r, c] of rangeCells()) if (canEdit(c, r) && cellVal(r, c) !== '') plan.push({ r, c, v: '' });
+      if (!plan.length) flash('비울 칸이 없어요(고칠 수 없는 칸이거나 이미 빈칸)');
+      else if (plan.length === 1) { stage(plan[0].r, plan[0].c, '', '일괄'); render(); bar(); }
+      else preview('칸 비우기', plan, [], '일괄');      // 여러 칸은 바로 저장되니 한 번 보여 주고
     } else if (e.key === 'Escape') { cell = cell2 = null; paintSel(); fx(); }
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing && canEdit(cell.c, r0) && !dropOpts(r0, cell.c)) {
       e.preventDefault(); const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c, e.key);
@@ -650,7 +683,7 @@
     const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
     box.hidden = !isSheet() || viewMode() === 'cards'; box.textContent = '';
     if (box.hidden) return;
-    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 누르면 전체 내용이 여기 나와요 · 두 번 누르거나 Enter로 고치기 · 화살표로 옮기기 · 행 번호를 누르면 줄 자세히')); return; }
+    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 한 번 누르면 바로 고치고, 고치면 바로 저장돼요 · 전체 내용은 여기 · 끌면 여러 칸 · 행 번호를 누르면 줄 자세히')); return; }
     const g = rangeOf();
     if (g && (g.r1 > g.r0 || g.c1 > g.c0)) {      // 범위: 칸 수 · 숫자 합계·평균(엑셀 아래 상태줄처럼 — 수익·배송비 더해 보기)
       const nums = []; let n = 0; for (const [rr, cc] of rangeCells()) { n++; const x = numOf(cellVal(rr, cc)); if (x != null && NUMC.includes(cc)) nums.push(x); }
@@ -681,12 +714,100 @@
     for (const tr of tbl.querySelectorAll('tr')) [...tr.children].forEach((td, i) => { if (i in at && (td.classList.contains('pin'))) td.style.left = at[i] + 'px'; });
   }
 
+  // 고친 칸 = 곧바로 저장(2026-10-24 사장님 "저장을 눌러야 저장돼? 그냥 입력하고 나가면 저장 안 되고?" — 시트처럼 넣으면 저장).
+  //   잠깐(0.4초) 모아 한 번에 보내고, 보내는 사이 고친 칸은 다음 번에. 막대의 [시트에 저장]은 없앰 — 위 '저장됨'에서 [되돌리기](⌘Z)
   function stage(r, c, val, op) {
-    const k = `${rid(r)}:${c}`, old = r[c] == null ? '' : String(r[c]);
-    if (val === old) delete pending[k];
-    else pending[k] = { tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old, new: val, ident: ident(r), op: op || '칸' };
+    const k = `${rid(r)}:${c}`, f = flying[k], old = f ? f.new : (r[c] == null ? '' : String(r[c]));   // 보내는 중인 칸은 보낸 값이 지금 값
+    if (val === old) { if (f) pending[k] = f; else delete pending[k]; }
+    else pending[k] = { tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old, new: val, ident: ident(r), op: op || '칸', c };
+    queueSave();
   }
-  const pendingOp = () => { const ops = new Set(Object.values(pending).map((x) => x.op || '칸')); return ops.size === 1 ? [...ops][0] : '일괄'; };
+  let flying = {}, saving = false, again = false, saveT = 0, retryT = 0, lastSaved = [], editing = null;
+  const justSaved = new Set();
+  let sv = { k: '' };            // 저장 상태: saving · ok(저장됨) · wait(회차 중 — 1분마다 다시) · net(못 보냄) · bad(일부 못 씀)
+  const rowOfEdit = (e) => last && last.rows.find((x) => x.tab === e.tab && String(x.row) === String(e.row));
+  function queueSave(ms) {
+    clearTimeout(saveT);
+    if (!saving && Object.keys(pending).length) { sv = { k: 'saving' }; saveUI(); }
+    saveT = setTimeout(() => autoSave(false), ms == null ? 400 : ms);
+  }
+  async function autoSave(force, unload) {
+    clearTimeout(saveT); clearTimeout(retryT);
+    if (saving && !unload) { again = true; return; }
+    const sent = Object.entries(pending).filter(([k, e]) => flying[k] !== e);
+    if (!sent.length) { if (!saving && sv.k === 'saving') { sv = { k: '' }; saveUI(); } return; }
+    saving = true; for (const [k, e] of sent) flying[k] = e;
+    sv = { k: 'saving' }; saveUI(); bar();
+    const ops = new Set(sent.map(([, e]) => e.op || '칸'));
+    let j;
+    try { j = await post({ kind: 'sheet_edit', edits: sent.map(([, { op, c, ...e }]) => e), op: ops.size === 1 ? [...ops][0] : '일괄', force: !!force }, true); }
+    catch (err) {
+      saving = false; for (const [k] of sent) delete flying[k];
+      sv = { k: 'net', msg: `⚠ 저장하지 못했어요 — ${err.message}. 인터넷·현황판 서버를 확인하고 [다시 저장]을 눌러 주세요(고친 칸은 주황색으로 남아 있어요).` };
+      saveUI(); bar(); return;
+    }
+    saving = false; for (const [k] of sent) delete flying[k];
+    const msg = String(j.msg || j.error || '');
+    if (/회차가 시트를 쓰는 중/.test(msg)) {        // 시트를 쓰는 회차가 끝나면 — 1분마다 다시(그동안 칸은 주황색 그대로)
+      sv = { k: 'wait', msg: `⏳ ${msg.replace(/ — 끝난 뒤에.*$/, '')} — 끝나면 저절로 저장해요(1분마다 다시 해 봐요).` };
+      saveUI(); bar(); retryT = setTimeout(() => autoSave(false), 60000); return;
+    }
+    const failed = new Set((msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
+    const failedRows = new Set((msg.match(/• \S+ \d+행:/g) || []).map((s) => s.slice(2, -1)));    // 줄 통째로 못 씀(쓰는 순간 줄이 바뀜)
+    const unsure = /줄마다 확인하지 못했어요/.test(msg) || !/\d+칸 저장했어요|바뀐 값이 없어요/.test(msg);   // 칸마다 결과가 없는 오류 = 모두 못 쓴 것으로
+    const ok = [];
+    for (const [k, e] of sent) {
+      const bad = unsure || failed.has(`${e.tab} ${e.row}행 ${e.col}`) || failedRows.has(`${e.tab} ${e.row}행`);
+      const p = pending[k];
+      if (p === e) delete pending[k];
+      else if (p && !bad) p.old = e.new;         // 보내는 사이 같은 칸을 또 고침 — 다음 저장은 방금 쓴 값에서
+      if (bad) continue;
+      const r = rowOfEdit(e); if (r) r[e.c] = e.new;
+      ok.push(e); justSaved.add(k); setTimeout(() => justSaved.delete(k), 1800);
+      const td = r && !pending[k] && cellTd(r, e.c); if (td) { td.classList.remove('dirty'); td.classList.remove('saved'); void td.offsetWidth; td.classList.add('saved'); }
+    }
+    lastSaved = ok;           // 되돌리기 = 이번에 저장한 칸만(못 쓴 저장 뒤에 앞 저장을 되돌리지 않게)
+    const hh = new Date().toTimeString().slice(0, 5);
+    sv = (failed.size || failedRows.size || unsure || !j.ok) && !/바뀐 값이 없어요/.test(msg)
+      ? { k: 'bad', at: hh, msg: `⚠ ${msg}\n저장하지 못한 칸은 지금 시트 값으로 다시 보여 줘요.` } : { k: 'ok', at: hh };
+    saveUI(); bar();
+    if (sv.k === 'bad') reloadWhenIdle(300);
+    else if (sel && ok.some((e) => rid(sel) === `${e.tab}:${e.row}`) && !busyTyping()) detail(true);   // 열린 자세히도 새 값으로
+    if (again || Object.keys(pending).some((k) => !flying[k])) { again = false; queueSave(0); }
+  }
+  const busyTyping = () => { const a = document.activeElement; return !!(editing || (a && a.closest && a.closest('#p-data') && a.closest('input,select,textarea'))); };
+  let reloadT = 0;
+  function reloadWhenIdle(ms) {        // 고치는 중(입력칸·끌기·대화창)이면 기다렸다가 다시 불러옴 — 입력하던 칸이 사라지지 않게
+    clearTimeout(reloadT);
+    reloadT = setTimeout(async () => {
+      if (saving || Object.keys(pending).length || drag || busyTyping() || document.querySelector('dialog[open]')) return reloadWhenIdle(1500);
+      const a = document.activeElement, had = !!(a && a.closest && a.closest('table.dt'));
+      await load();
+      const r = had && cell && last && last.rows.find((x) => rid(x) === cell.k), td = r && cellTd(r, cell.c);
+      if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); }      // 화살표로 이어서 옮길 수 있게
+    }, ms == null ? 1200 : ms);
+  }
+  function undoLast() {        // 방금 저장한 칸들을 전 값으로(그 뒤 또 고친 칸은 건드리지 않음) — 한 번 더 누르면 다시 앞 값으로
+    if (!lastSaved.length) { toast('되돌릴 저장이 없어요'); return; }
+    const back = lastSaved; lastSaved = []; let n = 0;
+    for (const e of back) { const r = rowOfEdit(e); if (r && cellVal(r, e.c) === e.new) { stage(r, e.c, e.old, '되돌리기'); n++; } }
+    render(); bar(); saveUI();
+    toast(n ? `${n}칸 되돌리는 중…` : '그사이 또 고친 칸이라 되돌리지 않았어요', !n);
+  }
+  function saveUI() {
+    const s = document.querySelector('.dt-save'); if (!s) return;
+    const n = Object.keys(pending).length;
+    s.hidden = !isSheet() || !sv.k; s.className = 'dt-save ' + sv.k; s.textContent = ''; if (s.hidden) return;
+    if (sv.k === 'saving') s.append(`저장 중… ${Math.max(n, 1)}칸`);
+    else if (sv.k === 'ok' || sv.k === 'bad') {
+      s.append(sv.k === 'ok' ? `✓ 저장됨 ${sv.at}` : `⚠ 일부 저장 못 함 ${sv.at}`);
+      if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 저장한 ${lastSaved.length}칸을 전 값으로 · ⌘Z(Ctrl+Z)`; u.onclick = undoLast; s.append(u); }
+    } else if (sv.k === 'wait') s.append(`⏳ 회차 끝나면 저장 · ${n}칸`);
+    else if (sv.k === 'net') s.append(`⚠ 저장 안 됨 · ${n}칸`);
+    s.title = sv.msg || '고친 칸은 바로 시트에 저장돼요';
+  }
+  // 창을 닫거나 다른 앱으로 갈 때: 고치던 칸을 넣고 바로 보냄(keepalive — 창이 닫혀도 끝까지 감)
+  function flushNow() { if (editing) editing.el.blur(); if (Object.keys(pending).some((k) => !flying[k]) && sv.k !== 'wait') autoSave(false, true); }
 
   // ── 여러 칸 붙여넣기·아래로 채우기 — 저장 전 미리보기(확인하면 '저장 안 한 칸'에 들어가고, 저장은 아래 막대에서 같은 길) ──
   function pasteGrid(r0, c0, text) {
@@ -726,16 +847,17 @@
     if (!plan.length) ul.append(E('li', 'muted', '바뀌는 칸이 없어요'));
     box.append(ul);
     if (skip.length) { const s = E('ul', 'dt-ev warn'); for (const x of skip.slice(0, 50)) s.append(E('li', null, '⚠ ' + x)); box.append(E('p', 'small', `넣지 않거나 확인할 것 ${skip.length}개`), s); }
-    box.append(E('p', 'muted small', '확인하면 아직 저장하지 않은 칸으로 들어가요 — 아래 막대의 [시트에 저장]을 눌러야 저장돼요(지금 값과 다르면 그 칸은 저장하지 않아요).'));
+    box.append(E('p', 'muted small', '확인하면 바로 시트에 저장해요(그사이 다른 사람이 바꾼 칸은 저장하지 않아요). 잘못 넣었으면 위의 [되돌리기] 또는 ⌘Z.'));
     const bs = E('div', 'btns');
-    bs.append(btn('취소', 'ghost', () => dlg.close()), btn(`${plan.length}칸 넣기`, 'primary', () => { for (const p of plan) stage(p.r, p.c, p.v, op); dlg.close(); render(); bar(); }));
+    const verb = plan.length && plan.every((p) => p.v === '') ? '비우기' : '넣기';
+    bs.append(btn('취소', 'ghost', () => dlg.close()), btn(`${plan.length}칸 ${verb}`, 'primary', () => { for (const p of plan) stage(p.r, p.c, p.v, op); dlg.close(); render(); bar(); }));
     box.append(bs); dlg.append(box); document.body.append(dlg);
     dlg.addEventListener('close', () => dlg.remove());
     dlg.showModal();
   }
   const dropOpts = (r, c) => { const d = ((last.dropdowns || {})[r.tab] || {})[c]; return d || (c === 'ship_mode' ? last.edit.methods : null); };
 
-  function cellEdit(td, r, c, init) {
+  function cellEdit(td, r, c, init, click) {
     if (td.querySelector('input,select')) return;
     const k = `${rid(r)}:${c}`, now = pending[k] ? pending[k].new : (r[c] == null ? '' : String(r[c]));
     let el;
@@ -750,13 +872,17 @@
       };
     }
     el.className = 'cell-in'; el.setAttribute('aria-label', `${r.tab} ${r.row}행 ${cname(c)}`);
-    td.textContent = ''; td.append(el); el.focus(); if (init != null && !opts) el.value = init; else if (el.select) el.select();   // 글자를 치며 시작하면 그 글자로 바꿈(엑셀처럼)
+    td.textContent = ''; td.append(el); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); unhide(td); el.focus({ preventScroll: true }); if (init != null && !opts) el.value = init; else if (el.select) el.select();   // 글자를 치며 시작하면 그 글자로 바꿈(엑셀처럼)
+    if (opts && click && el.showPicker) { try { el.showPicker(); } catch (e) { /* 목록 펼치기를 못 하는 브라우저 — 한 번 더 누르면 열림 */ } }
     let done = false;
-    const finish = (save, then) => { if (done) return; done = true; if (save) stage(r, c, el.value.trim()); render(); bar(); if (then) then(); };
+    editing = { el, now };
+    const finish = (save, then) => { if (done) return; done = true; editing = null; if (save) stage(r, c, el.value.trim()); render(); bar(); if (then) then(); };
+    const down = (d) => () => { const nx = last.rows[last.rows.indexOf(r) + d]; pickCell(nx || r, c); };
     el.onkeydown = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true, () => { const nx = last.rows[last.rows.indexOf(r) + 1]; pickCell(nx || r, c); }); }   // 저장 칸에 넣고 아래 칸으로
+      if (e.key === 'Enter') { e.preventDefault(); finish(true, down(1)); }   // 넣고(바로 저장) 아래 칸으로
       else if (e.key === 'Escape') finish(false, () => pickCell(r, c));
       else if (e.key === 'Tab') { e.preventDefault(); finish(true, () => nextCell(r, c, e.shiftKey ? -1 : 1)); }
+      else if (!opts && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.isComposing) { e.preventDefault(); finish(true, down(e.key === 'ArrowDown' ? 1 : -1)); }   // 한 줄 칸이라 위아래 = 옆 줄로(엑셀처럼)
     };
     el.onblur = () => finish(true);
     if (opts) el.onchange = () => finish(true);
@@ -770,55 +896,46 @@
     if (td) cellEdit(td, r, cols[i]);
   }
 
-  // ── 아래 고정 막대: 저장 안 한 칸 · 고른 줄에 같은 값 ──
+  // ── 아래 고정 막대: 고른 줄에 같은 값 · 저장이 막혔을 때(인터넷·회차·일부 못 씀)만 무엇이 왜 + 버튼 ──
   function bar() {
     const b = $('dt-bar'); if (!b) return;
-    const n = Object.keys(pending).length, m = picked.size;
-    b.hidden = !isSheet() || (!n && !m); b.textContent = ''; if (b.hidden) return;
+    const m = picked.size, stuck = ['wait', 'net', 'bad'].includes(sv.k);
+    b.hidden = !isSheet() || (!m && !stuck); b.textContent = ''; if (b.hidden) return;
     if (m) {
       const g = E('div', 'dt-bar-g');
       const s = E('select'); s.setAttribute('aria-label', '넣을 칸');
       for (const c of (last.edit.editable || [])) { const o = E('option', null, COLNAME[c] || c); o.value = c; s.append(o); }
       const v = E('input'); v.placeholder = '같은 값'; v.setAttribute('aria-label', '넣을 값');
-      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button';
-      go.onclick = () => { for (const r of last.rows.filter((x) => picked.has(rid(x)))) if (canEdit(s.value, r)) stage(r, s.value, v.value.trim(), '일괄'); render(); bar(); };
+      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button'; go.title = '바뀌는 칸을 먼저 보여 주고, 확인하면 바로 저장';
+      go.onclick = () => {
+        const plan = [], skip = [], val = v.value.trim();
+        for (const r of last.rows.filter((x) => picked.has(rid(x)))) { if (!canEdit(s.value, r)) skip.push(`${r.tab} ${r.row}행 ${cname(s.value)}: 고칠 수 없는 칸`); else if (cellVal(r, s.value) !== val) plan.push({ r, c: s.value, v: val }); }
+        preview(`고른 ${m}줄에 넣기 — ${cname(s.value)} '${val || '빈칸'}'`, plan, skip, '일괄');
+      };
       const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '고른 줄 중 맨 위 줄의 이 칸 값을 나머지 고른 줄에(미리보기 뒤)';
       fill.onclick = () => fillDown(s.value);
       const clr = E('button', 'btn sm ghost', '고르기 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
       g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr); b.append(g);
     }
-    if (n) {
-      const g = E('div', 'dt-bar-g');
-      const undo = E('button', 'btn sm ghost', '고친 것 버리기'); undo.type = 'button'; undo.onclick = () => { pending = {}; render(); bar(); };
-      const save = E('button', 'btn sm primary', `시트에 저장 (${n}칸)`); save.type = 'button';
-      save.onclick = () => saveEdits(false, save);
-      g.append(E('b', null, `${n}칸 바뀜`), E('span', 'muted small', Object.values(pending).slice(0, 3).map((x) => `${x.tab} ${x.row}행 ${x.col}`).join(' · ') + (n > 3 ? ' …' : '')), undo, save);
+    if (stuck) {
+      const g = E('div', 'dt-bar-g dt-bar-err');
+      g.append(E('span', 'dt-bar-t', sv.msg || ''));
+      if (sv.k === 'wait') g.append(btn('그래도 저장', 'weak', () => autoSave(true)));
+      if (sv.k === 'net') g.append(btn('다시 저장', 'primary', () => autoSave(false)));
+      if (sv.k !== 'bad' && Object.keys(pending).length) g.append(btn('고친 것 버리기', 'ghost', () => { clearTimeout(retryT); pending = {}; sv = { k: '' }; saveUI(); render(); bar(); }));
+      if (sv.k === 'bad') g.append(btn('닫기', 'ghost', () => { sv = { k: 'ok', at: sv.at }; saveUI(); bar(); }));
       b.append(g);
     }
     const msg = E('div', 'dt-bar-msg'); msg.id = 'dt-bar-msg'; msg.setAttribute('role', 'status'); msg.hidden = true; b.append(msg);
   }
-  function alertBar(t, force) {
+  function alertBar(t) {
     const b = $('dt-bar'); if (b) b.hidden = false;
     const m = $('dt-bar-msg'); if (!m) return; m.hidden = false; m.textContent = t;
-    if (force) { const x = E('button', 'btn sm weak', '그래도 저장'); x.type = 'button'; x.onclick = () => saveEdits(true, x); m.append(' ', x); }
-  }
-  async function saveEdits(force, btn) {
-    const edits = Object.values(pending); if (!edits.length) return;
-    btn.disabled = true; btn.textContent = '시트에 쓰는 중… (10–20초)';
-    try {
-      const j = await post({ kind: 'sheet_edit', edits: edits.map(({ op, ...e }) => e), op: pendingOp(), force });
-      if (/회차가 시트를 쓰는 중/.test(j.msg)) { bar(); alertBar('⚠ ' + j.msg, true); return; }
-      const failed = new Set((j.msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
-      const failedRows = new Set((j.msg.match(/• \S+ \d+행:/g) || []).map((s) => s.slice(2, -1)));    // 줄 통째로 못 씀(쓰는 순간 줄이 바뀜)
-      const unsure = /줄마다 확인하지 못했어요/.test(j.msg);
-      for (const [k, e] of Object.entries(pending)) if (!unsure && !failed.has(`${e.tab} ${e.row}행 ${e.col}`) && !failedRows.has(`${e.tab} ${e.row}행`)) delete pending[k];
-      await load();
-      alertBar((j.ok ? '✅ ' : '⚠ ') + j.msg);
-    } catch (e) { alertBar('⚠ ' + e.message); } finally { btn.disabled = false; }
   }
 
-  async function post(payload) {
-    const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'db' }, payload)) });
+  async function post(payload, keep) {      // keep = 창이 닫혀도 끝까지 보냄(keepalive, 64KB 아래만)
+    const body = JSON.stringify(Object.assign({ action: 'db' }, payload));
+    const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: !!keep && new TextEncoder().encode(body).length < 60000 });
     return r.json();
   }
   async function doAct(payload, btn, out) {
@@ -1251,7 +1368,9 @@
 
   const typing = (e) => !!(e.target && e.target.closest && e.target.closest('input,select,textarea'));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel && !typing(e) && !document.querySelector('dialog[open]')) closeDetail(); });
-  window.addEventListener('beforeunload', (e) => { if (Object.keys(pending).length) { e.preventDefault(); e.returnValue = ''; } });
+  // 닫기·새로고침: 고치던 칸까지 바로 보내고(keepalive), 회차 때문에 못 보낸 칸이나 인터넷 오류로 남은 칸이 있을 때만 붙잡음
+  window.addEventListener('beforeunload', (e) => { flushNow(); if (Object.keys(pending).length && ['wait', 'net'].includes(sv.k)) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });   // 휴대폰에서 다른 앱으로
   window.barunData = () => { build(); readHash(); loadTables(); load(); };     // 주소에 보기 상태(#data?…)가 있으면 그대로
   const pd = document.getElementById('p-data');      // 주소가 #data로 열렸으면 이 파일이 늦게 읽혀도 바로 그림
   if (pd && !pd.hidden) window.barunData();
