@@ -568,6 +568,7 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .sv-rows .t span { flex: 1; min-width: 0; font-weight: 650; } .sv-rows .t b { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sv-rows .s { font-size: 12.5px; color: var(--muted); }
 .sv-rows .bar { height: 8px; border-radius: 4px; background: var(--fill); overflow: hidden; } .sv-rows .bar i { display: block; height: 100%; border-radius: 4px; }
+.sv-ed input { width: 64px; font: inherit; font-size: 13px; padding: 2px 6px; margin: 0 4px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
 .sv-note { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.5; }
 .sv-side { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-right: 6px; white-space: nowrap; }
 .sv-side.h { background: color-mix(in srgb, var(--sv-h) 16%, transparent); color: var(--sv-h); } .sv-side.a { background: color-mix(in srgb, var(--sv-a) 16%, transparent); color: var(--sv-a); }
@@ -1212,9 +1213,11 @@ let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 
 let lastState = null;
 
 // 절감 장부 — notify/savings.py summary(): 사람 시간(손 안 탄 주문 단계 × 손으로 할 때 분)과 AI 시간(측정 종류·스크립트 회차)을 따로
-let svCounted = false;
+let svCounted = false, svEdit = false;   // svEdit: 사람 시간 기준(분) 고치기 켜짐
 function renderSavings(sv) {
-  const box = $('sav'); if (!box) return; box.textContent = '';
+  const box = $('sav'); if (!box) return;
+  if (svEdit && document.activeElement && document.activeElement.closest('#sav')) return;   // 기준을 적는 중엔 5초 갱신이 칸을 지우지 않게
+  box.textContent = '';
   if (sv.error) { box.append(el('p', 'muted', '절감 장부를 읽지 못했어요: ' + sv.error)); return; }
   const a = sv.all || {}, w = sv.week || {}, t = sv.today || {}, hu = sv.human || {}, rate = sv.usd_krw || 1330;
   const krw = (u) => { const v = Math.round((u || 0) * rate / 1000) * 1000; return v >= 1e8 ? `${(v / 1e8).toFixed(1)}억 원` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만 원` : `${v.toLocaleString('ko-KR')}원`; };
@@ -1234,7 +1237,7 @@ function renderSavings(sv) {
   const H = el('div', 'sv-n h'), A = el('div', 'sv-n a');
   const lh = el('div', 'lab'); lh.append(el('b'), document.createTextNode('👤 사람 시간 — 사장님 손 대신'));
   const la = el('div', 'lab'); la.append(el('b'), document.createTextNode('🤖 AI 시간 — 에이전트 대신'));
-  const eh = el('div', 'eq'); eh.innerHTML = `근무일로 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b>, 단계 <b>${(hu.stages || []).reduce((s, x) => s + x.n, 0).toLocaleString('ko-KR')}번</b>을 손 안 대고`;
+  const eh = el('div', 'eq'); eh.innerHTML = `근무일로 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b>의 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> + 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>를 손 안 대고`;
   const ea = el('div', 'eq'); ea.innerHTML = `AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b>(약 ${krw(a.cost)}) · 에이전트를 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b> 안 띄움`;
   H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
   big.append(H, el('i'), A); hero.append(big);
@@ -1282,24 +1285,32 @@ function renderSavings(sv) {
   }
   // ③ 무엇으로 아꼈나 — 사람 · AI
   const two = el('div', 'grid2');
-  const rowsCard = (title, desc, items, color, note) => {
-    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, title), el('span', 'desc', desc)); c.append(h);
+  const rowsCard = (title, desc, items, color, note, tool) => {
+    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, title), el('span', 'desc', desc)); if (tool) h.append(tool); c.append(h);
     const ul = el('ul', 'sv-rows'); const mx = Math.max(1, ...items.map((x) => x.secs));
     for (const x of items) {
       const li = el('li'), tt = el('div', 't'); tt.append(el('span', null, x.name), el('b', null, durK(x.secs))); li.append(tt);
       const bar = el('div', 'bar'), i = el('i'); i.style.width = `${x.secs / mx * 100}%`; i.style.background = `var(${color})`; bar.append(i); li.append(bar);
-      li.append(el('div', 's', x.sub)); ul.append(li);
+      if (svEdit && x.key) {                             // 기준 고치기 — 1건·1회당 분
+        const s = el('div', 's sv-ed'); const inp = el('input'); inp.type = 'number'; inp.min = '0'; inp.max = '600'; inp.step = '0.5'; inp.value = String(x.min);
+        inp.setAttribute('aria-label', `${x.name} 1${x.unit}당 분`);
+        inp.addEventListener('change', async () => { inp.disabled = true; await act({ action: 'human_min', key: x.key, min: +inp.value }); inp.disabled = false; });
+        s.append(document.createTextNode(`${x.what} — ${x.n.toLocaleString('ko-KR')}${x.unit} × `), inp, document.createTextNode(`분${x.min !== x.dflt ? ` (처음 ${x.dflt}분)` : ''}`)); li.append(s);
+      } else li.append(el('div', 's', x.sub));
+      ul.append(li);
     }
     if (!items.length) ul.append(el('li', 'muted small', '아직 쌓인 것이 없어요'));
     c.append(ul); if (note) c.append(el('p', 'sv-note', note)); return c;
   };
-  const hItems = (hu.stages || []).map((x) => ({ name: `${x.name}`, secs: x.secs, sub: `${x.what} — ${x.n.toLocaleString('ko-KR')}건 × ${x.min}분` }));
+  const hItems = (hu.stages || []).map((x) => ({ name: x.unit === '회' ? `${x.name} 회차` : x.name, secs: x.secs, key: x.key, what: x.what, n: x.n, unit: x.unit, min: x.min, dflt: x.default,
+    sub: `${x.what} — ${x.n.toLocaleString('ko-KR')}${x.unit} × ${x.min}분` }));
   if (hu.changes > 60) hItems.push({ name: '사장님 손일 줄인 개선', secs: hu.changes, sub: '매입 대기열·공홈 주문 한 번에 채우기·도착점검 등(개선마다 하루분 × 지난 날수)' });
   hItems.sort((p, q) => q.secs - p.secs);
   const L = sv.labels || {};
   const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · AI 비용 $${b.cost.toFixed(2)}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
   two.append(
-    rowsCard('👤 사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '단계마다 사람 손 없이 지나간 주문만 세요(자동화율과 같은 판정, 손 탄 주문은 빼요). 1건에 드는 분은 손으로 할 때를 보수적으로 잡은 값이에요.'),
+    rowsCard('👤 사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '주문 단계는 사람 손 없이 지나간 주문만 세요(자동화율과 같은 판정, 손 탄 주문은 빼요). 정기 일은 에이전트·스크립트가 끝낸 회차예요(①·②는 주문 단계로 세서 빼요). 분은 손으로 할 때 기준 — [기준 고치기]로 실제에 맞게 바꾸면 지난 날짜까지 다시 계산해요.',
+      (() => { const b = el('button', 'btn xs weak', svEdit ? '다 고쳤어요' : '기준 고치기'); b.type = 'button'; b.onclick = () => { svEdit = !svEdit; renderSavings(sv); }; return b; })()),
     rowsCard('🤖 AI·기계 시간', `누적 ${durK(a.secs)} · $${(a.cost || 0).toFixed(2)}`, aItems, '--sv-a', '횟수는 실제로 일어난 것, 1번에 아끼는 양은 측정한 평균이에요. 스크립트 회차는 그 업무 에이전트 회차 평균과 비교해요.'));
   box.append(two);
   // ④ 바뀐 것
