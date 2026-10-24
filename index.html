@@ -90,10 +90,11 @@ button { font: inherit; color: inherit; }
 .health.warn::before { background: var(--st-warn); } .health.bad { color: var(--red-ink); } .health.bad::before { background: var(--st-crit); }
 .health:focus-visible { outline: 2px solid var(--blue); }
 .topbar .ask-btn { display: none; }
-main.pages { max-width: 1240px; padding: 8px 28px 72px; }
+/* 화면 폭 상한 없음 — 넓은 모니터면 넓게(10/25 사장님) */
+main.pages { padding: 8px 28px 72px; }
 /* 주문 데이터 화면만 오른쪽 끝까지(여백 없이) — 표 칸을 한 번에 많이(10/24 사장님) */
 @media (min-width: 1024px) {
-  main.pages:has(> #p-data:not([hidden])) { max-width: none; padding-right: 0; }
+  main.pages:has(> #p-data:not([hidden])) { padding-right: 0; }
   #p-data > .dt-card { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
 }
 .page { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
@@ -385,6 +386,8 @@ dialog#ask-dlg::backdrop { background: rgba(0, 0, 0, .4); }
 .job .side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .job .side .when { font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
 .job .more { grid-column: 1 / -1; }
+/* 넓은 화면은 회차를 두 줄로 */
+@media (min-width: 1600px) { .job-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 36px; } .job-list > .job { border-top: 1px solid var(--line); } .job-list > .job:nth-child(-n+2) { border-top: 0; } }
 @media (max-width: 560px) { .job { grid-template-columns: 1fr; } .job .side { align-items: flex-start; text-align: left; flex-direction: row; flex-wrap: wrap; } }
 .group-h { font-size: 13px; font-weight: 700; color: var(--muted); margin: 18px 0 2px; }
 
@@ -1400,7 +1403,7 @@ function render(s) {
   };
   // 묶음: 에이전트 회차 · 스크립트·프로그램 — 같은 종류끼리
   const grp = [['에이전트 회차', mine.filter((j) => j.kind === 'agent')], ['스크립트·프로그램', mine.filter((j) => j.kind !== 'agent')]];
-  for (const [lab, list] of grp) { if (!list.length) continue; jw.append(el('div', 'group-h', `${lab} ${list.length}`)); list.forEach((j) => jw.append(jobRow(j))); }
+  for (const [lab, list] of grp) { if (!list.length) continue; jw.append(el('div', 'group-h', `${lab} ${list.length}`)); const jl = el('div', 'job-list'); list.forEach((j) => jl.append(jobRow(j))); jw.append(jl); }
   if (other.length) { const d = el('details'); d.style.marginTop = '12px'; d.append(el('summary', null, `바른청년 밖 작업·그만 쓴 것 ${other.length}개`)); other.forEach((j) => d.append(jobRow(j))); jw.append(d); }
 
   // 이벤트 허브 — 원천 상태 + 사건 흐름(감지 → 처리 → 결과)
