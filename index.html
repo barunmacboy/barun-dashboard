@@ -413,6 +413,11 @@ ul.log .name { font-weight: 600; }
 #login h3 { font-size: 22px; margin: 0 0 6px; letter-spacing: -.02em; }
 #login input { width: 100%; font: inherit; padding: 14px 16px; margin: 14px 0; border-radius: 14px; border: 0; background: var(--fill); color: var(--ink); }
 #login .btn { width: 100%; }
+#login input[hidden] { display: none; }
+#logout[hidden] { display: none; }
+#login .lg-err { color: var(--red-ink); font-size: 13px; min-height: 18px; margin: -4px 0 10px; }
+#login .lg-alt { display: block; margin: 12px auto 0; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+#login input + input { margin-top: 0; }
 
 /* ── 활동 타임라인(activity.js) ─────────────── */
 .act-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; }
@@ -836,6 +841,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   <button class="btn primary sm ask-btn" type="button" data-open-ask>＋ 에이전트에게 맡기기</button>
   <nav class="nav" id="nav"></nav>
   <div class="side-foot"><span class="upd" id="updated" role="status" aria-live="polite">불러오는 중…</span>
+    <button class="icon-btn" id="logout" type="button" aria-label="로그아웃" title="로그아웃(이 기기에서 잊기)" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button>
     <button class="icon-btn" id="reload" type="button" aria-label="지금 새로고침" title="지금 새로고침"><svg class="ico" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
 </aside>
 <div class="scrim" id="scrim"></div>
@@ -974,20 +980,44 @@ async function apiFetch(path, opts = {}) {
   const slow = API ? setTimeout(() => toast('주소창 쪽에 "로컬 네트워크의 기기에 접근" 허용 요청이 떠 있으면 [허용]을 눌러 주세요(이 기기에서 한 번만).'), 6000) : 0;
   let r;
   try { r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h })); } finally { clearTimeout(slow); }
-  if (r.status === 401) { showLogin(); throw new Error('토큰 필요'); }
+  if (r.status === 401) { showLogin(); throw new Error('로그인 필요'); }
   return r;
 }
 window.barunFetch = apiFetch;
 function showLogin() {
   if (document.getElementById('login')) return;
-  const w = document.createElement('div'); w.id = 'login'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
-  w.innerHTML = '<div class="box"><h3>처음 쓰는 기기예요</h3><p class="muted">디스코드 DM으로 받은 접근 토큰을 붙여 넣어 주세요. 이 기기에만 저장돼요.</p><input id="tok" type="password" autocomplete="off" aria-label="접근 토큰" placeholder="brn_…"><button class="btn primary" id="tok-ok" type="button">들어가기</button></div>';
+  // 2026-10-25: 아이디·암호로 들어가기(맞으면 서버가 이 기기용 토큰을 줌) — 예전 접근 토큰도 아래 링크로 그대로
+  const w = document.createElement('div'); w.id = 'login'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'login-h');
+  w.innerHTML = '<form class="box" id="login-f" autocomplete="on"><h3 id="login-h">바른청년 현황판</h3><p class="muted">아이디와 암호를 넣어 주세요. 이 기기는 30일 동안 기억해요.</p>'
+    + '<input id="lg-id" name="username" autocomplete="username" aria-label="아이디" placeholder="아이디" autocapitalize="off" spellcheck="false">'
+    + '<input id="lg-pw" name="password" type="password" autocomplete="current-password" aria-label="암호" placeholder="암호">'
+    + '<input id="tok" type="password" autocomplete="off" aria-label="접근 토큰" placeholder="brn_…" hidden>'
+    + '<p class="lg-err" id="lg-err" role="alert"></p><button class="btn primary" id="tok-ok" type="submit">들어가기</button>'
+    + '<button class="lg-alt" id="lg-alt" type="button">접근 토큰으로 들어가기</button></form>';
   document.body.append(w);
-  const go = () => { TOKEN = document.getElementById('tok').value.trim(); try { localStorage.setItem('barun.token', TOKEN); } catch (e) { /* 무시 */ } w.remove(); tick(); if (window.barunReloadTimeline) window.barunReloadTimeline(); };
-  document.getElementById('tok-ok').onclick = go;
-  document.getElementById('tok').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-  document.getElementById('tok').focus();
+  const $l = (id) => document.getElementById(id);
+  let useTok = false;
+  const done = (t) => { TOKEN = t; try { localStorage.setItem('barun.token', TOKEN); } catch (e) { /* 무시 */ } w.remove(); tick(); if (window.barunReloadTimeline) window.barunReloadTimeline(); };
+  $l('lg-alt').onclick = () => {
+    useTok = !useTok; $l('tok').hidden = !useTok; $l('lg-id').hidden = $l('lg-pw').hidden = useTok;
+    $l('lg-alt').textContent = useTok ? '아이디·암호로 들어가기' : '접근 토큰으로 들어가기'; $l('lg-err').textContent = ''; (useTok ? $l('tok') : $l('lg-id')).focus();
+  };
+  $l('login-f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (useTok) { const t = $l('tok').value.trim(); if (t) done(t); return; }
+    const id = $l('lg-id').value.trim(), pw = $l('lg-pw').value;
+    if (!id || !pw) { $l('lg-err').textContent = '아이디와 암호를 둘 다 넣어 주세요.'; return; }
+    $l('tok-ok').disabled = true; $l('lg-err').textContent = '';
+    try {
+      const r = await fetch(API + '/api/login', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pw }) });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok && j.token) done(j.token); else { $l('lg-err').textContent = j.msg || '들어가지 못했어요.'; $l('lg-pw').select(); }
+    } catch (err) { $l('lg-err').textContent = '서버에 닿지 않아요 — 잠시 뒤 다시 해 주세요.'; }
+    finally { $l('tok-ok').disabled = false; }
+  });
+  $l('lg-id').focus();
 }
+function logout() { try { localStorage.removeItem('barun.token'); } catch (e) { /* 무시 */ } TOKEN = ''; location.reload(); }
 function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); } t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000); }
 async function act(body, btn) {
   if (body.action === 'reject' && !confirm('거절할까요? 거절하면 하지 않아요.')) return;
@@ -1498,6 +1528,7 @@ async function tick() {
   } finally { busyTick = false; }
 }
 $('reload').onclick = () => { tick(); if (window.barunReloadTimeline) window.barunReloadTimeline(); };
+if (API || TOKEN) { $('logout').hidden = false; $('logout').onclick = logout; }   // 로그인해서 쓰는 곳에서만(맥미니 tailnet은 로그인이 없음)
 // GitHub Pages에서 열었는데 자료 서버에 닿지 않으면(Tailscale이 켜진 기기에서 크롬이 '로컬 네트워크 접근'을 막은 경우 등)
 // 같은 현황판을 자료 서버 주소에서 바로 연다 — 거기서는 같은 출처라 막히지 않는다(토큰은 그 주소에서 한 번 더 입력).
 async function probe() {
