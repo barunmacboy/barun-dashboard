@@ -8,6 +8,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  // 그림은 SVG만(2026-10-25 사장님 "이모지 최소화") — 공용 IC(index.html) + 여기서만 쓰는 것
+  const LIC = { copy: 'M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1', left: 'M15 18l-6-6 6-6' };
+  const svg = (n) => { const d = (window.IC || {})[n] || LIC[n]; return d ? `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>` : ''; };
+  const I = (n, cls) => { const e = E('span', 'dic' + (cls ? ' ' + cls : '')); e.innerHTML = svg(n); return e; };
+  const IB = (b, n, label, after) => { b.textContent = ''; if (after) b.append(label, I(n)); else b.append(I(n), label); return b; };   // 글 + 그림 버튼
+  const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
   const fetchJ = async (p, opts) => (await (window.barunFetch || fetch)(p, opts)).json();
   const won = (v) => (+v).toLocaleString('ko-KR') + '원';
   const COLNAME = { lead_id: '줄', title: '상품', quantity: '수량', state: '상태', profit: '이익', cost_krw: '도착원가', market_krw: '시장가', plan: '계획가',
@@ -39,7 +45,7 @@
     if (typeof v === 'string' && (v.startsWith('[') || v.startsWith('{'))) { try { const j = JSON.parse(v); return Array.isArray(j) ? j.join(', ') : Object.entries(j).map(([a, b]) => `${a === 'naver' ? '네이버' : a === 'coupang' ? '쿠팡' : a} ${typeof b === 'number' ? b.toLocaleString('ko-KR') : (typeof b === 'object' ? JSON.stringify(b) : b)}`).join(' · '); } catch (e) { /* 그대로 */ } }
     if (/^\d{4}-\d\d-\d\dT/.test(String(v))) return String(v).slice(5, 16).replace('T', ' ');
     if (CODE_COLS.includes(k)) return ko(v);     // 플랫폼 상태 코드·플랫폼 이름은 사람 말로(값·필터는 원래 코드 그대로)
-    return String(v);
+    return /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(String(v)) ? noE(v) : String(v);   // 보이는 값의 이모지만 걷음(값은 그대로)
   };
   const badgeCls = (v) => /탈락|반려|실패|SUSPENSION|PROHIBITION|CANCEL|취소|반품|미정/.test(v) ? 'bad' : /정밀확인|등록준비|대기|심사|OUTOFSTOCK|요청중|필요/.test(v) ? 'warn' : /등록|승인완료|SALE|ok|끝|발송완료|배송완료|구매확정|해외구매|재고발송/.test(v) ? 'ok' : '';
 
@@ -56,7 +62,7 @@
     card.append(E('div', 'dt-tables', null), tools, fp, au, E('div', 'dt-presets', null), E('div', 'dt-facets', null), E('div', 'dt-active', null),
       Object.assign(E('div', 'dt-fx'), { hidden: true }), E('div', 'dt-wrap', null), E('div', 'dt-more', null));
     root.append(card, Object.assign(E('div', 'dt-bar'), { id: 'dt-bar', hidden: true }), Object.assign(E('div', 'card dt-detail'), { id: 'dt-detail', hidden: true }));
-    const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '찾기 — 받는 분·상품·주문번호·송장·전화'; q.setAttribute('aria-label', '찾기'); q.enterKeyHint = 'search';
+    const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '받는 분·상품·주문번호·송장·전화'; q.setAttribute('aria-label', '찾기'); q.enterKeyHint = 'search';
     let t;
     const now = () => { clearTimeout(t); cur.q = q.value.trim(); cur.offset = 0; return load(); };
     q.oninput = () => { clearTimeout(t); t = setTimeout(now, 300); };
@@ -68,9 +74,9 @@
     const bs = E('div', 'dt-tbtns');
     bs.append(tb('필터·정렬', 'dt-fbtn', () => { fp.hidden = !fp.hidden; panel(); if (!fp.hidden) fp.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }),
       tb('', 'dt-vbtn', () => setView(viewMode() === 'cards' ? 'grid' : 'cards')),
-      tb('＋ 재고 넣기', 'dt-sbtn', () => stockDialog()),
+      IB(tb('', 'dt-sbtn', () => stockDialog()), 'plus', '재고 넣기'),
       tb('바꾼 기록', 'dt-abtn', () => auditPanel()));
-    bs.querySelector('.dt-abtn').title = '현황판에서 바꾼 기록 · 되돌리기 · 지운 줄 되살리기';
+    bs.querySelector('.dt-abtn').title = '바꾼 기록 · 되돌리기';
     const sv = E('span', 'dt-save'); sv.hidden = true; sv.setAttribute('role', 'status'); sv.setAttribute('aria-live', 'polite');   // 바로 저장 상태(저장 중·저장됨·되돌리기)
     tools.append(q, bs, sv);
   }
@@ -158,16 +164,16 @@
     const chipShown = (f) => f.op === 'in' && (last.facets || {})[f.c] && f.vs.every((v) => last.facets[f.c].some((x) => (x[0] == null ? '' : x[0]) === v));
     for (const f of cur.filters) {
       if (chipShown(f)) continue;
-      const b = E('button', 'chipbtn on', fdesc(f) + ' ✕'); b.type = 'button'; b.title = '이 필터 풀기';
+      const b = IB(E('button', 'chipbtn on'), 'x', fdesc(f) + ' ', true); b.type = 'button'; b.title = '필터 풀기';
       b.onclick = () => { cur.filters = cur.filters.filter((x) => x !== f); cur.offset = 0; load(); }; box.append(b);
     }
     cur.sort.forEach((s, i) => {
       const [c, d] = s.split(':');
-      const b = E('button', 'chipbtn on sortp', `${cur.sort.length > 1 ? i + 1 + '. ' : ''}${cname(c)} ${d === 'desc' ? '▼ 큰 것부터' : '▲ 작은 것부터'} ✕`); b.type = 'button'; b.title = '이 정렬 풀기';
+      const b = IB(E('button', 'chipbtn on sortp'), 'x', `${cur.sort.length > 1 ? i + 1 + '. ' : ''}${cname(c)} ${d === 'desc' ? '큰 순' : '작은 순'} `, true); b.type = 'button'; b.title = '정렬 풀기';
       b.onclick = () => { cur.sort.splice(i, 1); cur.offset = 0; load(); }; box.append(b);
     });
     if (cur.filters.length || cur.sort.length || cur.q) {
-      const clr = E('button', 'btn xs ghost', '모두 풀기'); clr.type = 'button'; clr.title = '찾기·필터·정렬을 모두 풀고 할 일 \'전체\'로';
+      const clr = E('button', 'btn xs ghost', '모두 풀기'); clr.type = 'button'; clr.title = '찾기·필터·정렬 모두 풀기';
       clr.onclick = () => { cur.filters = []; cur.sort = []; cur.q = ''; cur.preset = ''; cur.offset = 0; document.querySelector('.dt-q').value = ''; load(); };
       box.append(clr);
     }
@@ -204,8 +210,8 @@
     ss.setAttribute('aria-label', '정렬할 칸');
     const add = (d) => () => { cur.sort = cur.sort.filter((x) => x.split(':')[0] !== ss.value).concat(`${ss.value}:${d}`); cur.offset = 0; load(); };
     const sb = E('div', 'dt-form'); const sr = E('div', 'dt-fp-row');
-    sr.append(field('칸', ss), btn('▲ 작은 것부터', 'weak', add('asc')), btn('▼ 큰 것부터', 'weak', add('desc')));
-    sb.append(E('div', 'od-t', '정렬 더하기'), E('p', 'muted small', '표 머리를 누르면 그 칸으로 정렬(누를 때마다 작은 것부터 → 큰 것부터 → 해제), Shift를 누른 채 누르면 여러 칸. 빈칸은 늘 맨 뒤.'), sr);
+    sr.append(field('칸', ss), IB(btn('', 'weak', add('asc')), 'up', '작은 순'), IB(btn('', 'weak', add('desc')), 'down', '큰 순'));
+    sb.append(E('div', 'od-t', '정렬 더하기'), E('p', 'muted small', '머리 누르기: 작은 순 → 큰 순 → 해제 · Shift는 여러 칸'), sr);
     body.append(sb);
     // 열 보이기·고정(보기만 바뀜 — 시트 열 구조는 그대로, 보기 저장에 함께 남음)
     const cb = E('div', 'dt-form'); const cl = E('div', 'dt-cols');
@@ -213,7 +219,7 @@
       const l = E('div', 'dt-col');
       const vis = E('input'); vis.type = 'checkbox'; vis.checked = !cur.hide.includes(c); vis.setAttribute('aria-label', `${cname(c)} 보이기`);
       vis.onchange = () => { cur.hide = vis.checked ? cur.hide.filter((x) => x !== c) : cur.hide.concat(c); saveHash(); render(); };
-      const pn = E('button', 'chipbtn' + (cur.pin.includes(c) ? ' on' : ''), '📌'); pn.type = 'button'; pn.title = '왼쪽에 고정'; pn.setAttribute('aria-pressed', String(cur.pin.includes(c)));
+      const pn = E('button', 'chipbtn' + (cur.pin.includes(c) ? ' on' : '')); pn.append(I('pin')); pn.type = 'button'; pn.title = '왼쪽에 고정'; pn.setAttribute('aria-pressed', String(cur.pin.includes(c)));
       pn.setAttribute('aria-label', `${cname(c)} 고정`);
       pn.onclick = () => { cur.pin = cur.pin.includes(c) ? cur.pin.filter((x) => x !== c) : cur.pin.concat(c); saveHash(); render(); panel(); };
       const lab = E('label', null); lab.append(vis, E('span', null, cname(c)));
@@ -222,7 +228,7 @@
     const cr = E('div', 'dt-fp-row');
     cr.append(btn('모두 보이기', 'ghost', () => { cur.hide = []; saveHash(); render(); panel(); }), btn('고정 풀기', 'ghost', () => { cur.pin = []; saveHash(); render(); panel(); }));
     cb.append(E('div', 'od-t', `열 보이기·고정 (${last.cols.length - cur.hide.filter((x) => last.cols.includes(x)).length}/${last.cols.length}칸 보임)`),
-      E('p', 'muted small', '체크를 끄면 숨기고, 📌은 왼쪽에 붙여 옆으로 넘겨도 보여요. 보기에만 적용돼요.'), cl, cr);
+      E('p', 'muted small', '체크 끄면 숨김 · 핀은 왼쪽 고정'), cl, cr);
     body.append(cb);
     // 저장한 보기
     const vb = E('div', 'dt-form'); const vr = E('div', 'dt-fp-row');
@@ -277,7 +283,7 @@
         note.textContent = j.distinct > j.values.length ? `값 ${j.distinct.toLocaleString('ko-KR')}개 중 줄 많은 ${j.values.length}개 — 찾기로 좁혀 주세요` : `값 ${j.distinct.toLocaleString('ko-KR')}개`;
       };
       const go = btn('고른 값으로 걸기', 'primary', () => apply(chosen.size ? { c, op: 'in', vs: [...chosen] } : null));
-      const cnt2 = () => { go.textContent = chosen.size ? `고른 ${chosen.size}개로 걸기` : '고른 값 없음(필터 풀기)'; };
+      const cnt2 = () => { go.textContent = chosen.size ? `고른 ${chosen.size}개로 걸기` : '필터 풀기'; };
       find.oninput = () => { clearTimeout(tm); tm = setTimeout(fill, 250); };
       area.append(field('찾기', find), note, list, go); cnt2(); fill();
     }
@@ -311,7 +317,7 @@
     const all = E('button', 'chipbtn' + (allOn ? ' on' : ''), '전체'); all.type = 'button'; all.setAttribute('aria-pressed', String(allOn)); all.onclick = onAll; g.append(all);
     for (const [v, n] of items) {
       const b = E('button', 'chipbtn' + (isOn(v) ? ' on' : '') + (!col && n && /문제|취소|반품/.test(v) ? ' hot' : '') + (!col && !n ? ' zero' : ''), `${col ? blankName(col, v) : v} ${n.toLocaleString('ko-KR')}`); b.type = 'button';
-      b.setAttribute('aria-pressed', String(isOn(v))); b.onclick = (e) => onPick(v, e); if (col) b.title = '누르면 이것만 · ⌘/Ctrl+클릭은 여러 개 같이'; g.append(b);
+      b.setAttribute('aria-pressed', String(isOn(v))); b.onclick = (e) => onPick(v, e); if (col) b.title = '이것만 · ⌘클릭은 여러 개'; g.append(b);
     }
     if (col && items.length >= 15) { const m = E('button', 'chipbtn', '더 보기…'); m.type = 'button'; m.onclick = () => openFilter(col); g.append(m); }
     box.append(g);
@@ -327,14 +333,14 @@
     let j; try { j = await fetchJ('/api/db/rows?' + ps.toString()); } catch (e) {
       if (my !== seq) return;
       wrap.classList.remove('loading'); wrap.removeAttribute('aria-busy'); wrap.textContent = '';
-      wrap.append(stateBox('⚠ 불러오지 못했어요', e.message + ' — 현황판 서버나 인터넷 연결을 확인해 주세요.', [['다시 불러오기', () => load()]])); return;
+      wrap.append(stateBox('불러오지 못했어요', noE(e.message), [['다시 불러오기', () => load()]], true)); return;
     }
     if (my !== seq) return;
     wrap.classList.remove('loading'); wrap.removeAttribute('aria-busy');
     saveHash();
     if (j.error) {
       wrap.textContent = '';
-      wrap.append(stateBox('⚠ ' + j.error, '필터·정렬이 맞지 않을 수 있어요.', [['필터·정렬 모두 풀기', () => { cur.filters = []; cur.sort = []; cur.offset = 0; load(); }]])); return;
+      wrap.append(stateBox(noE(j.error), '필터·정렬을 확인해 주세요.', [['필터·정렬 모두 풀기', () => { cur.filters = []; cur.sort = []; cur.offset = 0; load(); }]])); return;
     }
     last = j;
     for (const [c, on] of [['.dt-sbtn', isSheet()], ['.dt-abtn', isSheet()]]) { const b = document.querySelector(c); if (b) b.hidden = !on; }
@@ -355,16 +361,16 @@
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
-    if (isSheet() && viewMode() === 'cards') { const b = E('button', 'btn sm weak', '＋ 재고 넣기'); b.type = 'button'; b.title = '고객 없이 들어온 물건을 이 탭 맨 아래 줄로'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
-    if (cur.offset > 0) { const b = E('button', 'btn sm ghost', '‹ 앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
-    if (cur.offset + last.rows.length < last.total) { const b = E('button', 'btn sm ghost', '다음 ›'); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
+    if (isSheet() && viewMode() === 'cards') { const b = IB(E('button', 'btn sm weak'), 'plus', '재고 넣기'); b.type = 'button'; b.title = '이 탭 맨 아래에 재고 줄'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
+    if (cur.offset > 0) { const b = IB(E('button', 'btn sm ghost'), 'left', '앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
+    if (cur.offset + last.rows.length < last.total) { const b = IB(E('button', 'btn sm ghost'), 'chevron', '다음', true); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
     bar();
-    if (jump) { const r = last.rows.find((x) => x.tab === jump.tab && +x.row === +jump.row); jump = null; if (r) openRow(r); else toast('그 줄을 찾지 못했어요(지워졌거나 옮겨졌을 수 있어요)'); }
+    if (jump) { const r = last.rows.find((x) => x.tab === jump.tab && +x.row === +jump.row); jump = null; if (r) openRow(r); else toast('그 줄이 없어요. 지워졌거나 옮겨졌어요'); }
     showFlash();
   }
   // 빈 화면·오류 = 무엇이 문제인지 + 바로 누를 버튼
-  function stateBox(title, sub, acts) {
-    const b = E('div', 'dt-state'); b.append(E('b', null, title)); if (sub) b.append(E('p', 'muted small', sub));
+  function stateBox(title, sub, acts, bad) {
+    const b = E('div', 'dt-state'); const h = E('b', null); if (bad) h.append(I('alert', 'bad'), ' '); h.append(title); b.append(h); if (sub) b.append(E('p', 'muted small', sub));
     if (acts && acts.length) { const r = E('div', 'btns'); for (const [t, fn] of acts) r.append(btn(t, 'weak', fn)); b.append(r); }
     return b;
   }
@@ -373,12 +379,12 @@
     if (cur.q) acts.push([`'${cur.q}' 찾기 지우기`, () => { cur.q = ''; document.querySelector('.dt-q').value = ''; cur.offset = 0; load(); }]);
     if (cur.preset) acts.push([`할 일 '${cur.preset}' 풀기(전체)`, () => { cur.preset = ''; cur.offset = 0; load(); }]);
     if (cur.filters.length) acts.push(['필터 풀기', () => { cur.filters = []; cur.offset = 0; load(); }]);
-    return stateBox('맞는 줄이 없어요', acts.length ? '찾는 말이나 할 일·필터를 풀어 보세요.' : (isSheet() ? '' : '이 표는 아직 비어 있어요.'), acts);
+    return stateBox('맞는 줄이 없어요', acts.length ? '찾기·필터를 풀어 보세요.' : (isSheet() ? '' : '빈 표예요.'), acts);
   }
   // 짧은 알림(복사됨·저장됨) — 화면 아래 가운데, 휴대폰은 탭 막대 위
   function toast(msg, bad, ms) {
     let t = $('dt-toast'); if (!t) { t = E('div', 'dt-toast'); t.id = 'dt-toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); document.body.append(t); }
-    t.textContent = msg; t.classList.toggle('bad', !!bad); t.hidden = false; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+    t.textContent = ''; if (bad) t.append(I('alert'), ' '); t.append(noE(msg)); t.classList.toggle('bad', !!bad); t.hidden = false; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
     clearTimeout(toast.tm); toast.tm = setTimeout(() => { t.classList.remove('show'); }, ms || (bad ? 4200 : 1800));
   }
   async function clip(v) {         // http 주소(테일스케일 IP)로 열면 navigator.clipboard가 없어서 옛 방식(execCommand)으로
@@ -391,8 +397,8 @@
     ta.remove(); return ok;
   }
   async function copyText(v, what) {
-    if (await clip(v)) { toast(`${what || '복사'}했어요 — ${v.length > 36 ? v.slice(0, 36).replace(/\n/g, ' ') + '…' : v.replace(/\n/g, ' ')}`); return true; }
-    toast('복사하지 못했어요(브라우저가 막음)', true); return false;
+    if (await clip(v)) { toast(`${what || '복사'}했어요 · ${v.length > 36 ? v.slice(0, 36).replace(/\n/g, ' ') + '…' : v.replace(/\n/g, ' ')}`); return true; }
+    toast('복사 실패 · 브라우저가 막음', true); return false;
   }
 
   // ── 표 그리기(주문 시트는 칸 고치기·줄 고르기) ──
@@ -412,9 +418,12 @@
 
   function render() {
     const wrap = document.querySelector('.dt-wrap'); const sx = wrap.scrollLeft, sy = wrap.scrollTop; wrap.textContent = '';
+    if (!wrap._edge) { wrap._edge = () => { const l = wrap.scrollLeft > 2, r = wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2; wrap.classList.toggle('fade-l', l); wrap.classList.toggle('fade-r', r); };
+      wrap.addEventListener('scroll', wrap._edge, { passive: true }); window.addEventListener('resize', wrap._edge); }
+    requestAnimationFrame(wrap._edge);
     const cardsOn = viewMode() === 'cards';
     wrap.classList.toggle('cards', cardsOn);
-    const vb = document.querySelector('.dt-vbtn'); if (vb) { vb.textContent = cardsOn ? '표로 보기' : '카드로 보기'; vb.title = cardsOn ? '엑셀처럼 칸으로 보고 고치기' : '줄마다 카드로(휴대폰에서 보기 좋게)'; }
+    const vb = document.querySelector('.dt-vbtn'); if (vb) { vb.textContent = cardsOn ? '표로 보기' : '카드로 보기'; vb.title = ''; }
     if (cardsOn) return renderCards(wrap);
     const ed = isSheet() ? (last.edit || {}) : null;
     const cols = visCols();
@@ -431,16 +440,16 @@
       const so = sortOf(c);
       th.setAttribute('aria-sort', so ? (so.d === 'asc' ? 'ascending' : 'descending') : 'none');
       const sb = E('button', 'th-sort', cname(c)); sb.type = 'button';
-      sb.title = '눌러서 정렬(작은 것부터 → 큰 것부터 → 해제) · Shift+클릭은 여러 칸';
-      if (so) sb.append(E('span', 'th-ar', (so.d === 'asc' ? ' ▲' : ' ▼') + (cur.sort.length > 1 ? so.i + 1 : '')));
+      sb.title = '정렬 · Shift는 여러 칸';
+      if (so) { const ar = E('span', 'th-ar'); ar.append(I(so.d === 'asc' ? 'up' : 'down')); if (cur.sort.length > 1) ar.append(String(so.i + 1)); sb.append(ar); }
       sb.onclick = (e) => clickSort(c, e.shiftKey);
-      const fb = E('button', 'th-filt' + (cur.filters.some((x) => x.c === c) ? ' on' : ''), '⏷'); fb.type = 'button';
-      fb.setAttribute('aria-label', `${cname(c)} 필터`); fb.title = '이 칸 필터';
+      const fb = E('button', 'th-filt' + (cur.filters.some((x) => x.c === c) ? ' on' : '')); fb.append(I('filter')); fb.type = 'button';
+      fb.setAttribute('aria-label', `${cname(c)} 필터`); fb.title = '필터';
       fb.onclick = () => openFilter(c);
       th.append(sb, fb);
       if (ed) {         // 칸 너비 끌어서 바꾸기(이 브라우저에 기억) · 두 번 누르면 원래대로
         if (colW[c]) th.style.width = th.style.minWidth = th.style.maxWidth = colW[c] + 'px';
-        const rz = E('span', 'rz'); rz.title = '끌어서 칸 너비 · 두 번 누르면 원래대로';
+        const rz = E('span', 'rz'); rz.title = '끌어서 너비 · 두 번 누르면 원래대로';
         rz.onmousedown = (e) => resizeStart(e, c, th); rz.ondblclick = (e) => { e.stopPropagation(); delete colW[c]; saveW(); render(); };
         th.append(rz);
       }
@@ -478,12 +487,12 @@
           td.append(E('span', 'note-dot', '◥'));
         }
         if (ed && canEdit(c, r)) {
-          td.classList.add('ed'); if (!nt) td.title = '누르면 바로 고쳐요 — 고치면 바로 저장돼요 · 엑셀에서 복사한 여러 칸은 칸을 고르고 붙여넣기';
+          td.classList.add('ed'); if (!nt) td.title = '눌러서 고치기 · 바로 저장';
           if (pk) td.classList.add('dirty'); else if (justSaved.has(`${rid(r)}:${c}`)) td.classList.add('saved');
           td.ondblclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
         }
         if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용 — 고칠 수 있는 칸은 뗄 때 바로 고치기(press). '행' 칸은 줄 자세히·조치
-          if (c === 'row') { td.classList.add('rowh'); td.title = '눌러서 줄 자세히·조치'; }
+          if (c === 'row') { td.classList.add('rowh'); td.title = '줄 자세히'; }
           td.onmousedown = (e) => {
             if (e.button || e.target.closest('input,select')) return;
             e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true;
@@ -497,8 +506,8 @@
         row.append(td);
       }
       if (ed) {          // 줄 끝 🗑 — 재고 줄은 한 번에(되살리기 버튼), 고객 주문 줄은 확인 한 번(나눈 줄일 수 있어서)
-        const td = E('td', 'del'), b = E('button', 'row-del', '🗑'); b.type = 'button';
-        b.title = isStock(r) || !r.key ? '이 재고 줄 지우기(되살릴 수 있어요)' : '이 주문 줄 지우기(확인 한 번 · 백업돼요)'; b.setAttribute('aria-label', `${r.tab} ${r.row}행 지우기`);
+        const td = E('td', 'del'), b = E('button', 'row-del'); b.append(I('trash')); b.type = 'button';
+        b.title = isStock(r) || !r.key ? '재고 줄 지우기 · 되살리기 가능' : '주문 줄 지우기 · 백업됨'; b.setAttribute('aria-label', `${r.tab} ${r.row}행 지우기`);
         b.onmousedown = (e) => e.stopPropagation();
         b.onclick = (e) => { e.stopPropagation(); rowDel(r, b); };
         td.append(b); row.append(td);
@@ -511,10 +520,10 @@
     if (ed && last.rows.length) {      // '45행 밑에 재고줄 플러스'(사장님) — 고른 줄(없으면 맨 아래 줄)의 상품명·옵션·구매처·배송방식만 복사
       const tf = E('tfoot'), ftr = E('tr'), ftd = E('td'); ftd.colSpan = cols.length + 2;
       const box = E('div', 'dt-add');
-      const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄(칸을 누른 줄)의 상품명·옵션·구매처·배송방식을 복사해 그 탭 맨 아래에 새 재고 줄 — 나머지 칸은 빈칸';
+      const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄의 상품 정보로 새 재고 줄';
       a.onclick = (e) => { e.stopPropagation(); stockCopy(addRef(), a); };
       const more = E('button', 'btn sm ghost', '다 적어서 넣기'); more.type = 'button'; more.onclick = (e) => { e.stopPropagation(); const r = addRef(); stockDialog(r && r.tab); };
-      box.append(a, E('span', 'muted', '상품명·옵션·구매처·배송방식만 복사 — 다른 줄을 복사하려면 그 줄 칸을 먼저 누르세요'), more);
+      box.append(a, E('span', 'muted', '상품명·옵션·구매처·배송방식만 복사'), more);
       ftd.append(box); ftr.append(ftd); tf.append(ftr); tbl.append(tf);
     }
     wrap.append(tbl);
@@ -561,7 +570,7 @@
       bar.append(E('span', null, sg.cur < 0 ? '배송완료' : sg.next));
       c.append(bar);
     }
-    if (r.problem) c.append(E('div', 'oc-prob', '⚠ ' + String(r.problem).replace(/^\s*(🟥\s*)?문제\s*:\s*/, '')));
+    if (r.problem) { const pb = E('div', 'oc-prob'); pb.append(I('alert'), ' ', noE(String(r.problem).replace(/^\s*(🟥\s*)?문제\s*:\s*/, ''))); c.append(pb); }
     return c;
   }
   function plainCard(r) {
@@ -663,7 +672,7 @@
   const rangeText = () => { const g = rangeOf(); if (!g) return ''; const out = []; for (let i = g.r0; i <= g.r1; i++) { const l = []; for (let j = g.c0; j <= g.c1; j++) l.push(cellVal(last.rows[i], g.vc[j]).replace(/[\t\n]/g, ' ')); out.push(l.join('\t')); } return out.join('\n'); };
   async function copySel() {
     const t = rangeText(); const ok = await clip(t);
-    flash(ok ? `복사했어요 — ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '복사하지 못했어요(브라우저가 막음)');
+    flash(ok ? `복사했어요 · ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '복사 실패 · 브라우저가 막음');
   }
   function flash(msg) { const box = document.querySelector('.dt-fx'); if (!box) return; const m = E('span', 'fx-flash', msg); box.append(m); setTimeout(() => m.remove(), 1800); }
   document.addEventListener('paste', (e) => {      // 칸을 고른 채 ⌘V — 엑셀·시트에서 복사한 여러 칸도 이 칸부터(미리보기)
@@ -709,7 +718,7 @@
     const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
     box.hidden = !isSheet() || viewMode() === 'cards'; box.textContent = '';
     if (box.hidden) return;
-    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 한 번 누르면 바로 고치고, 고치면 바로 저장돼요 · 전체 내용은 여기 · 끌면 여러 칸 · 행 번호를 누르면 줄 자세히')); return; }
+    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '누르면 고치기 · 끌면 여러 칸 · 행 번호는 자세히')); return; }
     const g = rangeOf();
     if (g && (g.r1 > g.r0 || g.c1 > g.c0)) {      // 범위: 칸 수 · 숫자 합계·평균(엑셀 아래 상태줄처럼 — 수익·배송비 더해 보기)
       const nums = []; let n = 0; for (const [rr, cc] of rangeCells()) { n++; const x = numOf(cellVal(rr, cc)); if (x != null && NUMC.includes(cc)) nums.push(x); }
@@ -729,10 +738,10 @@
         el.onblur = () => { if (el.value.trim() !== v) { stage(r, c, el.value.trim()); render(); bar(); } };
       }
       el.className = 'fx-val fx-in'; el.setAttribute('aria-label', `${cname(c)} 값`); box.append(el);
-    } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸(고칠 수 없음)'));
-    if (v) { const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C도 돼요'; cp.onclick = copySel; box.append(cp); }
+    } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸'));
+    if (v) { const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C'; cp.onclick = copySel; box.append(cp); }
     if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = E('a', 'btn sm ghost', '배송 조회 ↗'); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
-    const go = E('button', 'btn sm ghost', '줄 자세히 ›'); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
+    const go = IB(E('button', 'btn sm ghost'), 'chevron', '줄 자세히', true); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
   }
   function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky) — 실제 너비(소수 포함)로, offsetWidth(반올림)면 넘길 때 고정 칸이 1px씩 밀림
     const hs = [...tbl.querySelectorAll('thead th')]; let left = 0; const at = {};
@@ -784,13 +793,13 @@
     try { j = await post({ kind: 'sheet_edit', edits: sent.map(([, { op, c, ...e }]) => e), op: ops.size === 1 ? [...ops][0] : '일괄', force: !!force }, true); }
     catch (err) {
       saving = false; for (const [k] of sent) delete flying[k];
-      sv = { k: 'net', msg: `⚠ 저장하지 못했어요 — ${err.message}. 인터넷·현황판 서버를 확인하고 [다시 저장]을 눌러 주세요(고친 칸은 주황색으로 남아 있어요).` };
+      sv = { k: 'net', msg: `저장 실패: ${err.message}. 주황 칸은 [다시 저장]으로` };
       saveUI(); bar(); return;
     }
     saving = false; for (const [k] of sent) delete flying[k];
     const msg = String(j.msg || j.error || '');
     if (/회차가 시트를 쓰는 중/.test(msg)) {        // 시트를 쓰는 회차가 끝나면 — 1분마다 다시(그동안 칸은 주황색 그대로)
-      sv = { k: 'wait', msg: `⏳ ${msg.replace(/ — 끝난 뒤에.*$/, '')} — 끝나면 저절로 저장해요(1분마다 다시 해 봐요).` };
+      sv = { k: 'wait', msg: `${noE(msg).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 자동 저장` };
       saveUI(); bar(); retryT = setTimeout(() => autoSave(false), 60000); return;
     }
     const failed = new Set((msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
@@ -810,7 +819,7 @@
     lastSaved = ok;           // 되돌리기 = 이번에 저장한 칸만(못 쓴 저장 뒤에 앞 저장을 되돌리지 않게)
     const hh = new Date().toTimeString().slice(0, 5);
     sv = (failed.size || failedRows.size || unsure || !j.ok) && !/바뀐 값이 없어요/.test(msg)
-      ? { k: 'bad', at: hh, msg: `⚠ ${msg}\n저장하지 못한 칸은 지금 시트 값으로 다시 보여 줘요.` } : { k: 'ok', at: hh };
+      ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장 못 한 칸은 시트 값으로 되돌림` } : { k: 'ok', at: hh };
     saveUI(); bar();
     if (sv.k === 'bad') reloadWhenIdle(300);
     else if (sel && ok.some((e) => rid(sel) === `${e.tab}:${e.row}`) && !busyTyping()) detail(true);   // 열린 자세히도 새 값으로
@@ -841,11 +850,11 @@
     s.hidden = !isSheet() || !sv.k; s.className = 'dt-save ' + sv.k; s.textContent = ''; if (s.hidden) return;
     if (sv.k === 'saving') s.append(`저장 중… ${Math.max(n, 1)}칸`);
     else if (sv.k === 'ok' || sv.k === 'bad') {
-      s.append(sv.k === 'ok' ? `✓ 저장됨 ${sv.at}` : `⚠ 일부 저장 못 함 ${sv.at}`);
-      if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 저장한 ${lastSaved.length}칸을 전 값으로 · ⌘Z(Ctrl+Z)`; u.onclick = undoLast; s.append(u); }
-    } else if (sv.k === 'wait') s.append(`⏳ 회차 끝나면 저장 · ${n}칸`);
-    else if (sv.k === 'net') s.append(`⚠ 저장 안 됨 · ${n}칸`);
-    s.title = sv.msg || '고친 칸은 바로 시트에 저장돼요';
+      s.append(I(sv.k === 'ok' ? 'check' : 'alert'), sv.k === 'ok' ? ` 저장됨 ${sv.at}` : ` 일부 저장 못 함 ${sv.at}`);
+      if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 ${lastSaved.length}칸 되돌리기 · ⌘Z`; u.onclick = undoLast; s.append(u); }
+    } else if (sv.k === 'wait') s.append(I('clock'), ` 회차 끝나면 저장 · ${n}칸`);
+    else if (sv.k === 'net') s.append(I('alert'), ` 저장 안 됨 · ${n}칸`);
+    s.title = sv.msg || '고친 칸은 바로 저장';
   }
   // 창을 닫거나 다른 앱으로 갈 때: 고치던 칸을 넣고 바로 보냄(keepalive — 창이 닫혀도 끝까지 감)
   function flushNow() { if (editing) editing.el.blur(); if (Object.keys(pending).some((k) => !flying[k]) && sv.k !== 'wait') autoSave(false, true); }
@@ -863,7 +872,7 @@
         if (!c) { skip.push(`${r.tab} ${r.row}행 ${j + 1}번째 값: 오른쪽에 칸이 없어요`); return; }
         if (!canEdit(c, r)) { if (v.trim() !== cellVal(r, c)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 고칠 수 없는 칸(자동 계산·플랫폼 값)`); return; }
         const opts = dropOpts(r, c);
-        if (opts && v.trim() && !opts.includes(v.trim())) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: '${v.trim()}'은(는) 선택 목록에 없어요 — 그래도 넣어요`);
+        if (opts && v.trim() && !opts.includes(v.trim())) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: '${v.trim()}' 목록 밖 값`);
         if (v.trim() !== cellVal(r, c)) plan.push({ r, c, v: v.trim() });
       });
     });
@@ -871,24 +880,24 @@
   }
   function fillDown(c) {
     const rows = last.rows.filter((x) => picked.has(rid(x)));
-    if (rows.length < 2) { alertBar('⚠ 줄을 두 개 이상 골라 주세요(맨 위 줄 값을 아래 줄에 채워요)'); return; }
+    if (rows.length < 2) { alertBar('두 줄 이상 골라 주세요'); return; }
     const src = rows[0], v = cellVal(src, c);
     const plan = [], skip = [];
     for (const r of rows.slice(1)) { if (!canEdit(c, r)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 고칠 수 없는 칸`); else if (cellVal(r, c) !== v) plan.push({ r, c, v }); }
-    preview(`아래로 채우기 — ${src.tab} ${src.row}행 ${cname(c)} '${v || '빈칸'}'`, plan, skip, '채우기');
+    preview(`아래로 채우기 · ${src.tab} ${src.row}행 ${cname(c)} '${v || '빈칸'}'`, plan, skip, '채우기');
   }
   function preview(title, plan, skip, op) {
     let dlg = $('dt-prev'); if (dlg) dlg.remove();
     dlg = E('dialog', 'dt-prev'); dlg.id = 'dt-prev'; dlg.setAttribute('aria-label', title);
     const box = E('div', 'dt-prev-box');
-    box.append(E('h3', null, `${title} — ${plan.length}칸 바뀜`));
+    box.append(E('h3', null, `${title} · ${plan.length}칸`));
     const ul = E('ul', 'dt-ev');
     for (const p of plan.slice(0, 300)) ul.append(E('li', null, `${p.r.tab} ${p.r.row}행 ${p.r.receiver || p.r.name || ''} · ${cname(p.c)}: '${cellVal(p.r, p.c) || '빈칸'}' → '${p.v || '빈칸'}'`));
     if (plan.length > 300) ul.append(E('li', 'muted', `… 외 ${plan.length - 300}칸`));
     if (!plan.length) ul.append(E('li', 'muted', '바뀌는 칸이 없어요'));
     box.append(ul);
-    if (skip.length) { const s = E('ul', 'dt-ev warn'); for (const x of skip.slice(0, 50)) s.append(E('li', null, '⚠ ' + x)); box.append(E('p', 'small', `넣지 않거나 확인할 것 ${skip.length}개`), s); }
-    box.append(E('p', 'muted small', '확인하면 바로 시트에 저장해요(그사이 다른 사람이 바꾼 칸은 저장하지 않아요). 잘못 넣었으면 위의 [되돌리기] 또는 ⌘Z.'));
+    if (skip.length) { const s = E('ul', 'dt-ev warn'); for (const x of skip.slice(0, 50)) { const li = E('li'); li.append(I('alert'), ' ', x); s.append(li); } box.append(E('p', 'small', `확인할 것 ${skip.length}개`), s); }
+    box.append(E('p', 'muted small', '확인하면 바로 저장 · 되돌리기 ⌘Z'));
     const bs = E('div', 'btns');
     const verb = plan.length && plan.every((p) => p.v === '') ? '비우기' : '넣기';
     bs.append(btn('취소', 'ghost', () => dlg.close()), btn(`${plan.length}칸 ${verb}`, 'primary', () => { for (const p of plan) stage(p.r, p.c, p.v, op); dlg.close(); render(); bar(); }));
@@ -947,17 +956,17 @@
       const s = E('select'); s.setAttribute('aria-label', '넣을 칸');
       for (const c of (last.edit.editable || [])) { const o = E('option', null, COLNAME[c] || c); o.value = c; s.append(o); }
       const v = E('input'); v.placeholder = '같은 값'; v.setAttribute('aria-label', '넣을 값');
-      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button'; go.title = '바뀌는 칸을 먼저 보여 주고, 확인하면 바로 저장';
+      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button'; go.title = '미리 보고 저장';
       go.onclick = () => {
         const plan = [], skip = [], val = v.value.trim();
         for (const r of last.rows.filter((x) => picked.has(rid(x)))) { if (!canEdit(s.value, r)) skip.push(`${r.tab} ${r.row}행 ${cname(s.value)}: 고칠 수 없는 칸`); else if (cellVal(r, s.value) !== val) plan.push({ r, c: s.value, v: val }); }
-        preview(`고른 ${m}줄에 넣기 — ${cname(s.value)} '${val || '빈칸'}'`, plan, skip, '일괄');
+        preview(`고른 ${m}줄에 넣기 · ${cname(s.value)} '${val || '빈칸'}'`, plan, skip, '일괄');
       };
-      const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '고른 줄 중 맨 위 줄의 이 칸 값을 나머지 고른 줄에(미리보기 뒤)';
+      const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '맨 위 줄 값을 아래로';
       fill.onclick = () => fillDown(s.value);
       const clr = E('button', 'btn sm ghost', '고르기 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
       g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr);
-      if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = E('button', 'btn sm primary', '＋ 이 줄로 재고 추가'); cp.type = 'button'; cp.title = '상품명·옵션·구매처·배송방식만 복사해 그 탭 맨 아래에 새 재고 줄'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
+      if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = IB(E('button', 'btn sm primary'), 'plus', '이 줄로 재고 추가'); cp.type = 'button'; cp.title = '상품 정보로 새 재고 줄'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
       b.append(g);
     }
     if (stuck) {
@@ -988,14 +997,14 @@
     if (btn) { btn.disabled = true; if (payload.kind.startsWith('sheet')) btn.textContent = '시트에 쓰는 중…'; }
     try {
       const j = await post(payload);
-      toast((j.ok ? '✅ ' : '⚠ ') + String(j.msg || '').split('\n')[0].slice(0, 90), !j.ok);
+      toast(String(j.msg || '').split('\n')[0].slice(0, 90), !j.ok);
       if (out) {
-        out.textContent = (j.ok ? '✅ ' : '⚠ ') + j.msg; out.hidden = false;
+        out.textContent = ''; out.append(I(j.ok ? 'check' : 'alert'), ' ', noE(j.msg)); out.hidden = false;
         if (/회차가 시트를 쓰는 중/.test(j.msg)) { const b = E('button', 'btn sm weak', '그래도 하기'); b.type = 'button'; b.onclick = () => doAct(Object.assign({}, payload, { force: true }), b, out); out.append(' ', b); }
       }
       if (j.ok && !payload.kind.endsWith('preview')) { load(); loadTables(); }
       return j;
-    } catch (e) { toast('⚠ ' + e.message, true); if (out) { out.textContent = '⚠ ' + e.message; out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+    } catch (e) { toast(e.message, true); if (out) { out.textContent = ''; out.append(I('alert'), ' ', e.message); out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
   }
 
   const field = (lab, input) => { const l = E('label', 'dt-field'); l.append(E('span', null, lab), input); return l; };
@@ -1024,12 +1033,12 @@
   function syncAdd() {
     const b = document.querySelector('.dt-add .add'); if (!b) return;
     const r = addRef();
-    b.textContent = r ? `＋ ${r.tab} ${r.row}행 복사해 재고 줄 추가` : '＋ 재고 줄 추가';
+    IB(b, 'plus', r ? `${r.tab} ${r.row}행으로 재고 줄 추가` : '재고 줄 추가');
     b.disabled = !r;
   }
   async function stockCopy(r, b, force) {
     if (!r) return;
-    if (!String(r.name || '').trim()) { toast('상품명이 빈 줄이라 복사할 수 없어요 — [재고 넣기]로 적어 주세요', true); return; }
+    if (!String(r.name || '').trim()) { toast('상품명이 비어 복사 불가 · [재고 넣기]로', true); return; }
     const label = b && b.textContent; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'stock_copy', tab: r.tab, row: r.row, key: r.key || '', ident: ident(r) };   // 값은 서버가 지금 시트에서 다시 읽어 복사
     if (force) payload.force = true;
@@ -1039,11 +1048,11 @@
     if (j.ok) {
       const pos = m.match(/(\S+) (\d+)행/);
       newRow = pos ? { tab: pos[1], row: +pos[2] } : null;
-      toast(`✅ ${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 — ${r.row}행의 상품명·옵션·구매처·배송방식 복사, 나머지는 표에서 채우세요`, false, 3600);
+      toast(`${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 · ${r.row}행 상품 정보 복사`, false, 3600);
       load(); loadTables(); return;
     }
     if (/회차가 시트를 쓰는 중/.test(m) && confirm(m + '\n\n그래도 넣을까요?')) { stockCopy(r, b, true); return; }
-    toast('⚠ ' + m, true);
+    toast(m, true);
   }
   function showFlash() {        // load()가 그린 뒤 — 새 줄로 가서 반짝이고 빈 칸 하나를 골라 둠(바로 적기 시작하게). 지금 보기에 없으면 그 탭 전체로 한 번 바꿔 봄
     if (!newRow || !last) return;
@@ -1074,6 +1083,16 @@
     if ($('sk-css')) return;
     const s = E('style'); s.id = 'sk-css';
     s.textContent = `
+.dic { display: inline-flex; align-items: center; vertical-align: -0.14em; } .dic .ic { width: 1.05em; height: 1.05em; }
+.chipbtn .dic, .btn .dic { margin: 0 1px; } .dic.bad { color: var(--red-ink); }
+.row-del { color: var(--muted); } .row-del:hover { color: var(--red-ink); }
+.th-filt .dic .ic { width: 12px; height: 12px; } .th-ar .dic .ic { width: 11px; height: 11px; }
+.ov-ed .dic .ic { width: 14px; height: 14px; }
+.sk-done .ok .dic .ic { width: 30px; height: 30px; stroke-width: 2.4; }
+/* 스크롤바는 숨김 — 옆으로 더 있으면 그쪽 끝을 흐리게(2026-10-25) */
+.dt-wrap.fade-r:not(.cards) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.dt-wrap.fade-l:not(.cards) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.dt-wrap.fade-l.fade-r:not(.cards) { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 .dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); }
 table.dt.sheet tr.new > td { animation: dt-new 2.6s ease-out; }
 @keyframes dt-new { from { background: var(--green-bg); } }
@@ -1135,7 +1154,7 @@ details.sk-more[open] > summary::after { transform: rotate(-90deg); }
 .sk-sumv { color: var(--muted); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
 .sk-prev { margin: 0 20px 12px; padding: 12px 14px; border-radius: 12px; background: var(--fill2); color: var(--sub); font-size: 14px; display: flex; gap: 10px; align-items: center; min-height: 48px; line-height: 1.4; }
-.sk-prev .ic { flex: none; width: 24px; text-align: center; font-size: 16px; }
+.sk-prev .pi { flex: none; width: 24px; display: grid; place-items: center; font-size: 18px; }
 .sk-prev .tx { flex: 1; min-width: 0; }
 .sk-prev b { color: inherit; }
 .sk-prev.ok { background: var(--blue-bg); color: var(--blue-ink); }
@@ -1177,9 +1196,9 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const f = E('form', 'sk-f'); f.noValidate = true; f.autocomplete = 'off';
     const head = E('div', 'sk-h'); const ht = E('div');
     const h2 = E('h2', null, '재고 넣기'); h2.id = 'sk-t';
-    const hp = E('p', null, '고객 없이 들어온 물건을 시트 맨 아래 줄로 남겨요. 상품명과 수량만 있어도 돼요.'); hp.id = 'sk-d';
+    const hp = E('p', null, '고객 없이 들어온 물건. 상품명·수량만 있어도 돼요.'); hp.id = 'sk-d';
     ht.append(h2, hp);
-    const x = E('button', 'sk-x', '✕'); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = () => tryClose();
+    const x = E('button', 'sk-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = () => tryClose();
     head.append(ht, x);
     const body = E('div', 'sk-body'), prev = E('div', 'sk-prev'), foot = E('div', 'sk-foot');
     prev.setAttribute('role', 'status'); prev.setAttribute('aria-live', 'polite');
@@ -1233,7 +1252,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const bg = E('div', 'sk-grid2');
     const shopF = mk('shop', '구매처', { ph: '예: 아마존 · 츄위 · 공홈', list: 'sk-l-shop' }); shopF.insertBefore(shopChips, shopF.lastChild); shopF.classList.add('full');
     bg.append(shopF, mk('order_no', '공홈주문번호', { ph: '있으면 적어 주세요', hint: '같은 번호는 두 번 들어가지 않아요' }),
-      mk('price', '공홈가', { ph: '모르면 비워 두세요', mode: 'decimal', wrap: money, hint: '모르면 빈칸 — 0으로 채우지 않아요' }));
+      mk('price', '공홈가', { ph: '모르면 비워 두세요', mode: 'decimal', wrap: money, hint: '모르면 빈칸' }));
     buy.append(bg);
     const ship = E('details', 'sk-more'); const ss = E('summary'); const ssv = E('span', 'sk-sumv');
     ss.append(document.createTextNode('배송 정보'), E('span', 'sk-opt', '선택'), ssv); ship.append(ss);
@@ -1268,7 +1287,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const b = blocker();
       go.disabled = !!b || sending; why.textContent = b;
       go.textContent = sending ? '넣는 중…' : tab ? `${tab} 탭에 넣기` : '넣기';
-      setMsg('price', priceBad() ? '숫자만 적어 주세요(예: 24.99) — 모르면 비워 두세요' : null, priceBad());
+      setMsg('price', priceBad() ? '숫자만(예: 24.99)' : null, priceBad());
       setMsg('qty', qtyBad() && val('qty') ? '1 이상 숫자' : '', qtyBad() && !!val('qty'));
       money.b.textContent = CUR[tab] || '¤';
       bsv.textContent = buy.open ? '' : [val('shop'), val('order_no'), val('price') && (CUR[tab] || '') + val('price')].filter(Boolean).join(' · ');
@@ -1277,7 +1296,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     }
     buy.ontoggle = sync; ship.ontoggle = sync;
 
-    function showPrev(kind, ic, html) { prev.className = 'sk-prev' + (kind ? ' ' + kind : ''); prev.textContent = ''; prev.append(E('span', 'ic', ic)); const t = E('span', 'tx'); if (typeof html === 'string') t.textContent = html; else t.append(...html); prev.append(t); }
+    function showPrev(kind, ic, html) { prev.className = 'sk-prev' + (kind ? ' ' + kind : ''); prev.textContent = ''; prev.append(I(ic, 'pi')); const t = E('span', 'tx'); if (typeof html === 'string') t.textContent = html; else t.append(...html); prev.append(t); }
     // 서버 미리보기 — 탭·주문번호가 바뀌면(적는 동안은 0.4초 기다렸다가). 다른 칸은 화면에서만 확인
     function preview(now) {
       clearTimeout(pvT);
@@ -1291,17 +1310,17 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
         const m = String(j.msg || '');
         if (j.ok) {
           const [t, r] = m.split(' ');
-          showPrev('ok', '📍', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄로 들어가요' + (val('order_no') ? ' — 같은 주문번호 없음 ✓' : ''))]);
-          setMsg('order_no', val('order_no') ? '✓ 이 번호는 아직 시트에 없어요' : null);
+          showPrev('ok', 'pin', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄' + (val('order_no') ? ' · 중복 없음' : ''))]);
+          setMsg('order_no', val('order_no') ? '중복 없음' : null);
         } else if (/이미 있음/.test(m)) {
           const at = (m.split('→')[1] || '').trim(); dup = at;
           const b = E('button', 'btn sm weak', '그 줄 보기'); b.type = 'button';
           const pos = at.split(',')[0].trim().match(/^(\S+) (\d+)행$/);
           b.onclick = () => { if (pos) goRow(pos[1], pos[2], val('order_no')); };
-          showPrev('bad', '⚠', [document.createTextNode('같은 공홈주문번호가 이미 '), E('b', null, at), document.createTextNode('에 있어요. '), ...(pos ? [b] : [])]);
-          setMsg('order_no', `이미 ${at}에 있어요 — 다른 물건이면 번호를 비워 두세요`, true);
+          showPrev('bad', 'alert', [document.createTextNode('같은 공홈주문번호가 이미 '), E('b', null, at), document.createTextNode('에 있어요. '), ...(pos ? [b] : [])]);
+          setMsg('order_no', `이미 ${at}에 있음 · 다른 물건이면 비우기`, true);
         } else {
-          showPrev('warn', '!', m.replace(/^⚠\s*/, ''));
+          showPrev('warn', 'alert', noE(m));
         }
         sync();
       }, now ? 0 : 400);
@@ -1378,8 +1397,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       sync();
       if (/회차가 시트를 쓰는 중/.test(m)) {
         const fb = E('button', 'btn sm weak', '그래도 넣기'); fb.type = 'button'; fb.onclick = () => { busyTry = true; submit(); };
-        showPrev('warn', '⏳', [document.createTextNode(m + ' '), fb]);
-      } else showPrev('bad', '⚠', m || '넣지 못했어요');
+        showPrev('warn', 'clock', [document.createTextNode(noE(m) + ' '), fb]);
+      } else showPrev('bad', 'alert', noE(m) || '넣지 못했어요');
     }
     f.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
     f.addEventListener('keydown', (e) => {
@@ -1402,7 +1421,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const rows = [['상품', p.name + (p.옵션 ? ` · ${p.옵션}` : '')], ['수량', p.qty + '개'], ['구매처', p.shop], ['공홈주문번호', p.order_no], ['공홈가', p.price && (CUR[done.tab] || '') + p.price],
         ['배대지센터', p.center], ['해외송장', [p.해외송장, p.해외운송사].filter(Boolean).join(' · ')], ['메모', p.메모]];
       for (const [k, v] of rows) if (v) kv.append(E('dt', null, k), E('dd', null, v));
-      box.append(E('div', 'ok', '✓'), E('h3', null, `${done.tab} 탭 ${done.row ? done.row + '행' : ''}에 넣었어요`), E('p', null, '바로 표에 보여요. 칸은 표에서 눌러 고칠 수 있어요.'), kv);
+      const okI = E('div', 'ok'); okI.append(I('check')); box.append(okI, E('h3', null, `${done.tab} 탭 ${done.row ? done.row + '행' : ''}에 넣었어요`), E('p', null, '표에서 바로 고칠 수 있어요.'), kv);
       f.insertBefore(box, prev);
       foot.textContent = '';
       const look = E('button', 'btn ghost', '그 줄 보기'); look.type = 'button'; look.onclick = () => goRow(done.tab, done.row, p.name);
@@ -1464,9 +1483,9 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const chips = E('div', 'ov-chips'); chips.append(E('span', 'ov-chip', last.label)); if (st) { const v = ko(st); chips.append(E('span', 'badge ' + badgeCls(v), v)); }
     tt.append(E('div', 'ov-who', ttl), chips);
     const i = last.rows.indexOf(r), nav = E('div', 'ov-nav');
-    const pv = btn('‹', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('›', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); });
+    const pv = btn('', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); }); pv.append(I('up')); nx.append(I('down'));
     pv.setAttribute('aria-label', '위 줄'); nx.setAttribute('aria-label', '아래 줄'); pv.disabled = i <= 0; nx.disabled = i < 0 || i >= last.rows.length - 1;
-    const x = E('button', 'icon-btn ov-x', '✕'); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
+    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
     nav.append(E('span', 'ov-pos', i >= 0 ? `${i + 1}/${last.rows.length}` : ''), pv, nx, x);
     head.append(tt, nav); box.append(head);
     const dl = E('dl', 'kv');
@@ -1476,8 +1495,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const A = last.actions || [];
     if (A.includes('sheet_edit')) sheetActs(r, acts, out);
     if (A.includes('order_mark') && r.key) {
-      const h = select(['해외구매', '재고발송', '취소', '반품환불', '예외', '옛 주문', '미정'], r.handling), m = inp('메모(예: 재고로 보냄 — 호주 12행)');
-      acts.append(form('처리 방식(장부)', E('p', 'muted small', '이 주문을 어떻게 처리했는지 남기면 감시가 다시 묻지 않아요.'), field('처리 방식', h), field('메모', m),
+      const h = select(['해외구매', '재고발송', '취소', '반품환불', '예외', '옛 주문', '미정'], r.handling), m = inp('메모(예: 재고로 보냄, 호주 12행)');
+      acts.append(form('처리 방식(장부)', E('p', 'muted small', '남기면 감시가 다시 묻지 않아요.'), field('처리 방식', h), field('메모', m),
         btn('장부에 남기기', 'weak', (b) => doAct({ kind: 'order_mark', key: r.key, handling: h.value, memo: m.value.trim() }, b, out))));
     }
     if (A.includes('state')) {
@@ -1500,11 +1519,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       };
       const bs = E('div', 'btns');
       bs.append(btn('미리보기', '', (b) => doAct({ kind: 'register_preview', args: args() }, b, out)),
-        btn('등록 실행', 'primary', (b) => doAct({ kind: 'register', args: args(), confirm: `${how.value === '네이버옵션' ? '네이버' : '쿠팡'}에 ${q.value}개 ${(+p.value).toLocaleString('ko-KR')}원으로 실제 등록할까요? 미리보기에서 막힌 것이 없었는지 확인해 주세요.` }, b, out)));
+        btn('등록 실행', 'primary', (b) => doAct({ kind: 'register', args: args(), confirm: `${how.value === '네이버옵션' ? '네이버' : '쿠팡'}에 ${q.value}개 ${(+p.value).toLocaleString('ko-KR')}원으로 실제 등록할까요?` }, b, out)));
       acts.append(form('등록(공용 등록 도구)', field('방식', how), field('그룹·상품 번호', id), field('수량', q), field('판매가', p), field('기준', base), bs));
     }
     const kvc = E('section', 'ov-card wide'); kvc.append(E('h3', null, '모든 칸'), dl); box.append(kvc);     // 보기만 하는 표는 칸이 본문(접지 않음)
-    if (acts.childNodes.length) box.append(out, acts); else box.append(E('p', 'muted small', '이 표는 보기만 해요 — 바꿀 일은 #작업판에 말로 맡겨 주세요.'));
+    if (acts.childNodes.length) box.append(out, acts); else box.append(E('p', 'muted small', '보기 전용 표예요.'));
     if (r.key && !isStock(r) && ['orders', 'order_ledger'].includes(cur.table)) { const f = E('section', 'ov-card wide'); f.append(E('h3', null, '이 주문 기록')); box.append(f); historyBox(f, r, true); }
     if (!keep) { box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true }); }
   }
@@ -1565,29 +1584,29 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     if (sg.ost) chip(`${ko(r.platform || '') || '플랫폼'} ${ko(sg.ost)}`, 'badge ' + (sg.delivered ? 'ok' : sg.stop ? 'bad' : 'run'));
     if (ds && ds.k !== 'ok') chip('발송기한 ' + ds.t, 'badge ' + (ds.k === 'late' ? 'bad' : 'warn'));
     const what = E('div', 'ov-what', stock ? ['재고 줄', r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · '));
-    what.title = '눌러서 모두 보기'; what.onclick = () => what.classList.toggle('open');     // 긴 상품명은 두 줄까지, 누르면 모두
+    what.title = '모두 보기'; what.onclick = () => what.classList.toggle('open');     // 긴 상품명은 두 줄까지, 누르면 모두
     tt.append(E('div', 'ov-who' + (stock ? ' long' : ''), stock ? (r.name || '재고') : (r.receiver || '(받는 분 없음)')), what, chips);
     const nav = E('div', 'ov-nav');
     const i = last.rows.indexOf(r);
-    const pv = btn('‹', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('›', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); });
+    const pv = btn('', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); }); pv.append(I('up')); nx.append(I('down'));
     pv.title = '위 줄 ( [ )'; nx.title = '아래 줄 ( ] )'; pv.setAttribute('aria-label', '위 줄'); nx.setAttribute('aria-label', '아래 줄'); pv.disabled = i <= 0; nx.disabled = i < 0 || i >= last.rows.length - 1;
-    const x = E('button', 'icon-btn ov-x', '✕'); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
+    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
     nav.append(E('span', 'ov-pos', `${r.row}행` + (i >= 0 ? ` · ${i + 1}/${last.rows.length}` : '')), pv, nx, x);
     head.append(tt, nav); box.append(head);
     // 알림: 문제(바로 풀기) · 다시 구매 · 취소·반품 흐름
     if (r.problem) {
-      const a = E('div', 'ov-alert bad'); a.append(E('span', null, '⚠ 문제: ' + String(r.problem).replace(/^\s*(🟥\s*)?문제\s*:\s*/, '')));
-      a.append(btn('해결했어요 — 문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out)));
+      const a = E('div', 'ov-alert bad'); const at = E('span'); at.append(I('alert'), ' 문제: ' + noE(String(r.problem).replace(/^\s*(🟥\s*)?문제\s*:\s*/, ''))); a.append(at);
+      a.append(btn('문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out)));
       box.append(a);
     }
-    if (sg.rebuy) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: '구매처에서 주문이 취소됐어요 — 다시 사서 구매처·공홈주문번호·공홈가를 새로 넣어 주세요.' }));
-    else if (sg.stop) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: `취소·반품 흐름이에요 — ${[pg, sg.ost && '플랫폼 ' + ko(sg.ost), sg.claim && '클레임 ' + ko(sg.claim)].filter(Boolean).join(' · ')}\n승인·거절은 #할-일 카드의 버튼으로 해요.` }));
+    if (sg.rebuy) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: '구매처 주문 취소됨 · 다시 사서 구매처·주문번호·공홈가 새로 넣기' }));
+    else if (sg.stop) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: `취소·반품 · ${[pg, sg.ost && '플랫폼 ' + ko(sg.ost), sg.claim && '클레임 ' + ko(sg.claim)].filter(Boolean).join(' · ')}\n승인·거절은 #할-일 카드에서` }));
     // 진행 단계(7) + 지금
     if (!stock) {
       const ol = E('ol', 'ov-steps' + (sg.stop ? ' stopped' : '')); ol.setAttribute('aria-label', `진행 ${sg.done}/7 단계`);
       sg.steps.forEach(([n, ok], j) => ol.append(E('li', ok ? 'done' : j === sg.cur && !sg.stop ? 'now' : '', n)));
       box.append(ol);
-      if (!sg.stop) box.append(E('p', 'ov-next' + (sg.cur < 0 ? ' fin' : ''), sg.cur < 0 ? '✓ 배송완료 — 끝난 주문이에요' : `지금: ${sg.next}` + (ds ? ` · 발송기한 ${String(r.due).slice(5, 10).replace('-', '/')} (${ds.t})` : '')));
+      if (!sg.stop) box.append(E('p', 'ov-next' + (sg.cur < 0 ? ' fin' : ''), sg.cur < 0 ? '배송완료' : `지금: ${sg.next}` + (ds ? ` · 발송기한 ${String(r.due).slice(5, 10).replace('-', '/')} (${ds.t})` : '')));
     }
     box.append(out);
     // 할 일 카드 — 지금 단계에서 채울 칸
@@ -1622,7 +1641,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       row.append(val);
       for (const [t, href, cls] of (opt.links || []).filter(() => raw)) { const a = E('a', 'ov-link' + (cls ? ' ' + cls : ''), t); a.href = href(raw); if (/^https?:/.test(a.href)) { a.target = '_blank'; a.rel = 'noopener'; a.title = t.replace(' ↗', '') + ' (새 창)'; } row.append(a); }
       if (editable) {      // 2026-10-24 사장님 "원클릭만으로 수정": 값을 한 번 누르면 그 자리 입력칸 — 벗어나거나 Enter면 바로 저장(표와 같은 자동 저장 길), Esc는 그대로
-        val.classList.add('ov-edv'); val.title = '눌러서 바로 고치기 — 벗어나면 저장돼요'; val.tabIndex = 0; val.setAttribute('role', 'button');
+        val.classList.add('ov-edv'); val.title = '눌러서 고치기 · 벗어나면 저장'; val.tabIndex = 0; val.setAttribute('role', 'button');
         const go = () => {
           const opts = dropOpts(r, c); let el;
           if (opts) { el = select(['', ...opts, ...(raw && !opts.includes(raw) ? [raw] : [])], raw); } else { el = inp(PH[c] || '', raw); el.autocomplete = 'off'; if (NUMC.includes(c)) el.inputMode = 'decimal'; }
@@ -1641,7 +1660,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
           if (opts && el.showPicker) { try { el.showPicker(); } catch (e) { /* 목록을 못 펼치는 브라우저 — 한 번 더 누르면 열림 */ } }
         };
         val.onclick = go; val.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
-        if (raw) { const cp = E('button', 'ov-ed', '⧉'); cp.type = 'button'; cp.title = '복사'; cp.setAttribute('aria-label', cname(c) + ' 복사'); cp.onclick = () => copyText(raw, cname(c) + ' 복사'); row.append(cp); }
+        if (raw) { const cp = E('button', 'ov-ed'); cp.append(I('copy')); cp.type = 'button'; cp.title = '복사'; cp.setAttribute('aria-label', cname(c) + ' 복사'); cp.onclick = () => copyText(raw, cname(c) + ' 복사'); row.append(cp); }
       }
       return row;
     };
@@ -1655,7 +1674,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const digits = (v) => String(v).replace(/[^\d+]/g, '');
     if (!stock) {           // 받는 분 정보 한 번에 복사(배대지 신청서·문의에 붙여 넣기)
       const lines = [['수령인', r.receiver], ['연락처', r.tel], ['통관부호', r.pccc], ['우편번호', r.zip], ['주소', r.addr], ['배송메모', r.ship_memo]].filter(([, v]) => v);
-      const cb = E('button', 'ov-hbtn', '받는 분 정보 복사'); cb.type = 'button'; cb.title = '수령인·연락처·통관부호·우편번호·주소·배송메모를 줄마다';
+      const cb = E('button', 'ov-hbtn', '받는 분 정보 복사'); cb.type = 'button'; cb.title = '수령인·연락처·통관부호·주소 줄마다';
       cb.onclick = () => copyText(lines.map(([k, v]) => `${k}: ${v}`).join('\n'), '받는 분 정보 복사');
       card('고객·배송지', [kv('receiver', { always: true }), kv('tel', { links: [['전화', (v) => 'tel:' + digits(v), 'tap'], ['문자', (v) => 'sms:' + digits(v), 'tap']] }),
         kv('pccc'), kv('zip'), kv('addr'), kv('ship_memo')], true, lines.length ? cb : null);
@@ -1672,14 +1691,14 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       hp.then((j) => {
         const others = ((j && j.rows) || []).filter((x) => !(x.tab === r.tab && +x.row === +r.row));
         if (!others.length || sel !== r) return;
-        same.hidden = false; same.append(E('span', 'muted small', `같은 주문 ${others.length + 1}줄(나눈 줄):`));
+        same.hidden = false; same.append(E('span', 'muted small', `같은 주문 ${others.length + 1}줄:`));
         for (const o of others) same.append(btn(`${o.tab} ${o.row}행${o.progress ? ' · ' + o.progress : ''}`, 'ghost', () => jumpTo(o, r)));
       });
     }
     // 접어 둔 것: 플랫폼 기록 · 조치 · 바꾼 기록 · 모든 칸
     const fold = (title, fill, open, eager) => { const d = E('details', 'ov-fold'); d.append(E('summary', null, title)); let done = false; const go = () => { if (!done) { done = true; fill(d); } }; d.ontoggle = () => { if (d.open) go(); }; if (open) d.open = true; if (open || eager) go(); box.append(d); };
     if (hp) fold('플랫폼 주문·처리 기록', (d) => historyBox(d, r, true, hp), true);
-    fold('조치 — 문제 표시·메모·색·줄 나누기·옮기기·지우기', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
+    fold('조치', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
     if (rowName(r)) fold('이 줄 바꾼 기록(되돌리기)', (d) => auditList(d, { tab: r.tab, key: rowName(r), limit: 50 }));
     fold('모든 칸 보기', (d) => { const dl = E('dl', 'kv'); for (const [k, v] of Object.entries(r)) { if (v == null || v === '' || k.startsWith('_')) continue; dl.append(E('dt', null, cname(k))); const dd = E('dd'); dd.append(E('pre', null, fmt(k, v))); dl.append(dd); } d.append(dl); }, false, true);
     if (!keep) { box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true }); }   // ✕에 포커스를 주면 파란 테두리가 크게 떠서(10/24 감사) 서랍 자체에
@@ -1689,7 +1708,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const hit = last.rows.find((x) => x.tab === o.tab && +x.row === +o.row);
     if (hit) return openRow(hit);
     cur.q = r.order_no || r.key; cur.preset = ''; cur.filters = []; cur.offset = 0; document.querySelector('.dt-q').value = cur.q;
-    jump = { tab: o.tab, row: o.row }; toast('같은 주문 줄을 보려고 찾기를 주문번호로 바꿨어요'); load();
+    jump = { tab: o.tab, row: o.row }; toast('주문번호로 찾는 중'); load();
   }
   document.addEventListener('keydown', (e) => {      // 자세히가 열려 있으면 [ ] 로 위·아래 줄
     if (!sel || !last || typing(e) || (e.key !== '[' && e.key !== ']')) return;
@@ -1706,7 +1725,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       let j; try { j = await fetchJ('/api/db/audit?' + new URLSearchParams(q).toString()); } catch (e) { list.textContent = '기록을 불러오지 못했어요: ' + e.message; return; }
       list.textContent = '';
       if (j.error) { list.textContent = j.error; return; }
-      if (!j.batches.length) { list.append(E('p', 'muted small', '아직 현황판에서 바꾼 기록이 없어요')); return; }
+      if (!j.batches.length) { list.append(E('p', 'muted small', '바꾼 기록이 없어요')); return; }
       for (const b of j.batches) {
         const g = E('div', 'dt-batch');
         const h = E('div', 'dt-batch-h');
@@ -1750,8 +1769,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   function auditPanel() {
     const box = document.querySelector('.dt-audit'); if (!box) return;
     box.hidden = !box.hidden; box.textContent = ''; if (box.hidden) return;
-    box.append(E('div', 'od-t', '바꾼 기록 — 현황판에서 바꾼 모든 일(최근 것부터)'),
-      E('p', 'muted small', '묶음(한 번에 저장한 것)이나 한 칸을 되돌릴 수 있어요. 지금 값이 그때 바꾼 값과 다르면(그사이 또 바뀜) 되돌리지 않아요. 지운 줄은 탭 맨 아래에 되살려요.'));
+    box.append(E('div', 'od-t', '바꾼 기록'),
+      E('p', 'muted small', '묶음이나 한 칸씩 되돌려요. 그사이 또 바뀐 칸은 건너뛰어요.'));
     auditList(box, { limit: 100 });
     const dd = E('details', 'dt-all'); dd.append(E('summary', null, '지운 줄 백업(기록 전에 지운 줄 포함)'));
     let done = false; dd.ontoggle = () => { if (dd.open && !done) { done = true; deletedList(dd); } };
@@ -1765,19 +1784,19 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   };
   function sheetActs(r, acts, out, noEdit) {
     const ordered = r.key && !isStock(r);
-    acts.append(tool('재고 줄 추가', '이 줄의 상품명·옵션·구매처·배송방식만 복사해 같은 탭 맨 아래에 새 재고 줄 — 나머지 칸은 표에서 채워요', btn('＋ 이 줄로 재고 추가', 'primary', (b) => stockCopy(r, b))));
+    acts.append(tool('재고 줄 추가', '이 줄 상품 정보로 새 재고 줄', btn('이 줄로 재고 추가', 'primary', (b) => stockCopy(r, b))));
     // 칸 고치기(표에서 누르기 어려운 휴대폰용 — 같은 저장 길)
     const cols = (last.edit.editable || []).concat(isStock(r) ? last.edit.stock_only : []);
     const c = select(cols.map((x) => COLNAME[x] || x)), v = inp('새 값');
     const syncV = () => { const k = cols[c.selectedIndex]; v.value = r[k] == null ? '' : r[k]; }; c.onchange = syncV; syncV();
-    if (!noEdit) acts.append(tool('칸 고치기', '표에서 칸을 누르기 어려울 때(휴대폰) 값 고치기', field('칸', c), field('값', v), btn('시트에 저장', 'primary', (b) => {
+    if (!noEdit) acts.append(tool('칸 고치기', '휴대폰에서 값 고치기', field('칸', c), field('값', v), btn('시트에 저장', 'primary', (b) => {
       const k = cols[c.selectedIndex];
       doAct({ kind: 'sheet_edit', edits: [{ tab: r.tab, row: r.row, key: r.key, col: sheetCol(k), old: r[k] == null ? '' : String(r[k]), new: v.value.trim(), ident: ident(r) }] }, b, out);
     })));
-    if (r.problem) acts.append(tool('문제 줄', '이 줄에 걸린 문제 — 해결했으면 풀기', E('p', 'small', r.problem), btn('문제 풀기(빨간색 해제)', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out))));
+    if (r.problem) acts.append(tool('문제 줄', '해결했으면 풀기', E('p', 'small', noE(r.problem)), btn('문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out))));
     else {
       const pc = select(['해외송장', '국내송장', '공홈주문번호', '공홈가', '구매처', '훗타운신청번호', '배송방식', '수령인', '메모']), why = inp('무엇이 문제인지(근거)'), todo = inp('할 일');
-      acts.append(tool('문제 표시', '사람이 봐야 할 문제가 있을 때 — 빨간 줄 + #할-일 카드로 알려요', field('칸', pc), field('문제', why), field('할 일', todo),
+      acts.append(tool('문제 표시', '빨간 줄 + #할-일 카드', field('칸', pc), field('문제', why), field('할 일', todo),
         btn('문제로 표시', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'problem', tab: r.tab, row: r.row, key: rowName(r), col: pc.value, why: why.value.trim(), todo: todo.value.trim() }, b, out))));
     }
     // 칸 메모·줄 색(시트의 메모·배경색 대신 — barun.db grid_meta, 줄이 밀려도 그 줄을 따라감)
@@ -1785,25 +1804,25 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const mc = select(mcols.map(cname)), mt = inp('메모(비우면 지움)');
     const syncM = () => { const n = noteOf(r, mcols[mc.selectedIndex]); mt.value = n ? n.text : ''; }; mc.onchange = syncM; syncM();
     const metaPost = (b, kind, col, oldv, newv) => doAct({ kind: 'sheet_meta', tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key, ident: ident(r), col, mkind: kind, old: oldv, new: newv }, b, out);
-    acts.append(tool('칸 메모', '시트의 \'메모\' 대신 — 칸에 설명을 붙여 둬요(표에 ◥ 표시)', field('칸', mc), field('메모', mt), btn('메모 남기기', 'weak', (b) => {
+    acts.append(tool('칸 메모', '칸에 설명 붙이기', field('칸', mc), field('메모', mt), btn('메모 남기기', 'weak', (b) => {
       const k = mcols[mc.selectedIndex], n = noteOf(r, k);
       metaPost(b, 'note', sheetCol(k), n ? n.text : '', mt.value.trim());
     })));
     const pal = last.colors || {};
     const cs = select(['(없음)', ...Object.keys(pal)]); const nowC = (r._meta || {}).ucolor || '';
     cs.value = Object.keys(pal).find((k) => pal[k] === nowC) || '(없음)';
-    acts.append(tool('줄 색', '시트에서 배경색 칠하던 것 대신 — 눈에 띄게 표시만 해요', E('p', 'muted small', (r._meta || {}).color ? `자동 색(재고·문제 등)이 있어요 — 사람 색이 그 위에 보여요.` : '사람이 표시해 두는 색이에요(자동 칠하기가 지우지 않아요).'),
+    acts.append(tool('줄 색', '눈에 띄게 표시', E('p', 'muted small', (r._meta || {}).color ? '자동 색 위에 보여요.' : '자동 칠하기가 지우지 않아요.'),
       field('색', cs), btn('색 바꾸기', 'weak', (b) => metaPost(b, 'ucolor', '', nowC, pal[cs.value] || ''))));
     if (!ordered) { stockActs(r, acts, out); return; }
     const tot = +(r.send_qty || r.qty || 0) || 2;
     const keep = inp('이 줄 수량', String(Math.max(1, tot - 1))), mv = inp('새 줄 수량', '1');
-    acts.append(tool('줄 나누기', '한 주문을 두 상자로 나눠 보낼 때(관세 US$150 넘을 때 등)', E('p', 'muted small', '같은 주문을 두 줄로 — 새 줄은 같은 탭 맨 아래, 송장·신청번호 칸은 비워요.'), field('이 줄 보낼수량', keep), field('새 줄 보낼수량', mv),
+    acts.append(tool('줄 나누기', '두 상자로 나눠 보낼 때', E('p', 'muted small', '새 줄은 탭 맨 아래, 송장·신청번호는 빈칸.'), field('이 줄 보낼수량', keep), field('새 줄 보낼수량', mv),
       btn('두 줄로 나누기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'split', tab: r.tab, row: r.row, key: r.key, keep: keep.value.trim(), move: mv.value.trim(),
         confirm: `${r.receiver} 주문을 ${keep.value}개 + ${mv.value}개 두 줄로 나눌까요?` }, b, out))));
     const to = select(tabsOf().filter((t) => t !== r.tab));
-    acts.append(tool('다른 탭으로 옮기기', '배대지·나라 탭이 잘못 들어갔을 때', E('p', 'muted small', '새 탭 맨 아래로 옮기고, 다음부터 이 상품은 그 탭으로 들어가요.'), field('옮길 탭', to),
+    acts.append(tool('다른 탭으로 옮기기', '탭이 잘못 들어갔을 때', E('p', 'muted small', '다음부터 이 상품은 그 탭으로 들어가요.'), field('옮길 탭', to),
       btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: r.key, to: to.value, confirm: `${r.receiver} 줄을 ${r.tab} → ${to.value} 탭으로 옮길까요?` }, b, out))));
-    acts.append(tool('줄 지우기', '잘못 들어온 줄을 지울 때(통째로 백업돼요)', E('p', 'muted small', '지운 주문은 다시 자동으로 들어오지 않아요. 지운 줄은 통째로 백업해 둬요. 같은 주문의 나눈 줄인지 먼저 확인해 주세요.'),
+    acts.append(tool('줄 지우기', '잘못 들어온 줄', E('p', 'muted small', '다시 자동으로 들어오지 않아요. 나눈 줄인지 먼저 확인.'),
       btn('이 줄 지우기', 'danger', (b) => {
         const t = prompt(`정말 지우려면 받는 분 이름(${r.receiver})을 적어 주세요`);
         if (t == null) return;
@@ -1824,18 +1843,18 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const m = String(j.msg || j.error || '');
     if (!j.ok) {
       if (/회차가 시트를 쓰는 중/.test(m) && confirm(m + '\n\n그래도 지울까요?')) { rowDel(r, b, true); return; }
-      toast('⚠ ' + m.split('\n')[0].slice(0, 120), true); return;
+      toast(m.split('\n')[0].slice(0, 120), true); return;
     }
     if (sel && rid(sel) === rid(r)) { sel = null; detail(); }
     load(); loadTables();
     let line = 0;          // 방금 지운 줄 백업 번호 → 되살리기 버튼
     try { const d = await fetchJ('/api/db/deleted?limit=5'); const x = (d.rows || []).find((y) => y.tab === r.tab && String(y.row) === String(r.row) && (y.name || '') === (r.name || '')); if (x) line = x.line; } catch (e) { /* 버튼 없이 */ }
-    undoToast(`🗑 ${r.tab} ${r.row}행 ${stock ? '재고 ' + name : r.receiver || ''} 지웠어요`, line ? () => doAct({ kind: 'sheet_undo', line }, null, null) : null);
+    undoToast(`${r.tab} ${r.row}행 ${stock ? '재고 ' + name : r.receiver || ''} 지움`, line ? () => doAct({ kind: 'sheet_undo', line }, null, null) : null);
   }
   function undoToast(msg, fn) {
     toast(msg, false, fn ? 8000 : 2400);
     const t = $('dt-toast'); if (!t || !fn) return;
-    const u = E('button', 'dt-undo', '되살리기'); u.type = 'button'; u.title = '방금 지운 줄을 그 탭 맨 아래에 되살려요';
+    const u = E('button', 'dt-undo', '되살리기'); u.type = 'button'; u.title = '탭 맨 아래에 되살리기';
     u.onclick = () => { t.classList.remove('show'); fn(); };
     t.append(' ', u);
   }
@@ -1843,9 +1862,9 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   function stockActs(r, acts, out) {     // 재고 줄(key 없음): 옮기기·지우기 — 줄 번호 + 상품명·공홈주문번호·수령인이 화면과 같을 때만
     const name = r.name || r.shop_order || '재고';
     const to = select(tabsOf().filter((t) => t !== r.tab));
-    acts.append(tool('다른 탭으로 옮기기', '재고를 다른 탭(배대지·나라)에 둘 때', E('p', 'muted small', '새 탭 맨 아래로 옮겨요.'), field('옮길 탭', to),
+    acts.append(tool('다른 탭으로 옮기기', '재고를 다른 탭에', E('p', 'muted small', '새 탭 맨 아래로.'), field('옮길 탭', to),
       btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: '', ident: ident(r), to: to.value, confirm: `재고 '${name}' 줄을 ${r.tab} → ${to.value} 탭으로 옮길까요?` }, b, out))));
-    acts.append(tool('줄 지우기', '다 쓴·잘못 넣은 재고 줄을 지울 때(백업돼요)', E('p', 'muted small', '지운 줄은 통째로 백업해 둬요. 아직 쓰지 않은 재고인지 먼저 확인해 주세요.'),
+    acts.append(tool('줄 지우기', '다 쓴·잘못 넣은 재고 줄', E('p', 'muted small', '백업돼요. 남은 재고인지 먼저 확인.'),
       btn('이 재고 줄 지우기', 'danger', (b) => doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: '', ident: ident(r), confirm: `재고 '${name}'(${r.tab} ${r.row}행) 줄을 지울까요?` }, b, out))));
   }
 

@@ -1,4 +1,4 @@
-// 🚀 자동화율 화면 — 완전 자동화 목표(사람 손 2% 미만)까지 어디쯤인지: 큰 숫자 → 흐름 띠(단계별 수준) → 단계 자세히 → 추이 → 로드맵·다음 할 일 → 새로 찾은 여지
+// 자동화율 화면 — 완전 자동화 목표(사람 손 2% 미만)까지 어디쯤인지: 큰 숫자 → 흐름 띠(단계별 수준) → 단계 자세히 → 추이 → 로드맵·다음 할 일 → 새로 찾은 여지
 // (2026-10-22 사장님: "파이프라인을 작업 단위로 쪼개 자동화 단계와 전체 자동화율을 한눈에"). 읽기: GET /api/automation(autoimprove/pipeline.py).
 // 원본은 config/pipeline.toml — 화면은 보여 주기만. 자리: index.html에 미리 있는 화면(#p-…)을 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
@@ -6,7 +6,9 @@
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   // 수준 → 색(순서 있는 척도, 글자로도 함께 표시 — 색만으로 구분하지 않음)
   const LV = [['사람', 'var(--st-crit)'], ['자료만', 'var(--st-serious)'], ['반자동', 'var(--st-warn)'], ['자동', 'var(--st-run)'], ['완전 자동', 'var(--st-good)']];
-  const ST = { done: ['✓', 'ok', '끝'], doing: ['●', 'run', '진행 중'], todo: ['○', '', '할 일'] };
+  const ST = { done: ['', 'ok', '끝'], doing: ['', 'run', '진행 중'], todo: ['', '', '할 일'] };
+  const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
+  const mark = (st) => { const e = E('span', 'au-mk ' + (st || 'todo')); if (st === 'done') e.innerHTML = window.ico ? window.ico('check') : ''; return e; };   // 끝·진행·할 일 표시를 그림으로
   let timer = 0, busy = false, data = null, pick = null;
 
   function install() {
@@ -44,25 +46,28 @@
       .au-ph .p { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; } .au-ph .p b { display: block; height: 100%; background: var(--st-good); }
       .au-ph ul { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; } .au-ph li { padding: 2px 0; color: var(--sub); }
       .au-ph li.done { color: var(--muted); text-decoration: line-through; }
+      .au-mk { display: inline-flex; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; align-items: center; justify-content: center; }
+      .au-mk.todo { border: 1.5px solid var(--muted); border-radius: 50%; width: 9px; height: 9px; } .au-mk.doing { background: var(--st-run); border-radius: 50%; width: 8px; height: 8px; }
+      .au-mk.done { color: var(--st-good); }
       @media (max-width: 900px) { .au-phases { grid-template-columns: 1fr; } }
       @media (max-width: 720px) { #au-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
     document.head.append(css);
     sec.innerHTML = `
-      <div class="card hero"><h2 id="au-title">불러오는 중이에요</h2><p class="lead" id="au-lead"></p>
+      <div class="card hero"><h2 id="au-title">불러오는 중</h2><p class="lead" id="au-lead"></p>
         <div class="au-meter" id="au-meter" role="meter" aria-valuemin="0" aria-valuemax="100"><b></b><i></i></div>
         <div class="au-meter-l"><span>0%</span><span id="au-goal-l"></span></div>
         <div class="stats" id="au-stats" style="margin-top:14px"></div></div>
-      <div class="card"><div class="card-h"><h2 id="au-flow-h">업무 흐름</h2><span class="desc">칸을 누르면 지금 방식·막힌 이유·다음 할 일이 보여요. 숫자 = 최근 7일 그 단계를 사람 손 없이 지난 주문 비율(보낸 문의는 답을 자동으로 확인하는 비율).</span></div>
+      <div class="card"><div class="card-h"><h2 id="au-flow-h">업무 흐름</h2><span class="desc">숫자 = 7일간 손 안 탄 주문 비율 · 누르면 자세히</span></div>
         <div class="au-leg" id="au-leg"></div><div class="au-flow" id="au-flow" role="group" aria-label="주문 흐름 단계"></div>
         <div class="au-detail" id="au-detail" aria-live="polite"></div></div>
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>지금 할 일</h2><span class="desc" id="au-next-d"></span></div><ul class="list" id="au-next"></ul></div>
-        <div class="card"><div class="card-h"><h2>최근 14일 추이</h2><span class="desc">날마다 사람 손 안 탄 주문 비율 · 점선 = 목표</span></div><div class="au-trend" id="au-trend" role="img"></div></div>
+        <div class="card"><div class="card-h"><h2>최근 14일 추이</h2><span class="desc">손 안 탄 비율 · 점선 목표</span></div><div class="au-trend" id="au-trend" role="img"></div></div>
       </div>
-      <div class="card"><div class="card-h"><h2>로드맵 5단계</h2><span class="desc">파란 칸이 지금 단계예요. 태스크가 다 끝나면 다음 단계로 넘어가요.</span></div><div class="au-phases" id="au-phases"></div></div>
+      <div class="card"><div class="card-h"><h2>로드맵 5단계</h2><span class="desc">파란 칸이 지금 단계</span></div><div class="au-phases" id="au-phases"></div></div>
       <div class="grid2">
-        <div class="card"><div class="card-h"><h2>사람 카드가 나온 곳</h2><span class="desc">최근 7일 #할-일 카드 — 많은 곳부터 줄여요</span></div><ul class="list" id="au-cards"></ul></div>
-        <div class="card"><div class="card-h"><h2>새로 찾은 자동화 여지</h2><span class="desc">회차 점검·에이전트가 찾을 때마다 쌓여요</span></div><ul class="list" id="au-ideas"></ul></div>
+        <div class="card"><div class="card-h"><h2>사람 카드가 나온 곳</h2><span class="desc">최근 7일 #할-일</span></div><ul class="list" id="au-cards"></ul></div>
+        <div class="card"><div class="card-h"><h2>새로 찾은 자동화 여지</h2><span class="desc">회차·에이전트가 찾은 것</span></div><ul class="list" id="au-ideas"></ul></div>
       </div>`;
     document.addEventListener('barun:page', (e) => { if (e.detail === 'auto') { load(); start(); } else stop(); });
     if (!sec.hidden) { load(); start(); }
@@ -79,18 +84,18 @@
     const b = E('div', 'row-body'); b.append(E('span', null, title)); if (sub) b.append(E('span', 'muted small', sub));
     r.append(b); if (badge) r.append(E('span', 'badge ' + (cls || ''), badge)); l.append(r); return l;
   }
-  const ROLE = { orders: '📦 주문·발송', mail: '✉️ 메일·송장', pricing: '💰 가격·위너', inquiry: '💬 고객문의', close: '📊 마감·분석', improve: '🛠 개선', infra: '⚙️ 인프라', sourcing: '🔎 소싱·원가' };
+  const ROLE = { orders: '주문·발송', mail: '메일·송장', pricing: '가격·위너', inquiry: '고객문의', close: '마감·분석', improve: '개선', infra: '인프라', sourcing: '소싱·원가' };
 
   function detail(s) {
     const d = $('au-detail'); d.innerHTML = '';
     const h = E('div'); h.append(E('strong', null, `${s.n}. ${s.name}`), document.createTextNode('  '), E('span', 'badge', `수준 ${s.level} · ${s.level_name}`));
     if (s.pct != null) h.append(document.createTextNode(' '), E('span', 'badge ' + (s.pct >= 98 ? 'ok' : s.pct >= 50 ? 'run' : 'warn'), `7일 ${s.auto}/${s.orders}건 자동`));
     const dl = E('dl');
-    for (const [k, v] of [['지금 방식', s.how], ['막힌 이유', s.blocker || '없음'], ['다음 단계', s.next || '이대로 유지']]) dl.append(E('dt', null, k), E('dd', null, v));
+    for (const [k, v] of [['지금 방식', s.how], ['막힌 이유', s.blocker || '없음'], ['다음 단계', s.next || '유지']]) dl.append(E('dt', null, k), E('dd', null, noE(v)));
     d.append(h, dl);
     if (s.tasks && s.tasks.length) {
       const ul = E('ul', 'list'); ul.style.marginTop = '8px';
-      for (const t of s.tasks) ul.append(li(`${ST[t.state || 'todo'][0]} ${t.title}`, `로드맵 ${t.phase}단계`, ST[t.state || 'todo'][2], ST[t.state || 'todo'][1]));
+      for (const t of s.tasks) { const l = li(noE(t.title), `로드맵 ${t.phase}단계`, ST[t.state || 'todo'][2], ST[t.state || 'todo'][1]); l.querySelector('.row-body > span').prepend(mark(t.state)); ul.append(l); }
       d.append(ul);
     }
   }
@@ -100,17 +105,17 @@
     const p = d.pct ?? 0, goal = d.goal;
     const worst = d.stages.filter((s) => s.pct != null && s.orders && s.applies !== 'asks').sort((a, b) => a.pct - b.pct || b.orders - a.orders)[0];
     $('au-title').textContent = `사람 손 안 탄 주문 ${pctTxt(d.pct)} — 목표 ${goal}%`;
-    $('au-lead').textContent = `최근 ${d.days}일 주문 ${d.orders}건 중 ${d.done - d.touched}건이 처음부터 끝까지 자동이었어요.` +
-      (worst ? ` 가장 큰 막힘은 '${worst.name}'(${worst.orders}건 중 자동 ${worst.auto}건)이에요.` : '');
+    $('au-lead').textContent = `최근 ${d.days}일 주문 ${d.orders}건 중 ${d.done - d.touched}건 전 과정 자동` +
+      (worst ? ` · 가장 큰 막힘 ${worst.name}(${worst.auto}/${worst.orders})` : '');
     const m = $('au-meter'); m.querySelector('b').style.width = `${Math.min(100, p)}%`; m.querySelector('i').style.left = `${goal}%`;
     m.setAttribute('aria-valuenow', String(p)); m.setAttribute('aria-label', `사람 손 안 탄 주문 ${p}%, 목표 ${goal}%`);
-    $('au-goal-l').textContent = `목표 ${goal}% ▸`;
+    $('au-goal-l').textContent = `목표 ${goal}%`;
     const st = $('au-stats'); st.innerHTML = '';
     const ph = d.phases.find((x) => x.n === d.now_phase) || {};
     st.append(stat('최근 7일 주문', `${d.orders}`, Object.entries(d.mix).map(([k, v]) => `${k} ${v}`).join(' · ')),
       stat('사람 손 탄 주문', `${d.touched}`, d.pending ? `처리 방식 미정 ${d.pending}건 제외` : '', d.touched ? 'warn' : 'ok'),
       stat('주문 100건당 사람 카드', d.cards_per_100 == null ? '—' : `${d.cards_per_100}장`, `7일 카드 ${d.human_cards}장`, d.cards_per_100 > 2 ? 'warn' : 'ok'),
-      stat('단계 평균 자동화 수준', `${d.level_avg}%`, '14단계 수준(0~4)의 평균', ''),
+      stat('단계 평균 자동화 수준', `${d.level_avg}%`, '수준 0~4 평균', ''),
       stat('지금 로드맵', `${d.now_phase}단계`, `${ph.title || ''} · ${ph.done || 0}/${ph.total || 0}`, 'run'));
     const leg = $('au-leg'); leg.innerHTML = '';
     LV.forEach(([nm, c], i) => { const s = E('span'); const dot = E('i'); dot.style.background = c; s.append(dot, document.createTextNode(`${i} ${nm}`)); leg.append(s); });
@@ -128,9 +133,9 @@
       fl.append(b);
     }
     detail(d.stages.find((s) => s.id === pick));
-    const un = $('au-next'); un.innerHTML = ''; $('au-next-d').textContent = `${d.now_phase}단계 · ${ph.title || ''} — ${ph.goal || ''}`;
-    if (!d.next.length) empty(un, '이 단계 태스크를 다 끝냈어요');
-    for (const t of d.next) un.append(li(`${ST[t.state || 'todo'][0]} ${t.title}`, t.stage_name, ST[t.state || 'todo'][2], ST[t.state || 'todo'][1]));
+    const un = $('au-next'); un.innerHTML = ''; $('au-next-d').textContent = `${d.now_phase}단계 · ${ph.title || ''}`;
+    if (!d.next.length) empty(un, '이 단계 끝');
+    for (const t of d.next) { const l = li(noE(t.title), t.stage_name, ST[t.state || 'todo'][2], ST[t.state || 'todo'][1]); l.querySelector('.row-body > span').prepend(mark(t.state)); un.append(l); }
     const tr = $('au-trend'); tr.innerHTML = '';
     const g = E('div', 'goal', `목표 ${goal}%`); g.style.bottom = `${goal * 0.8 + 14}px`; tr.append(g);
     tr.setAttribute('aria-label', d.trend.map((t) => `${t.day.slice(5)} ${t.pct == null ? '주문 없음' : t.pct + '%'}`).join(', '));
@@ -145,18 +150,18 @@
       const c = E('div', 'au-ph' + (x.n === d.now_phase ? ' now' : ''));
       const pb = E('div', 'p'); const bb = E('b'); bb.style.width = `${x.total ? x.done / x.total * 100 : 0}%`; pb.append(bb);
       const ul = E('ul');
-      for (const t of x.tasks) { const l = E('li', t.state === 'done' ? 'done' : '', `${ST[t.state || 'todo'][0]} ${t.title}`); ul.append(l); }
+      for (const t of x.tasks) { const l = E('li', t.state === 'done' ? 'done' : ''); l.append(mark(t.state), document.createTextNode(noE(t.title))); ul.append(l); }
       c.append(E('h3', null, `${x.n}. ${x.title}`), E('div', 'w', `${x.when} · ${x.done}/${x.total}`), E('div', 'g', x.goal), pb, ul);
       ps.append(c);
     }
     const uc = $('au-cards'); uc.innerHTML = '';
     const cr = Object.entries(d.cards_by_role).sort((a, b) => b[1] - a[1]);
-    if (!cr.length) empty(uc, '최근 7일 사람 카드가 없어요');
+    if (!cr.length) empty(uc, '없음');
     for (const [r, n] of cr) uc.append(li(ROLE[r] || r || '기타', '', `${n}장`, n >= 10 ? 'warn' : ''));
     const ui = $('au-ideas'); ui.innerHTML = '';
-    if (!d.ideas.length) empty(ui, '아직 쌓인 여지가 없어요');
+    if (!d.ideas.length) empty(ui, '없음');
     const sn = Object.fromEntries(d.stages.map((s) => [s.id, s.name]));
-    for (const i of d.ideas.slice(0, 12)) ui.append(li(i.text, `${(i.at || '').slice(5, 16).replace('T', ' ')} · ${i.by || ''}`, sn[i.stage] || (i.stage ? i.stage : '공정'), ''));
+    for (const i of d.ideas.slice(0, 12)) ui.append(li(noE(i.text), `${(i.at || '').slice(5, 16).replace('T', ' ')} · ${i.by || ''}`, sn[i.stage] || (i.stage ? i.stage : '공정'), ''));
   }
 
   async function load() {

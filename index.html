@@ -41,6 +41,9 @@
   }
 }
 * { box-sizing: border-box; }
+/* 스크롤바는 어디서도 안 보이게(2026-10-25 사장님) — 스크롤은 그대로 됨 */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
   font: 15px/1.55 "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
@@ -49,6 +52,10 @@ a { color: var(--blue-ink); text-decoration: none; } a:hover { text-decoration: 
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 8px; }
 .ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ic { display: inline-block; width: 1em; height: 1em; vertical-align: -0.14em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--axis); vertical-align: 1px; flex: none; }
+.dot.late, .dot.bad { background: var(--st-crit); } .dot.soon { background: var(--st-serious); } .dot.warn { background: var(--st-warn); }
+.dot.stuck { background: var(--st-warn); } .dot.ok { background: var(--st-good); } .dot.run { background: var(--st-run); }
 
 /* ── 뼈대: 왼쪽 메뉴 · 위 막대 · 화면 ─────────────── */
 .sidebar { position: fixed; inset: 0 auto 0 0; width: var(--side-w); background: var(--side); border-right: 1px solid var(--line);
@@ -59,7 +66,7 @@ button { font: inherit; color: inherit; }
 .brand b { display: block; font-size: 16px; letter-spacing: -.02em; line-height: 1.2; }
 .brand small { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; }
 .sidebar .ask-btn { margin: 4px 14px 10px; }
-.nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px; scrollbar-width: thin; }
+.nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
 .nav-g { font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 14px 10px 4px; letter-spacing: .02em; }
 .nav-i { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 10px; height: 38px; border-radius: 10px;
   color: var(--sub); font-size: 14.5px; font-weight: 500; cursor: pointer; }
@@ -491,9 +498,6 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
 .chipbtn { border: 0; background: var(--fill); color: var(--sub); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 30px; }
 .chipbtn.on { background: var(--blue); color: #fff; }
 .dt-wrap { overflow: auto; border-radius: 12px; max-height: calc(100vh - 200px); min-height: 320px; box-shadow: inset 0 0 0 1px var(--line); }   /* 표 안에서 위아래·좌우로 넘김 — 가로 막대가 늘 화면 안에(10/23) */
-.dt-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
-.dt-wrap::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 6px; border: 3px solid var(--card); }
-.dt-wrap::-webkit-scrollbar-track { background: var(--fill2); }
 table.dt { font-size: 13px; min-width: 720px; }
 table.dt th { position: sticky; top: 0; z-index: 2; background: var(--card); white-space: nowrap; }
 table.dt td { white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
@@ -651,7 +655,7 @@ table.rep td.ed { background: #fff8db; padding: 3px 6px; }
   background: var(--fill); color: var(--muted); font-size: 10px; line-height: 18px; font-weight: 700; z-index: 1; }
 .ov-steps li::after { content: ''; position: absolute; top: 8px; left: -50%; width: 100%; height: 2px; background: var(--line); }
 .ov-steps li:first-child::after { display: none; }
-.ov-steps li.done { color: var(--ink2); } .ov-steps li.done::before { content: '✓'; background: var(--green); color: #fff; } .ov-steps li.done::after { background: var(--green); }
+.ov-steps li.done { color: var(--ink2); } .ov-steps li.done::before { content: ''; background: var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat; } .ov-steps li.done::after { background: var(--green); }
 .ov-steps li.now { color: var(--blue-ink); font-weight: 700; } .ov-steps li.now::before { background: var(--blue); color: #fff; }
 .ov-next { margin: 4px 0 0; font-size: 13px; color: var(--blue-ink); font-weight: 600; text-align: center; }
 .ov-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
@@ -888,10 +892,10 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 <body>
 <aside class="sidebar" id="side" aria-label="메뉴">
   <div class="brand"><span class="logo" aria-hidden="true">바</span><span><b>바른청년</b><small>운영 현황</small></span></div>
-  <button class="btn primary sm ask-btn" type="button" data-open-ask>＋ 에이전트에게 맡기기</button>
+  <button class="btn primary sm ask-btn" type="button" data-open-ask><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 에이전트에게 맡기기</button>
   <nav class="nav" id="nav"></nav>
   <div class="side-foot"><span class="upd" id="updated" role="status" aria-live="polite">불러오는 중…</span>
-    <button class="icon-btn" id="logout" type="button" aria-label="로그아웃" title="로그아웃(이 기기에서 잊기)" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button>
+    <button class="icon-btn" id="logout" type="button" aria-label="로그아웃" title="로그아웃" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button>
     <button class="icon-btn" id="reload" type="button" aria-label="지금 새로고침" title="지금 새로고침"><svg class="ico" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
 </aside>
 <div class="scrim" id="scrim"></div>
@@ -901,7 +905,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="전체 메뉴" aria-controls="side" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <div class="bar-t"><h1 id="page-title">한눈에</h1><p id="page-desc"></p></div>
     <button class="health" id="health" type="button" data-goto="home" aria-label="전체 상태"><span class="htxt">확인 중</span></button>
-    <button class="btn primary sm ask-btn" type="button" data-open-ask aria-label="에이전트에게 맡기기">＋ 맡기기</button>
+    <button class="btn primary sm ask-btn" type="button" data-open-ask aria-label="에이전트에게 맡기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 맡기기</button>
   </header>
 
   <main class="pages" id="pages">
@@ -909,7 +913,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-home" aria-label="한눈에">
       <div class="card status">
         <div class="alert" id="barund-alert" role="alert" hidden></div>
-        <h2 id="hero-title">불러오는 중이에요</h2>
+        <h2 id="hero-title">불러오는 중</h2>
         <p class="lead" id="hero-lead"></p>
         <div class="stats" id="stats"></div>
       </div>
@@ -917,12 +921,12 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
         <div class="stack">
           <div class="card" id="mine-sec">
             <div class="card-h"><h2>내 차례</h2><span class="badge" id="mine-n" hidden></span><button class="more-link" type="button" data-goto="todo">할 일 전체 ›</button>
-              <span class="desc">급한 것·버튼 한 번이면 끝나는 것부터. 여기서 바로 눌러도 디스코드와 똑같이 처리돼요.</span></div>
+              <span class="desc">급한 것부터 · 디스코드와 같이 처리</span></div>
             <ul class="mine" id="todo-preview"></ul>
           </div>
           <div class="card" id="office-sec">
             <div class="card-h"><h2>사무실</h2><span class="office-count" id="office-count"></span>
-              <span class="desc">직원에게 마우스를 올리면 지금 하는 일, 누르면 한 일·할 일 전체가 보여요.</span></div>
+              <span class="desc">누르면 한 일·할 일</span></div>
             <div id="office"></div>
             <div id="office-detail" hidden></div>
           </div>
@@ -944,11 +948,11 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
       <div class="card" id="todo">
         <div class="card-h"><h2>할 일 카드</h2>
           <span class="act"><button class="btn sm" data-act="review" type="button">끝난 것 다시 확인</button><button class="btn sm ghost" data-act="refresh" type="button">디스코드 카드 새로고침</button></span>
-          <span class="desc">디스코드 #할-일과 같은 카드예요. 제목을 누르면 내용이 펼쳐져요.</span></div>
+          <span class="desc">#할-일과 같은 카드</span></div>
         <div id="todo-list"></div>
       </div>
       <div class="card" id="board-sec">
-        <div class="card-h"><h2>일 보드</h2><span class="desc">할 일·요청·승인·개선·감지·회차를 상태별로 한 표에서 봐요.</span></div>
+        <div class="card-h"><h2>일 보드</h2><span class="desc">모든 일을 상태별로</span></div>
         <div class="board" id="board"></div>
       </div>
     </section>
@@ -963,12 +967,12 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 
     <section class="page" id="p-work" aria-label="회차·허브" hidden>
       <div class="card" id="jobs-sec">
-        <div class="card-h"><h2>자동작업</h2><span class="desc">회차 대기열(barund)이 차례대로 열어요. ▶ 누르면 대기열에 들어가요.</span></div>
+        <div class="card-h"><h2>자동작업</h2><span class="desc">대기열(barund)이 차례대로 실행</span></div>
         <div id="barund-info"></div>
         <div id="jobs"></div>
       </div>
       <div class="card" id="hub-sec">
-        <div class="card-h"><h2>이벤트 허브</h2><span class="desc">정해진 시각 대신 몇 분마다 살펴보고, 바뀐 게 있으면 바로 처리해요. 최근 24시간 감지한 것과 한 일이에요.</span></div>
+        <div class="card-h"><h2>이벤트 허브</h2><span class="desc">바뀌면 바로 처리 · 최근 24시간</span></div>
         <div class="hub-health" id="hub-health"></div>
         <div class="hub-counts" id="hub-counts"></div>
         <ul class="flow" id="hub-flow"></ul>
@@ -981,7 +985,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 
     <section class="page" id="p-activity" aria-label="활동 기록" hidden>
       <div class="card">
-        <div class="card-h"><h2>에이전트 활동</h2><span class="desc">줄마다 회차(막대)와 그때 한 일(점). 막대나 점을 누르면 아래에 자세히 나와요.</span></div>
+        <div class="card-h"><h2>에이전트 활동</h2><span class="desc">막대는 회차, 점은 한 일</span></div>
         <div class="act-head" id="act-controls"></div>
         <div id="act-chart"><div id="act-tip" hidden></div></div>
         <div id="act-table" hidden></div>
@@ -992,10 +996,10 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-records" aria-label="일지·알림" hidden>
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>오늘 작업 일지</h2></div><ul class="log" id="worklog"></ul></div>
-        <div class="card"><div class="card-h"><h2>현재 상태</h2><span class="desc">STATUS.md — 상황 메모</span></div><div class="md" id="status"></div></div>
+        <div class="card"><div class="card-h"><h2>현재 상태</h2><span class="desc">STATUS.md</span></div><div class="md" id="status"></div></div>
       </div>
       <div class="card"><div class="card-h"><h2>알림 기록</h2></div><ul class="log" id="events"></ul></div>
-      <div class="card" id="invoices"><div class="card-h"><h2>인보이스</h2><span class="desc">메일에서 받은 인보이스 PDF — 눌러서 보기</span></div><ul class="log" id="inv"></ul></div>
+      <div class="card" id="invoices"><div class="card-h"><h2>인보이스</h2><span class="desc">메일로 받은 PDF</span></div><ul class="log" id="inv"></ul></div>
       <div class="grid2">
         <div class="card" id="git-sec"><div class="card-h"><h2>git 기록</h2></div><div id="git"></div></div>
         <div class="card" id="backup-sec"><div class="card-h"><h2>백업</h2></div><div id="backup"></div></div>
@@ -1009,10 +1013,10 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 <dialog id="ask-dlg" aria-labelledby="ask-h">
   <form class="ask-box" method="dialog" id="ask-form">
     <h3 id="ask-h">에이전트에게 맡기기</h3>
-    <p>말로 쓰면 지휘 에이전트가 맞는 분야 에이전트에게 나눠 맡겨요. 바꾸는 일은 승인 버튼을 거쳐요.</p>
+    <p>분야별 에이전트가 나눠 맡아요. 바꾸는 일은 승인을 거쳐요.</p>
     <textarea id="task-text" aria-label="맡길 일" placeholder="예: 몰테일 호주 건 신청 상태 알려줘"></textarea>
     <div class="ex" id="ask-ex"></div>
-    <div class="row-b"><span class="muted">⌘ Enter로 보내기</span><button class="btn ghost" value="cancel" type="submit">닫기</button><button class="btn primary" id="task-send" type="button">맡기기</button></div>
+    <div class="row-b"><span class="muted">⌘ Enter 보내기</span><button class="btn ghost" value="cancel" type="submit">닫기</button><button class="btn primary" id="task-send" type="button">맡기기</button></div>
   </form>
 </dialog>
 
@@ -1024,7 +1028,7 @@ let TOKEN = ''; try { TOKEN = localStorage.getItem('barun.token') || ''; } catch
 async function apiFetch(path, opts = {}) {
   const h = Object.assign({}, opts.headers || {}); if (TOKEN) h.Authorization = 'Bearer ' + TOKEN;
   // Tailscale이 켜진 기기에서는 이 주소가 사설 IP로 풀려 크롬이 '로컬 네트워크 접근' 허용을 물어본다 — 오래 걸리면 안내
-  const slow = API ? setTimeout(() => toast('주소창 쪽에 "로컬 네트워크의 기기에 접근" 허용 요청이 떠 있으면 [허용]을 눌러 주세요(이 기기에서 한 번만).'), 6000) : 0;
+  const slow = API ? setTimeout(() => toast('주소창의 "로컬 네트워크 접근" 요청에서 [허용]을 눌러 주세요.'), 6000) : 0;
   let r;
   try { r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h })); } finally { clearTimeout(slow); }
   if (r.status === 401) { showLogin(); throw new Error('로그인 필요'); }
@@ -1035,7 +1039,7 @@ function showLogin() {
   if (document.getElementById('login')) return;
   // 2026-10-25: 아이디·암호로 들어가기(맞으면 서버가 이 기기용 토큰을 줌) — 예전 접근 토큰도 아래 링크로 그대로
   const w = document.createElement('div'); w.id = 'login'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'login-h');
-  w.innerHTML = '<form class="box" id="login-f" autocomplete="on"><h3 id="login-h">바른청년 현황판</h3><p class="muted">아이디와 암호를 넣어 주세요. 이 기기는 30일 동안 기억해요.</p>'
+  w.innerHTML = '<form class="box" id="login-f" autocomplete="on"><h3 id="login-h">바른청년 현황판</h3><p class="muted">이 기기는 30일 동안 로그인 유지</p>'
     + '<input id="lg-id" name="username" autocomplete="username" aria-label="아이디" placeholder="아이디" autocapitalize="off" spellcheck="false">'
     + '<input id="lg-pw" name="password" type="password" autocomplete="current-password" aria-label="암호" placeholder="암호">'
     + '<input id="tok" type="password" autocomplete="off" aria-label="접근 토큰" placeholder="brn_…" hidden>'
@@ -1053,27 +1057,27 @@ function showLogin() {
     e.preventDefault();
     if (useTok) { const t = $l('tok').value.trim(); if (t) done(t); return; }
     const id = $l('lg-id').value.trim(), pw = $l('lg-pw').value;
-    if (!id || !pw) { $l('lg-err').textContent = '아이디와 암호를 둘 다 넣어 주세요.'; return; }
+    if (!id || !pw) { $l('lg-err').textContent = '아이디와 암호를 넣어 주세요.'; return; }
     $l('tok-ok').disabled = true; $l('lg-err').textContent = '';
     try {
       const r = await fetch(API + '/api/login', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pw }) });
       const j = await r.json().catch(() => ({}));
       if (j.ok && j.token) done(j.token); else { $l('lg-err').textContent = j.msg || '들어가지 못했어요.'; $l('lg-pw').select(); }
-    } catch (err) { $l('lg-err').textContent = '서버에 닿지 않아요 — 잠시 뒤 다시 해 주세요.'; }
+    } catch (err) { $l('lg-err').textContent = '서버에 연결되지 않아요. 잠시 뒤 다시 해 주세요.'; }
     finally { $l('tok-ok').disabled = false; }
   });
   $l('lg-id').focus();
 }
 function logout() { try { localStorage.removeItem('barun.token'); } catch (e) { /* 무시 */ } TOKEN = ''; location.reload(); }
-function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); } t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000); }
+function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); } t.textContent = noEmoji(msg); t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000); }
 async function act(body, btn) {
-  if (body.action === 'reject' && !confirm('거절할까요? 거절하면 하지 않아요.')) return;
+  if (body.action === 'reject' && !confirm('거절할까요?')) return;
   if (btn) btn.disabled = true;
   try {
     const r = await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const j = await r.json(); toast((j.ok ? '' : '⚠ ') + j.msg); tick();
+    const j = await r.json(); toast((j.ok ? '' : '실패: ') + j.msg); tick();
     return j;
-  } catch (e) { toast('⚠ ' + e.message); } finally { if (btn) btn.disabled = false; }
+  } catch (e) { toast('실패: ' + e.message); } finally { if (btn) btn.disabled = false; }
 }
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act]'); if (b) { act(Object.assign({ action: b.dataset.act }, b.dataset.key ? { key: b.dataset.key } : {}, b.dataset.job ? { job: b.dataset.job } : {}, b.dataset.idx != null ? { idx: +b.dataset.idx } : {}), b); return; }
@@ -1081,9 +1085,11 @@ document.addEventListener('click', (ev) => {
   if (ev.target.closest('[data-open-ask]')) openAsk();
 });
 const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+// 글은 이모지를 걷어 넣는다(서버·디스코드 카드 제목에 붙어 오는 것 — 2026-10-25 사장님 "이모지 최소화"). 줄바꿈은 그대로.
+const deE = (t) => String(t).replace(/(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{24C2}][\u{FE0F}\u{200D}]?)+[ \u00A0]?/gu, '');
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = deE(text); return e; };
 const hm = (s) => s ? s.replace('T', ' ').slice(5, 16) : '—';
-const clean = (t) => String(t || '').replace(/<@[!&]?\d+>/g, '@');
+const clean = (t) => deE(String(t || '').replace(/<@[!&]?\d+>/g, '@')).trim();
 const KIND_KO = { launchd: '프로그램', agent: '에이전트', 'claude-desktop': '데스크톱 앱', 'agent-pending': '이전 대기', retired: '그만 씀', external: '바른청년 밖' };
 function chip(text, cls) { return el('span', 'badge ' + (cls || ''), text); }
 const relDay = (iso, now) => !iso ? '' : (iso.slice(0, 10) === (now || '').slice(0, 10) ? iso.slice(11, 16) : iso.slice(5, 10).replace('-', '/') + ' ' + iso.slice(11, 16));
@@ -1108,13 +1114,53 @@ const ICON = {
   records: P('M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h10M9 8h5'),
   more: P('M5 12h.01M12 12h.01M19 12h.01'),
 };
+
+// ── 공용 아이콘(2026-10-25 사장님: "이모지 최소화, 다 SVG 아이콘으로") ─────────────
+// 화면 글자 사이에 넣는 작은 그림: ico('check') → <svg class="ic">. 모듈(flow.js·data.js…)도 이것만 쓴다 — 이모지 새로 넣지 않기.
+// 상태 점: dot('late'|'soon'|'stuck'|'ok'|'run') → 색 점(빨강·주황·노랑·초록 이모지 대신). 서버·디스코드에서 온 글의 이모지는 noEmoji()로 걷어 낸다.
+const IC = {
+  check: 'M20 6 9 17l-5-5', x: 'M18 6 6 18M6 6l12 12', plus: 'M12 5v14M5 12h14', minus: 'M5 12h14',
+  alert: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
+  clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', hourglass: 'M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4',
+  user: 'M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z', users: 'M16 21a6 6 0 0 0-12 0M10 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21a6 6 0 0 0-4-5.6M16 3.1a4 4 0 0 1 0 7.8',
+  bot: 'M12 8V4H8M4 8h16v12H4zM2 14h2M20 14h2M9 13v2M15 13v2', cog: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+  radio: 'M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
+  package: 'M16.5 9.4 7.5 4.2M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7 12 12l8.7-5M12 22V12',
+  truck: 'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.6a1 1 0 0 0-.2-.6l-3.5-4.4A1 1 0 0 0 17.5 8H14M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  cart: 'M8 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM19 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM2 2h3l2.7 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6',
+  mail: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',
+  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3', filter: 'M22 3H2l8 9.5V19l4 2v-8.5z',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  pause: 'M6 4h4v16H6zM14 4h4v16h-4z', play: 'M6 3l14 9-14 9z', stop: 'M6 6h12v12H6z',
+  refresh: 'M21 12a9 9 0 0 1-15 6.7L3 16M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M3 21v-5h5',
+  link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+  external: 'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
+  key: 'M21 2l-2 2M15.5 7.5l3 3L22 7l-3-3M15.5 7.5 11.4 11.6M11.4 11.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8z', lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
+  money: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6', card: 'M2 5h20v14H2zM2 10h20',
+  chart: 'M4 20h16M7 16v-5M12 16V7M17 16v-8', trend: 'M22 7 13.5 15.5 8.5 10.5 2 17M16 7h6v6',
+  calendar: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', pin: 'M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2z',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z', trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6',
+  eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  doc: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5', box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+  globe: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20', store: 'M3 9l1.5-5h15L21 9M3 9h18v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0zM5 13v8h14v-8',
+  zap: 'M13 2 4 14h7l-1 8 9-12h-7z', sleep: 'M12 22a10 10 0 1 1 9.4-13.4A7 7 0 0 0 12 22zM15 3h4l-4 4h4', hand: 'M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8a8 8 0 0 0 16 0v-2a2 2 0 0 0-4 0',
+  arrow: 'M5 12h14M13 6l6 6-6 6', back: 'M19 12H5M11 18l-6-6 6-6', up: 'M12 19V5M6 11l6-6 6 6', down: 'M12 5v14M18 13l-6 6-6-6',
+  chevron: 'M9 18l6-6-6-6', history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2', db: 'M12 8c5 0 9-1.3 9-3s-4-3-9-3-9 1.3-9 3 4 3 9 3zM3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3',
+};
+const ico = (name, cls) => IC[name] ? `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[name]}"/></svg>` : '';
+const dot = (tone) => `<span class="dot ${tone || ''}" aria-hidden="true"></span>`;
+const EMOJI_RE = /(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{24C2}\u{3030}\u{303D}\u{3297}\u{3299}][\u{FE0F}\u{200D}]?)+\s?/gu;
+const noEmoji = (t) => String(t ?? '').replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+Object.assign(window, { IC, ico, dot, noEmoji });
 // [이름, 글, 그림, 숫자 표시, 설명]
 const NAV = [
-  [null, [['home', '한눈에', '지금 상황과 내 차례를 한 화면에']]],
-  ['일', [['todo', '할 일', '디스코드 #할-일 카드 — 승인·고르기·처리', 'todo'], ['tasks', '맡긴 일', '#작업판·카드 답글·DM으로 맡긴 일의 진행', 'tasks'], ['asks', '보낸 문의', '배대지·구매처·쿠팡에 넣은 1:1 문의', 'asks']]],
-  ['운영', [['flow', '업무 흐름', '소싱부터 배송까지 14단계 — 단계마다 누가 무엇을 하고 무엇이 사람을 기다리는지'], ['data', '주문 데이터', '주문 장부·DB를 바로 고치고 조치해요'], ['reports', '보고서', '전체현황·매출분석·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행 — 15초마다 새로 읽어요']]],
-  ['자동화', [['auto', '자동화율', '사람 손 없이 지나는 비율과 로드맵'], ['work', '회차·허브', '자동작업 회차와 이벤트 허브'], ['savings', '절감 장부', '효율화로 아낀 시간·AI 비용'], ['activity', '활동 기록', '회차와 한 일을 시간 순으로']]],
-  ['기록', [['records', '일지·알림', '작업 일지·알림·인보이스·git·백업']]],
+  [null, [['home', '한눈에', '지금 상황과 내 차례']]],
+  ['일', [['todo', '할 일', '#할-일 카드', 'todo'], ['tasks', '맡긴 일', '에이전트에게 맡긴 일', 'tasks'], ['asks', '보낸 문의', '배대지·구매처·쿠팡 1:1 문의', 'asks']]],
+  ['운영', [['flow', '업무 흐름', '단계별 진행과 담당'], ['data', '주문 데이터', '주문 장부 보기·고치기'], ['reports', '보고서', '전체현황·매출·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행']]],
+  ['자동화', [['auto', '자동화율', '자동 처리 비율과 로드맵'], ['work', '회차·허브', '자동작업과 이벤트 허브'], ['savings', '절감 장부', '아낀 시간과 AI 비용'], ['activity', '활동 기록', '시간순 회차와 작업']]],
+  ['기록', [['records', '일지·알림', '일지·알림·인보이스·git·백업']]],
 ];
 const PAGES = Object.fromEntries(NAV.flatMap(([, items]) => items.map((x) => [x[0], { label: x[1], desc: x[2], badge: x[3] }])));
 const TABS = Object.keys(PAGES);
@@ -1194,7 +1240,7 @@ function mdRender(src, root) {
     for (const p of parts) {
       if (/^\*\*.+\*\*$/.test(p)) parent.appendChild(el('strong', null, p.slice(2, -2)));
       else if (/^`.+`$/.test(p)) parent.appendChild(el('code', null, p.slice(1, -1)));
-      else if (p) parent.appendChild(document.createTextNode(p));
+      else if (p) parent.appendChild(document.createTextNode(deE(p)));
     }
   };
   for (const line of src.split('\n')) {
@@ -1227,7 +1273,7 @@ function renderSavings(sv) {
   const perH = (hu.all || 0) / elapsed, perA = (a.secs || 0) / elapsed, perC = (a.cost || 0) / elapsed;
   // ① 큰 숫자
   const hero = el('section', 'sv-hero'); hero.setAttribute('aria-label', '누적 절감');
-  hero.append(el('div', 'sv-kick', `${since}부터 ${Math.ceil(elapsed)}일 동안 자동화가 대신한 시간`));
+  hero.append(el('div', 'sv-kick', `${since}부터 ${Math.ceil(elapsed)}일 · 자동화가 대신한 시간`));
   const big = el('div', 'sv-big');
   const num = (secs, cls) => {
     const d = el('div', 'num'); d.dataset.secs = String(Math.round(secs || 0)); d.dataset.cls = cls;
@@ -1235,14 +1281,14 @@ function renderSavings(sv) {
     paint(secs || 0); d._paint = paint; return d;
   };
   const H = el('div', 'sv-n h'), A = el('div', 'sv-n a');
-  const lh = el('div', 'lab'); lh.append(el('b'), document.createTextNode('👤 사람 시간 — 사장님 손 대신'));
-  const la = el('div', 'lab'); la.append(el('b'), document.createTextNode('🤖 AI 시간 — 에이전트 대신'));
-  const eh = el('div', 'eq'); eh.innerHTML = `근무일로 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b>의 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> + 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>를 손 안 대고`;
-  const ea = el('div', 'eq'); ea.innerHTML = `AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b>(약 ${krw(a.cost)}) · 에이전트를 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b> 안 띄움`;
+  const lh = el('div', 'lab'); lh.innerHTML = `<b></b>${ico('user')} 사람 시간`;
+  const la = el('div', 'lab'); la.innerHTML = `<b></b>${ico('bot')} AI 시간`;
+  const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>`;
+  const ea = el('div', 'eq'); ea.innerHTML = `AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
   H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
   big.append(H, el('i'), A); hero.append(big);
   const pace = el('div', 'sv-pace');
-  pace.innerHTML = `<span>하루 평균 사람 ${hrs(perH).toFixed(1)}시간 · AI ${hrs(perA).toFixed(1)}시간</span><span>→ 이 속도면 한 달에 <b>사람 ${Math.round(hrs(perH * 30))}시간(근무일 ${workdays(perH * 30)}일)</b> · <b>AI ${Math.round(hrs(perA * 30))}시간 · ${krw(perC * 30)}</b></span><span class="tag">예상</span>`;
+  pace.innerHTML = `<span>하루 평균 사람 ${hrs(perH).toFixed(1)}시간 · AI ${hrs(perA).toFixed(1)}시간</span><span>한 달 <b>사람 ${Math.round(hrs(perH * 30))}시간 · 근무일 ${workdays(perH * 30)}일</b> · <b>AI ${Math.round(hrs(perA * 30))}시간 · ${krw(perC * 30)}</b></span><span class="tag">예상</span>`;
   hero.append(pace);
   const mini = el('div', 'sv-mini');
   for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], ['최근 7일', hu.week, w.secs, w.cost]]) {
@@ -1259,8 +1305,8 @@ function renderSavings(sv) {
   const days = (sv.daily || []).slice(-14);
   if (days.length) {
     const c = el('section', 'card'); c.append(el('div', 'card-h'));
-    c.firstChild.append(el('h2', null, '날마다 아낀 시간'), el('span', 'desc', '막대를 누르거나 마우스를 올리면 그날 숫자가 보여요'));
-    const lg = el('div', 'sv-legend'); for (const [cls, nm] of [['--sv-h', '👤 사람 시간'], ['--sv-a', '🤖 AI 시간']]) { const s = el('span'); const i = el('i'); i.style.background = `var(${cls})`; s.append(i, document.createTextNode(nm)); lg.append(s); }
+    c.firstChild.append(el('h2', null, '날마다 아낀 시간'), el('span', 'desc', '막대를 누르면 그날 숫자'));
+    const lg = el('div', 'sv-legend'); for (const [cls, nm] of [['--sv-h', '사람 시간'], ['--sv-a', 'AI 시간']]) { const s = el('span'); const i = el('i'); i.style.background = `var(${cls})`; s.append(i, document.createTextNode(nm)); lg.append(s); }
     c.append(lg);
     const max = Math.max(1, ...days.map((d) => Math.max(d.human, d.ai))) / 3600;
     const top = max <= 4 ? Math.ceil(max) : max <= 12 ? Math.ceil(max / 2) * 2 : Math.ceil(max / 5) * 5;
@@ -1295,32 +1341,32 @@ function renderSavings(sv) {
         const s = el('div', 's sv-ed'); const inp = el('input'); inp.type = 'number'; inp.min = '0'; inp.max = '600'; inp.step = '0.5'; inp.value = String(x.min);
         inp.setAttribute('aria-label', `${x.name} 1${x.unit}당 분`);
         inp.addEventListener('change', async () => { inp.disabled = true; await act({ action: 'human_min', key: x.key, min: +inp.value }); inp.disabled = false; });
-        s.append(document.createTextNode(`${x.what} — ${x.n.toLocaleString('ko-KR')}${x.unit} × `), inp, document.createTextNode(`분${x.min !== x.dflt ? ` (처음 ${x.dflt}분)` : ''}`)); li.append(s);
+        s.append(document.createTextNode(`${x.what} · ${x.n.toLocaleString('ko-KR')}${x.unit} × `), inp, document.createTextNode(`분${x.min !== x.dflt ? ` (처음 ${x.dflt}분)` : ''}`)); li.append(s);
       } else li.append(el('div', 's', x.sub));
       ul.append(li);
     }
-    if (!items.length) ul.append(el('li', 'muted small', '아직 쌓인 것이 없어요'));
+    if (!items.length) ul.append(el('li', 'muted small', '아직 없음'));
     c.append(ul); if (note) c.append(el('p', 'sv-note', note)); return c;
   };
   const hItems = (hu.stages || []).map((x) => ({ name: x.unit === '회' ? `${x.name} 회차` : x.name, secs: x.secs, key: x.key, what: x.what, n: x.n, unit: x.unit, min: x.min, dflt: x.default,
-    sub: `${x.what} — ${x.n.toLocaleString('ko-KR')}${x.unit} × ${x.min}분` }));
-  if (hu.changes > 60) hItems.push({ name: '사장님 손일 줄인 개선', secs: hu.changes, sub: '매입 대기열·공홈 주문 한 번에 채우기·도착점검 등(개선마다 하루분 × 지난 날수)' });
+    sub: `${x.what} · ${x.n.toLocaleString('ko-KR')}${x.unit} × ${x.min}분` }));
+  if (hu.changes > 60) hItems.push({ name: '손일 줄인 개선', secs: hu.changes, sub: '개선별 하루분 × 지난 날수' });
   hItems.sort((p, q) => q.secs - p.secs);
   const L = sv.labels || {};
   const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · AI 비용 $${b.cost.toFixed(2)}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
   two.append(
-    rowsCard('👤 사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '주문 단계는 사람 손 없이 지나간 주문만 세요(자동화율과 같은 판정, 손 탄 주문은 빼요). 정기 일은 에이전트·스크립트가 끝낸 회차예요(①·②는 주문 단계로 세서 빼요). 분은 손으로 할 때 기준 — [기준 고치기]로 실제에 맞게 바꾸면 지난 날짜까지 다시 계산해요.',
-      (() => { const b = el('button', 'btn xs weak', svEdit ? '다 고쳤어요' : '기준 고치기'); b.type = 'button'; b.onclick = () => { svEdit = !svEdit; renderSavings(sv); }; return b; })()),
-    rowsCard('🤖 AI·기계 시간', `누적 ${durK(a.secs)} · $${(a.cost || 0).toFixed(2)}`, aItems, '--sv-a', '횟수는 실제로 일어난 것, 1번에 아끼는 양은 측정한 평균이에요. 스크립트 회차는 그 업무 에이전트 회차 평균과 비교해요.'));
+    rowsCard('사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '손 안 탄 주문 단계와 끝낸 정기 회차(①② 제외) × 손으로 할 때 분. 기준을 바꾸면 지난 날도 다시 계산.',
+      (() => { const b = el('button', 'btn xs weak', svEdit ? '완료' : '기준 고치기'); b.type = 'button'; b.onclick = () => { svEdit = !svEdit; renderSavings(sv); }; return b; })()),
+    rowsCard('AI·기계가 대신한 일', `누적 ${durK(a.secs)} · $${(a.cost || 0).toFixed(2)}`, aItems, '--sv-a', '횟수는 실측, 1번 절약량은 측정 평균.'));
   box.append(two);
   // ④ 바뀐 것
   const ch = sv.changes || [];
   if (ch.length) {
-    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, `바뀐 것 ${ch.length}건`), el('span', 'desc', '디스코드 #효율화에도 하나씩 올라가요')); c.append(h);
+    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, `바뀐 것 ${ch.length}건`), el('span', 'desc', '#효율화와 같음')); c.append(h);
     const ul = el('ul', 'log');
     for (const x of ch) {
       const li = el('li'), top = el('div');
-      top.append(el('span', 'sv-side ' + (x.side === 'human' ? 'h' : 'a'), x.side === 'human' ? '👤 사람' : '🤖 AI'), document.createTextNode(x.what));
+      const sd = el('span', 'sv-side ' + (x.side === 'human' ? 'h' : 'a')); sd.innerHTML = x.side === 'human' ? `${ico('user')} 사람` : `${ico('bot')} AI`; top.append(sd, document.createTextNode(deE(x.what)));
       const per = [x.day_secs ? `하루 ${durK(x.day_secs)}` : '', x.day_cost ? `$${x.day_cost.toFixed(2)}` : ''].filter(Boolean).join(' · ');
       li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + (x.by ? ' · ' + x.by : '') + (per ? ' · ' + per : '')), top, x.detail ? el('div', 'muted small', x.detail) : '');
       ul.append(li);
@@ -1342,12 +1388,12 @@ document.addEventListener('barun:tasks', (e) => {
   if (c.queued) n.append(chip(`차례 ${c.queued}`));
   window.barunBadge('tasks', (c.wait || 0));
   if (!open.length) {
-    const li = el('li'); li.append(el('span', 'tt muted small', '지금 맡긴 일이 없어요.')); const b = el('button', 'btn xs weak', '＋ 맡기기'); b.type = 'button'; b.dataset.openAsk = ''; li.append(b); ul.append(li);
+    const li = el('li'); li.append(el('span', 'tt muted small', '맡긴 일 없음')); const b = el('button', 'btn xs weak'); b.innerHTML = `${ico('plus')} 맡기기`; b.type = 'button'; b.dataset.openAsk = ''; li.append(b); ul.append(li);
   }
   for (const t of open.slice(0, 6)) {
     const [cls, lab] = TST[t.state] || ['', t.state];
     const li = el('li'); li.append(el('span', 'dot ' + cls));
-    const tt = el('span', 'tt'); tt.append(el('b', null, clean(t.title) || '(제목 없음)'), el('span', null, lab + ' · ' + clean(t.state === 'run' ? (t.doing || (t.steps || []).slice(-1)[0] || '막 시작했어요') : (t.summary || t.by || ''))));
+    const tt = el('span', 'tt'); tt.append(el('b', null, clean(t.title) || '(제목 없음)'), el('span', null, lab + ' · ' + clean(t.state === 'run' ? (t.doing || (t.steps || []).slice(-1)[0] || '시작') : (t.summary || t.by || ''))));
     li.append(tt, el('span', 'tm', t.state === 'run' ? `${dur(t.secs)}째` : dur(t.secs)));
     li.style.cursor = 'pointer'; li.dataset.goto = 'tasks'; ul.append(li);
   }
@@ -1384,29 +1430,29 @@ function render(s) {
   // 위 막대 전체 상태 + 첫 카드 결론 한 문장
   const ht = $('hero-title'); ht.textContent = '';
   let lvl = 'ok', htxt = '정상 운영 중';
-  if (us.blocked) { ht.append('Claude 사용량 한도에 ', el('em', 'bad', '걸렸어요'), ` — ${us.until}에 풀려요`); lvl = 'bad'; htxt = '사용량 한도'; }
-  else if (bd && bd.alive === false) { ht.append('회차 대기열이 ', el('em', 'bad', '멈췄어요')); lvl = 'bad'; htxt = '대기열 멈춤'; }
-  else if (fails) { ht.append('실패한 회차가 ', el('em', 'bad', `${fails}건`), ' 있어요'); lvl = 'bad'; htxt = `실패 ${fails}건`; }
-  else if (urgent) { ht.append('급한 일이 ', el('em', 'bad', `${urgent}건`), ' 있어요'); lvl = 'warn'; htxt = `급한 일 ${urgent}건`; }
-  else if (issues.length) { ht.append('사장님 확인이 필요한 일이 ', el('em', null, `${issues.length}건`), ' 있어요'); }
-  else ht.textContent = '모두 잘 돌아가고 있어요';
+  if (us.blocked) { ht.append('Claude 사용량 ', el('em', 'bad', '한도'), ` · ${us.until} 해제`); lvl = 'bad'; htxt = '사용량 한도'; }
+  else if (bd && bd.alive === false) { ht.append('회차 대기열 ', el('em', 'bad', '멈춤')); lvl = 'bad'; htxt = '대기열 멈춤'; }
+  else if (fails) { ht.append('실패한 회차 ', el('em', 'bad', `${fails}건`)); lvl = 'bad'; htxt = `실패 ${fails}건`; }
+  else if (urgent) { ht.append('급한 일 ', el('em', 'bad', `${urgent}건`)); lvl = 'warn'; htxt = `급한 일 ${urgent}건`; }
+  else if (issues.length) { ht.append('확인할 일 ', el('em', null, `${issues.length}건`)); }
+  else ht.textContent = '모두 정상';
   if (lvl === 'ok' && (stale.length || hubBad)) { lvl = 'warn'; htxt = stale.length ? '멈춤 의심' : '허브 확인 지연'; }
   const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt; hp.setAttribute('aria-label', '전체 상태: ' + htxt);
-  $('hero-lead').textContent = `지금 ${busy}명이 일하고 있어요` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(' — ')[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
+  $('hero-lead').textContent = `${busy}명 일하는 중` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
-  if (bd && bd.alive === false) { al.hidden = false; al.textContent = `⛔ 회차 대기열(barund)이 응답하지 않아요${bd.at ? ` — 마지막 신호 ${hm(bd.at)}` : ''}. 정기·이벤트 회차가 열리지 않아요.`; }
-  else if (us.blocked) { al.hidden = false; al.textContent = `⛔ Claude 사용량 한도 — ${us.until}에 풀려요. 무인 회차는 Codex로 대신 돌고, #작업판 일·대화 세션은 그때까지 멈춰요.`; }
+  if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열(barund) 응답 없음${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
+  else if (us.blocked) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`Claude 사용량 한도 · ${us.until} 해제 · 무인 회차는 Codex로, 작업판·대화는 멈춤`); }
   else al.hidden = true;
   renderSavings(sv);
   const ST = [
-    ['할 일', issues.length, '건', urgent ? `긴급 ${urgent}건` : '디스코드 #할-일', urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
-    ['승인 대기', approvals, '건', taskWait ? `작업판 ${taskWait}건 포함` : '버튼으로 승인', approvals ? 'warn' : 'ok', 'todo'],
+    ['할 일', issues.length, '건', urgent ? `긴급 ${urgent}건` : '#할-일', urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
+    ['승인 대기', approvals, '건', taskWait ? `작업판 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
     ['최근 실패', fails, '건', fails ? [...agentFails.map(() => '회차'), ...lcFails.map((j) => j.id)].slice(0, 3).join(', ') : '마지막 결과 기준', fails ? 'bad' : 'ok', 'work'],
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
-    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간 · 사람' : '', svA.secs || svA.cost ? `AI ${Math.round(svA.secs / 360) / 10}시간 · $${(svA.cost || 0).toFixed(2)}` : '효율화가 쌓이면 보여요', svH || svA.secs ? 'ok' : '', 'savings'],
+    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간 · 사람' : '', svA.secs || svA.cost ? `AI ${Math.round(svA.secs / 360) / 10}시간 · $${(svA.cost || 0).toFixed(2)}` : '-', svH || svA.secs ? 'ok' : '', 'savings'],
   ];
   const sg = $('stats'); sg.textContent = '';
   for (const [k, v, u, d, cls, go] of ST) {
@@ -1424,7 +1470,7 @@ function render(s) {
   const SYS = [
     ['회차 대기열', bd ? (bd.alive === false ? 'bad' : '') : 'idle', bd ? (bd.alive === false ? `멈춤 · ${hm(bd.at)}` : `실행 중 · 맡은 업무 ${(bd.managed || []).length}개`) : '정보 없음', 'work:jobs-sec'],
     ['이벤트 허브', !H.sources ? 'idle' : !H.alive ? 'bad' : hubBad ? 'warn' : '', !H.sources ? '정보 없음' : !H.alive ? '멈춤' : hubBad ? `원천 ${hubBad}곳 확인 지연` : `원천 ${Object.keys(H.sources).length}곳 정상`, 'work:hub-sec'],
-    ['다음 회차', nextJob ? '' : 'idle', nextJob ? `${nextJob.next} ${(nextJob.desc || nextJob.id).split(' — ')[0]}` : '오늘 남은 회차 없음', 'work:jobs-sec'],
+    ['다음 회차', nextJob ? '' : 'idle', nextJob ? `${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '오늘 남은 회차 없음', 'work:jobs-sec'],
     ['진행 신호', stale.length ? 'warn' : '', stale.length ? `멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : `${hbs.filter(([, h]) => h.state === 'running').length}개 진행 중`, 'activity'],
     ['AI 사용량(7일)', us.blocked ? 'bad' : (p7 ?? 0) >= 85 ? 'warn' : '', us.blocked ? `한도 · ${us.until}에 풀림` : `${H5(p7)}%${uw.seven_day && uw.seven_day.resets ? ` · ${uw.seven_day.resets} 채워짐` : ''}`, 'work'],
     ['최근 백업', s.backup.latest ? '' : 'bad', s.backup.latest ? `${s.backup.latest.slice(5).replace('-', '/')} · ${s.backup.count}일치 보관` : '없음', 'records:backup-sec'],
@@ -1442,7 +1488,7 @@ function render(s) {
   const sorted = [...issues].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3) || (oneTap(b) ? 1 : 0) - (oneTap(a) ? 1 : 0));
   const pv = $('todo-preview'); pv.textContent = '';
   const mn = $('mine-n'); mn.hidden = !issues.length; mn.textContent = `${issues.length}건`; mn.className = 'badge ' + (urgent ? 'bad' : 'warn');
-  if (!issues.length) pv.append(el('li', 'empty', '✅ 지금 사장님 차례인 일이 없어요'));
+  if (!issues.length) pv.append(el('li', 'empty', '내 차례 없음'));
   sorted.slice(0, 6).forEach((i) => {
     const li = el('li'); const [sl, sc] = SV[i.severity] || ['', ''];
     li.append(el('span', 'sv ' + (oneTap(i) && sc !== 'bad' ? 'run' : sc)));
@@ -1455,11 +1501,11 @@ function render(s) {
     else if (i.key !== 'login-needed') B('처리했어요', 'done', 'weak');
     li.append(body, a); pv.append(li);
   });
-  if (issues.length > 6) { const li = el('li'); li.style.display = 'block'; const b = el('button', 'more-link', `${issues.length - 6}건 더 — 할 일 전체 보기 ›`); b.type = 'button'; b.dataset.goto = 'todo'; b.style.marginLeft = '0'; li.append(b); pv.append(li); }
+  if (issues.length > 6) { const li = el('li'); li.style.display = 'block'; const b = el('button', 'more-link', `${issues.length - 6}건 더 ›`); b.type = 'button'; b.dataset.goto = 'todo'; b.style.marginLeft = '0'; li.append(b); pv.append(li); }
 
   // 할 일 — 급한 것·승인 먼저, 버튼은 한 줄(주 행동 하나 + 보조)
   const tl = $('todo-list'); tl.textContent = '';
-  if (!issues.length) tl.append(el('div', 'empty', '✅ 열린 할 일이 없어요'));
+  if (!issues.length) tl.append(el('div', 'empty', '열린 할 일 없음'));
   // 묶어 보기(2026-10-22 사장님 "더 편하게"): 버튼 한 번으로 끝나는 것 · 3일 넘게 그대로인 것 — 오래된 건 한꺼번에 정리
   const oldOne = (i) => i.last && (Date.parse(s.now) - Date.parse(i.last)) > 72 * 3600e3;
   const FIL = [['all', '전체', () => true], ['tap', '버튼 한 번', oneTap], ['old', '3일 넘음', oldOne]];
@@ -1471,9 +1517,9 @@ function render(s) {
   }
   const shown = sorted.filter((FIL.find((f) => f[0] === todoFilter) || FIL[0])[2]);
   if (todoFilter === 'old' && shown.length) {
-    const bulk = el('button', 'btn sm weak', `보이는 ${shown.length}건 모두 '처리했어요'`); bulk.type = 'button';
+    const bulk = el('button', 'btn sm weak', `${shown.length}건 모두 처리`); bulk.type = 'button';
     bulk.onclick = async () => {
-      if (!confirm(`3일 넘게 그대로인 ${shown.length}건을 모두 닫을까요? 아직 할 일이 남은 카드는 먼저 빼 주세요(카드마다 '보는 중'을 누르면 목록에 남아요).`)) return;
+      if (!confirm(`${shown.length}건을 모두 닫을까요? 남길 카드는 먼저 '보는 중'으로 바꿔 주세요.`)) return;
       bulk.disabled = true;
       for (const i of shown) { try { await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'done', key: i.key, note: '현황판에서 오래된 카드 한꺼번에 정리' }) }); } catch (e) { /* 하나 실패해도 계속 */ } }
       toast(`${shown.length}건을 닫았어요`); todoFilter = 'all'; tick();
@@ -1519,10 +1565,10 @@ function render(s) {
       const st = (BO.labels || {})[r.state] || r.state;
       li.append(el('div', 'bm', [hmm(r.updated), st, dom[r.role] || r.role, r.source].filter(Boolean).join(' · ')));
       if (r.body) { const d = el('details'); d.append(el('summary', null, '내용'), el('pre', null, r.body)); li.append(d); }
-      if (r.ref) { const a = el('a', 'small', '디스코드 ↗'); a.href = r.ref; a.target = '_blank'; a.rel = 'noopener'; li.append(a); }
+      if (r.ref) { const a = el('a', 'small'); a.innerHTML = `디스코드 ${ico('external')}`; a.href = r.ref; a.target = '_blank'; a.rel = 'noopener'; li.append(a); }
       ul.append(li);
     }
-    if (!rows.length) ul.append(el('li', 'muted', '없어요'));
+    if (!rows.length) ul.append(el('li', 'muted', '없음'));
     c.append(ul); bdv.append(c);
   }
 
@@ -1530,7 +1576,8 @@ function render(s) {
   const bi = $('barund-info'); bi.textContent = '';
   if (bd) {
     const p = el('div', 'hub-src' + (bd.alive === false ? ' bad' : ''));
-    p.append(el('span', null, (bd.alive === false ? '⛔ 회차 대기열 멈춤' : '● 회차 대기열 실행 중') + (bd.at ? ` · ${hm(bd.at)} 신호` : '')),
+    const ps = el('span'); ps.innerHTML = dot(bd.alive === false ? 'bad' : 'ok') + ' '; ps.append((bd.alive === false ? '회차 대기열 멈춤' : '회차 대기열 실행 중') + (bd.at ? ` · ${hm(bd.at)} 신호` : ''));
+    p.append(ps,
       el('span', 'small', `맡은 업무 ${(bd.managed || []).length}개`));
     if ((bd.log || []).length) { const d = el('details'); d.append(el('summary', null, '최근 대기열 기록'), el('pre', null, bd.log.join('\n'))); p.append(d); }
     bi.append(p);
@@ -1554,15 +1601,15 @@ function render(s) {
     else if (ran.length) { const x = ran[0]; side.append(chip(x.end ? (x.rc === 0 ? '정상' : `실패 rc=${x.rc}`) : '진행 중', x.end ? (x.rc === 0 ? 'ok' : 'bad') : 'run')); }
     else if (j.launchd && j.launchd.pid) side.append(chip('실행 중', 'ok'));
     else if (j.launchd && j.launchd.last_exit != null) side.append(chip(j.launchd.last_exit === 0 ? '정상' : `종료코드 ${j.launchd.last_exit}`, j.launchd.last_exit === 0 ? 'ok' : 'bad'));
-    if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs weak', '▶ 지금 실행'); b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
+    if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs weak'); b.innerHTML = `${ico('play')} 지금 실행`; b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
     r.append(main, side);
     if ((j.runs || []).length) {
       const more = el('div', 'more'); const d = el('details');
       const last = ran[0];
-      d.append(el('summary', null, last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${last.secs}초` : ''} — 답과 이전 회차` : '이전 회차'));
+      d.append(el('summary', null, last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${last.secs}초` : ''}` : '이전 회차'));
       if (last && last.summary) d.append(el('pre', null, last.summary));
       d.append(el('pre', null, j.runs.map((x) => x.skip ? `${x.start}  건너뜀 — ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n')));
-      if (last && last.fallback) d.append(chip('Claude 로그인 없음 → Codex로 대체', 'warn'));
+      if (last && last.fallback) d.append(chip('Codex로 대체', 'warn'));
       more.append(d); r.append(more);
     }
     return r;
@@ -1578,12 +1625,13 @@ function render(s) {
   if (hub.error) hh.append(el('span', 'muted', '허브 기록을 읽지 못했어요: ' + hub.error));
   if (H.sources) {
     const live = el('div', 'hub-src' + (H.alive ? '' : ' bad'));
-    live.append(el('span', null, H.alive ? '● 허브 실행 중' : '✕ 허브 멈춤'), el('span', 'small', `24시간 다시 시작 ${H.restarts || 0}번`));
+    const lv = el('span'); lv.innerHTML = dot(H.alive ? 'ok' : 'bad') + ' '; lv.append(H.alive ? '허브 실행 중' : '허브 멈춤');
+    live.append(lv, el('span', 'small', `24시간 재시작 ${H.restarts || 0}번`));
     hh.append(live);
     for (const v of Object.values(H.sources)) {
       const b = el('div', 'hub-src' + (v.ok ? '' : ' bad'));
-      b.append(el('span', null, `${v.icon} ${v.label} · ${v.ok ? '정상' : (v.fails ? `실패 ${v.fails}번` : '확인 지연')}`));
-      b.append(el('span', 'small', `${v.age_min == null ? '아직 확인 전' : v.age_min + '분 전 확인'} · ${Math.round(v.every / 60)}분마다` + (v.error && !v.ok ? ` · ${v.error.slice(0, 60)}` : '')));
+      const sp = el('span'); sp.innerHTML = dot(v.ok ? 'ok' : 'bad') + ' '; sp.append(`${v.label} · ${v.ok ? '정상' : (v.fails ? `실패 ${v.fails}번` : '확인 지연')}`); b.append(sp);
+      b.append(el('span', 'small', `${v.age_min == null ? '확인 전' : v.age_min + '분 전'} · ${Math.round(v.every / 60)}분마다` + (v.error && !v.ok ? ` · ${v.error.slice(0, 60)}` : '')));
       hh.append(b);
     }
   }
@@ -1594,10 +1642,10 @@ function render(s) {
   }
   const hf = $('hub-flow'); hf.textContent = '';
   const HST = { ok: ['처리됨', 'ok'], fail: ['실패', 'bad'], todo: ['사람 확인', 'warn'], running: ['진행 중', 'run'], skip: ['건너뜀', ''] };
-  if (!(hub.incidents || []).length) hf.append(el('li', 'empty', '최근 24시간 감지된 변화가 없어요'));
+  if (!(hub.incidents || []).length) hf.append(el('li', 'empty', '최근 24시간 변화 없음'));
   for (const i of (hub.incidents || [])) {
     const li = el('li');
-    li.append(el('div', 'when', i.at.slice(11, 16)), el('div', 'src', `${i.icon} ${i.label}`));
+    li.append(el('div', 'when', i.at.slice(11, 16)), el('div', 'src', i.label));
     const ch = el('div', 'chain');
     ch.append(el('span', 'pill det', '감지 · ' + i.detected));
     for (const st of i.steps) {
@@ -1605,7 +1653,7 @@ function render(s) {
       if (st.run) ch.append(el('span', 'arrow', '→'), el('span', 'pill ' + st.run.status, (st.run.status === 'ok' ? '회차 정상' : st.run.status === 'skip' ? '회차 건너뜀' : st.run.status === 'running' ? '회차 진행 중' : '회차 실패') + (st.run.secs ? ` ${st.run.secs}초` : '')));
     }
     const [lab, cls] = HST[i.status] || [i.status, ''];
-    const r = el('div', 'result'); r.append(chip(lab, cls), document.createTextNode(' ' + String(i.outcome || '').split('\n')[0].slice(0, 160)));
+    const r = el('div', 'result'); r.append(chip(lab, cls), document.createTextNode(' ' + deE(String(i.outcome || '').split('\n')[0].slice(0, 160))));
     ch.append(r);
     const extra = i.steps.map((st) => [st.reason && `이유: ${st.reason}`, st.detail && `결과: ${st.detail}`, st.run && st.run.text && `${st.text} 회차: ${st.run.text}`].filter(Boolean).join('\n')).filter(Boolean).join('\n');
     if (extra) { const d = el('details'); d.append(el('summary', null, '자세히'), el('pre', null, extra)); ch.append(d); }
@@ -1614,17 +1662,17 @@ function render(s) {
 
   // 인보이스
   const inv = $('inv'); inv.textContent = '';
-  if (!(s.invoices || []).length) inv.append(el('li', 'empty', '보관된 인보이스가 없어요'));
+  if (!(s.invoices || []).length) inv.append(el('li', 'empty', '인보이스 없음'));
   for (const f of (s.invoices || [])) {
     const li = el('li'); const a = el('a', null, f.name); a.href = '#';
-    a.onclick = async (ev) => { ev.preventDefault(); try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank'); } catch (e) { toast('⚠ ' + e.message); } };
+    a.onclick = async (ev) => { ev.preventDefault(); try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank'); } catch (e) { toast('열지 못함: ' + e.message); } };
     li.append(a, el('span', 'muted small', ` · ${f.at.replace('T', ' ').slice(5)} · ${f.kb}KB`)); inv.append(li);
   }
 
   // 알림 기록
   const SEV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오늘', 'warn'], high: ['오늘', 'warn'], info: ['참고', ''], debug: ['기록', ''] };
   const ev = $('events'); ev.textContent = '';
-  if (!(s.events || []).length) ev.append(el('li', 'empty', '아직 기록이 없어요'));
+  if (!(s.events || []).length) ev.append(el('li', 'empty', '기록 없음'));
   for (const e of (s.events || [])) {
     const li = el('li'); li.id = 'ev-' + e.id;
     const [lab, cls] = SEV[e.severity] || [e.severity, ''];
@@ -1636,20 +1684,20 @@ function render(s) {
   }
 
   const wl = $('worklog'); wl.textContent = '';
-  if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 기록이 없어요'));
+  if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 기록 없음'));
   for (const l of [...s.worklog].reverse()) wl.append(el('li', null, l));
   mdRender(s.status_md || '(없음)', $('status'));
 
   const g = $('git'); g.textContent = '';
   const sync = s.git.ahead === 0 && s.git.behind === 0;
-  g.append(el('p', 'small ' + (sync ? 'muted' : ''), sync ? 'GitHub와 같아요' : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`));
+  g.append(el('p', 'small ' + (sync ? 'muted' : ''), sync ? 'GitHub와 같음' : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`));
   const gl = el('ul', 'log');
-  for (const c of s.git.log) { const li = el('li'); li.append(el('code', null, c.hash), document.createTextNode(' '), el('span', 'muted small', c.when + ' '), document.createTextNode(c.subject)); gl.append(li); }
+  for (const c of s.git.log) { const li = el('li'); li.append(el('code', null, c.hash), document.createTextNode(' '), el('span', 'muted small', c.when + ' '), document.createTextNode(deE(c.subject))); gl.append(li); }
   g.append(gl);
   if (s.git.dirty.length) { const d = el('details'); d.append(el('summary', null, `커밋 안 된 파일 ${s.git.dirty.length}개`)); d.append(el('pre', null, s.git.dirty.join('\n'))); g.append(d); }
 
   const b = $('backup'); b.textContent = '';
-  b.append(el('p', null, s.backup.latest ? `가장 최근 ${s.backup.latest} · 로컬 ${s.backup.count}일치 보관` : '로컬 백업이 없어요'));
+  b.append(el('p', null, s.backup.latest ? `최근 ${s.backup.latest} · 로컬 ${s.backup.count}일치` : '로컬 백업 없음'));
   if (s.backup.log.length) b.append(el('pre', null, s.backup.log.join('\n')));
 }
 
@@ -1660,7 +1708,7 @@ async function tick() {
     const r = await apiFetch('/api/state');
     render(await r.json());
   } catch (e) {
-    $('updated').textContent = '불러오지 못했어요 · ' + e.message; $('updated').className = 'upd err';
+    $('updated').textContent = '불러오기 실패 · ' + e.message; $('updated').className = 'upd err';
   } finally { busyTick = false; }
 }
 $('reload').onclick = () => { tick(); if (window.barunReloadTimeline) window.barunReloadTimeline(); };
@@ -1674,8 +1722,8 @@ async function probe() {
 }
 probe().then((ok) => {
   if (ok) { tick(); setInterval(() => { if (!document.hidden) tick(); }, 20000); document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); }); return; }
-  $('updated').textContent = '이 기기에서는 자료 서버 주소로 옮겨요…'; $('updated').className = 'upd err';
-  toast('이 기기에서는 브라우저가 자료 서버 연결을 막고 있어요(Tailscale이 켜진 기기에서 흔해요). 같은 현황판을 서버 주소로 열어요 — 토큰을 한 번 더 넣어 주세요.');
+  $('updated').textContent = '서버 주소로 옮기는 중…'; $('updated').className = 'upd err';
+  toast('브라우저가 연결을 막아 서버 주소로 옮겨요. 토큰을 한 번 더 넣어 주세요.');
   setTimeout(() => { location.href = API + '/'; }, 2500);
 });
 // 첫 화면: 주소의 #화면 → 마지막으로 본 화면 → 한눈에. '#ev-…'(타임라인에서 알림 기록으로 가는 고리)는 일지·알림으로.

@@ -24,7 +24,7 @@
     if (parent) parent.appendChild(e);
     return e;
   };
-  const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = window.noEmoji ? String(text).split('\n').map(window.noEmoji).join('\n') : text; return e; };
   const T = (s) => new Date(s.length === 19 ? s + '+09:00' : s);
   const hm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
@@ -149,7 +149,7 @@
         const cy = y + 16, my = y + 34;
         // 줄 이름(분야 색 띠 + 이름 + 실행 방식 + 요약)
         svgEl('rect', { x: 12, y: y + 6, width: 4, height: LANE_H - 12, rx: 2, fill: ln.color }, svg);
-        svgEl('text', { x: 24, y: y + 19, class: 'lane' }, svg).textContent = `${ln.icon || ''} ${ln.label}`.trim();
+        svgEl('text', { x: 24, y: y + 19, class: 'lane' }, svg).textContent = ln.label;
         const st = ln.stats;
         const sub = [ln.runner, st.runs ? `회차 ${st.runs} · 실패 ${st.fail}` : '', st.skips ? `건너뜀 ${st.skips}` : '', st.avg_secs ? `평균 ${dur(st.avg_secs)}` : '', st.events ? `기록 ${st.events}` : '']
           .filter(Boolean).join(' · ');

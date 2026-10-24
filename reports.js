@@ -1,12 +1,12 @@
-// 📑 시트 보고서 — 구글 시트에만 있던 보고 탭(전체현황·매출분석·판매점검·메일정리·설정)을 현황판 '보고서' 화면에서 (2026-10-22 사장님: 시트를 안 써도 될 만큼).
+// 시트 보고서 — 구글 시트에만 있던 보고 탭(전체현황·매출분석·판매점검·메일정리·설정)을 현황판 '보고서' 화면에서 (2026-10-22 사장님: 시트를 안 써도 될 만큼).
 // 자료: GET /api/db/grid?tab= (dashboard/dbview.py — 주문 장부 원본 barun.db 격자, ops/gridstore.py). 보고 탭은 각 회차가 다시 쓰고, 여기서는 보기만.
 // 설정 탭만 노란 칸(직접환율·탭 기본통화·배대지센터·고정비)을 고칠 수 있다 → POST /api/action {action:"db", kind:"settings_set"} → ops/orderedit.settings.
 // 그리기: 빈 줄로 나뉜 덩어리마다 — 첫 칸만 있는 줄은 소제목, 그 다음 줄은 머리글, 나머지는 표(덩어리 안에서 늘 빈 열은 뺌).
 (() => {
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const fetchJ = async (p, opts) => (await (window.barunFetch || fetch)(p, opts)).json();
-  const DESC = { 전체현황: '진행 중 주문 요약 — 주문 갱신 때마다 다시 써요', 매출분석: '이번 달 매출·순이익 — 하루 마감 때 다시 써요', 판매점검: '쿠팡 판매 점검(⑦) 보고',
-    메일정리: '네이버 메일 정리(⑤) 보고', 설정: '환율·탭 기본값 — 노란 칸을 고치면 다음 주문 갱신부터 수익 계산에 써요' };
+  const DESC = { 전체현황: '진행 중 주문 요약', 매출분석: '이번 달 매출·순이익', 판매점검: '쿠팡 판매 점검(⑦)',
+    메일정리: '네이버 메일 정리(⑤)', 설정: '환율·탭 기본값 · 노란 칸 수정은 다음 갱신부터 반영' };
   let cur = '전체현황', data = null, pending = {}, note = '';
   const card = () => document.getElementById('rep-card');
 
@@ -129,11 +129,11 @@
     const chips = box.querySelector('.rep-tabs'); chips.textContent = '';
     for (const t of data.tabs) {
       const b = E('button', 'chipbtn' + (t === cur ? ' on' : ''), t); b.type = 'button'; b.setAttribute('aria-pressed', String(t === cur));
-      b.onclick = () => { if (Object.keys(pending).length && !confirm('저장 안 한 칸이 있어요. 버리고 다른 보고서로 갈까요?')) return; pending = {}; note = ''; cur = t; load(); };
+      b.onclick = () => { if (Object.keys(pending).length && !confirm('저장 안 한 칸을 버릴까요?')) return; pending = {}; note = ''; cur = t; load(); };
       chips.append(b);
     }
     box.querySelector('.rep-desc').textContent = `${DESC[cur] || ''}${data.updated ? ` · ${data.updated.slice(5, 16).replace('T', ' ')} 기준` : ''}`;
-    if (!data.grid.length) { body.append(E('p', 'muted', '아직 내용이 없어요')); return; }
+    if (!data.grid.length) { body.append(E('p', 'muted', '내용 없음')); return; }
     const ch = charts(); if (ch) body.append(ch);
     for (const b of blocks(data.grid)) {
       const sec = E('section', 'rep-sec');
@@ -164,8 +164,8 @@
             body: JSON.stringify({ action: 'db', kind: 'settings_set', edits: Object.values(pending) }) });
           const j = await r.json();
           if (j.ok) pending = {};
-          note = (j.ok ? '✅ ' : '⚠ ') + j.msg;
-        } catch (e) { note = '⚠ ' + e.message; }
+          note = (j.ok ? '' : '실패: ') + j.msg;
+        } catch (e) { note = '실패: ' + e.message; }
         await load();
       };
       b.append(E('b', null, `${n}칸 바뀜`), undo, save);
