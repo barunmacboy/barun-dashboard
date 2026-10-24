@@ -896,6 +896,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 
     <section class="page" id="p-tasks" aria-label="맡긴 일" hidden></section>
     <section class="page" id="p-asks" aria-label="보낸 문의" hidden></section>
+    <section class="page" id="p-flow" aria-label="업무 흐름" hidden></section>
     <section class="page" id="p-data" aria-label="주문 데이터" hidden></section>
     <section class="page" id="p-reports" aria-label="보고서" hidden></section>
     <section class="page" id="p-sourcing" aria-label="소싱" hidden></section>
@@ -1017,6 +1018,7 @@ const ICON = {
   tasks: P('M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12zM8.5 12h.01M12 12h.01M15.5 12h.01'),
   asks: P('M22 2 11 13M22 2l-7 20-4-9-9-4z'),
   data: P('M4 4h16v16H4zM4 9.5h16M4 15h16M10 4v16'),
+  flow: P('M5 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01M7 6h6a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-2a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h6'),
   reports: P('M4 20h16M7 16v-5M12 16V7M17 16v-8'),
   sourcing: P('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3'),
   auto: P('M13 2 4 14h7l-1 8 9-12h-7z'),
@@ -1030,7 +1032,7 @@ const ICON = {
 const NAV = [
   [null, [['home', '한눈에', '지금 상황과 내 차례를 한 화면에']]],
   ['일', [['todo', '할 일', '디스코드 #할-일 카드 — 승인·고르기·처리', 'todo'], ['tasks', '맡긴 일', '#작업판·카드 답글·DM으로 맡긴 일의 진행', 'tasks'], ['asks', '보낸 문의', '배대지·구매처·쿠팡에 넣은 1:1 문의', 'asks']]],
-  ['운영', [['data', '주문 데이터', '주문 장부·DB를 바로 고치고 조치해요'], ['reports', '보고서', '전체현황·매출분석·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행 — 15초마다 새로 읽어요']]],
+  ['운영', [['flow', '업무 흐름', '소싱부터 배송까지 14단계 — 단계마다 누가 무엇을 하고 무엇이 사람을 기다리는지'], ['data', '주문 데이터', '주문 장부·DB를 바로 고치고 조치해요'], ['reports', '보고서', '전체현황·매출분석·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행 — 15초마다 새로 읽어요']]],
   ['자동화', [['auto', '자동화율', '사람 손 없이 지나는 비율과 로드맵'], ['work', '회차·허브', '자동작업 회차와 이벤트 허브'], ['savings', '절감 장부', '효율화로 아낀 시간·AI 비용'], ['activity', '활동 기록', '회차와 한 일을 시간 순으로']]],
   ['기록', [['records', '일지·알림', '작업 일지·알림·인보이스·git·백업']]],
 ];
@@ -1520,6 +1522,7 @@ window.addEventListener('hashchange', route); route();
 <script src="data.js"></script>
 <script src="sourcing.js"></script>
 <script src="automation.js"></script>
+<script src="flow.js"></script>
 <script src="asks.js"></script>
 <script src="agents.js"></script>
 <script src="tasks.js"></script>
