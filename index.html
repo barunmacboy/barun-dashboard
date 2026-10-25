@@ -578,6 +578,9 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .sv-note { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.5; }
 .sv-side { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-right: 6px; white-space: nowrap; }
 .sv-side.h { background: color-mix(in srgb, var(--sv-h) 16%, transparent); color: var(--sv-h); } .sv-side.a { background: color-mix(in srgb, var(--sv-a) 16%, transparent); color: var(--sv-a); }
+.sv-new { display: inline-block; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; padding: 1px 6px; border-radius: 6px; margin-right: 6px;
+  background: var(--red-ink); color: #fff; vertical-align: 1px; }   /* 24시간 안에 올라온 개선(2026-10-25 사장님 "NEW 뱃지") */
+li.sv-fresh { background: color-mix(in srgb, var(--red-ink) 5%, transparent); border-radius: 10px; }
 @media (prefers-reduced-motion: no-preference) { .sv-day b { transition: height .6s cubic-bezier(.2, .8, .2, 1); } }
 
 /* 시트 보고서(기록 탭) */
@@ -962,6 +965,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-tasks" aria-label="맡긴 일" hidden></section>
     <section class="page" id="p-asks" aria-label="보낸 문의" hidden></section>
     <section class="page" id="p-flow" aria-label="업무 흐름" hidden></section>
+    <section class="page" id="p-catalog" aria-label="상품" hidden></section>
     <section class="page" id="p-data" aria-label="주문 데이터" hidden></section>
     <section class="page" id="p-reports" aria-label="보고서" hidden></section>
     <section class="page" id="p-sourcing" aria-label="소싱" hidden></section>
@@ -1107,6 +1111,7 @@ const ICON = {
   asks: P('M22 2 11 13M22 2l-7 20-4-9-9-4z'),
   data: P('M4 4h16v16H4zM4 9.5h16M4 15h16M10 4v16'),
   flow: P('M5 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01M7 6h6a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-2a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h6'),
+  catalog: P('M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8'),
   reports: P('M4 20h16M7 16v-5M12 16V7M17 16v-8'),
   sourcing: P('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3'),
   auto: P('M13 2 4 14h7l-1 8 9-12h-7z'),
@@ -1160,7 +1165,7 @@ Object.assign(window, { IC, ico, dot, noEmoji });
 const NAV = [
   [null, [['home', '한눈에', '지금 상황과 내 차례']]],
   ['일', [['todo', '할 일', '#할-일 카드', 'todo'], ['tasks', '맡긴 일', '에이전트에게 맡긴 일', 'tasks'], ['asks', '보낸 문의', '배대지·구매처·쿠팡 1:1 문의', 'asks']]],
-  ['운영', [['flow', '업무 흐름', '단계별 진행과 담당'], ['data', '주문 데이터', '주문 장부 보기·고치기'], ['reports', '보고서', '전체현황·매출·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행']]],
+  ['운영', [['flow', '업무 흐름', '단계별 진행과 담당'], ['catalog', '상품', '상품 대장 — 같은 물건 한 줄'], ['data', '주문 데이터', '주문 장부 보기·고치기'], ['reports', '보고서', '전체현황·매출·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행']]],
   ['자동화', [['auto', '자동화율', '자동 처리 비율과 로드맵'], ['work', '회차·허브', '자동작업과 이벤트 허브'], ['savings', '절감 장부', '아낀 시간과 AI 비용'], ['activity', '활동 기록', '시간순 회차와 작업']]],
   ['기록', [['records', '일지·알림', '일지·알림·인보이스·git·백업']]],
 ];
@@ -1364,10 +1369,13 @@ function renderSavings(sv) {
   // ④ 바뀐 것
   const ch = sv.changes || [];
   if (ch.length) {
-    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, `바뀐 것 ${ch.length}건`), el('span', 'desc', '#효율화와 같음')); c.append(h);
+    const NEW_MS = 24 * 3600e3, fresh = (x) => Date.now() - new Date(x.at).getTime() < NEW_MS;   // 24시간 안 = NEW(notify/savings._fresh와 같은 기준)
+    const nNew = ch.filter(fresh).length;
+    const c = el('section', 'card'); const h = el('div', 'card-h'); h.append(el('h2', null, `바뀐 것 ${ch.length}건` + (nNew ? ` · 새로 ${nNew}건` : '')), el('span', 'desc', '#효율화와 같음')); c.append(h);
     const ul = el('ul', 'log');
     for (const x of ch) {
-      const li = el('li'), top = el('div');
+      const li = el('li', fresh(x) ? 'sv-fresh' : null), top = el('div');
+      if (fresh(x)) top.append(el('span', 'sv-new', 'NEW'));
       const sd = el('span', 'sv-side ' + (x.side === 'human' ? 'h' : 'a')); sd.innerHTML = x.side === 'human' ? `${ico('user')} 사람` : `${ico('bot')} AI`; top.append(sd, document.createTextNode(deE(x.what)));
       const per = [x.day_secs ? `하루 ${durK(x.day_secs)}` : '', x.day_cost ? `$${x.day_cost.toFixed(2)}` : ''].filter(Boolean).join(' · ');
       li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + (x.by ? ' · ' + x.by : '') + (per ? ' · ' + per : '')), top, x.detail ? el('div', 'muted small', x.detail) : '');
@@ -1743,6 +1751,7 @@ window.addEventListener('hashchange', route); route();
 <script src="sourcing.js"></script>
 <script src="automation.js"></script>
 <script src="flow.js"></script>
+<script src="catalog.js"></script>
 <script src="asks.js"></script>
 <script src="agents.js"></script>
 <script src="tasks.js"></script>
