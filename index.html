@@ -76,6 +76,8 @@ button { font: inherit; color: inherit; }
 .nav-i .lab { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nb { font-size: 11.5px; font-weight: 700; background: var(--red); color: #fff; border-radius: 999px; padding: 0 6px; line-height: 18px; min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
 .nb[hidden] { display: none; }
+.nb.new { font-size: 10px; letter-spacing: .05em; padding: 0 5px; line-height: 17px; }   /* 메뉴 NEW — 24시간 안 새 것을 아직 안 열어 봄 */
+.tb-i.has-new::after { content: ""; position: absolute; top: 8px; left: calc(50% + 8px); width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
 .side-foot { border-top: 1px solid var(--line); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
 .side-foot .upd { flex: 1; min-width: 0; }
 .upd.err { color: var(--red-ink); }
@@ -1189,8 +1191,21 @@ const MOBILE = ['home', 'todo', 'tasks', 'data'];
     if (PAGES[id].badge) { const n = el('span', 'nb'); n.dataset.badge = PAGES[id].badge; n.hidden = true; b.append(n); }
     b.onclick = () => showTab(id); tb.append(b);
   }
-  const m = el('button', 'tb-i'); m.type = 'button'; m.innerHTML = ICON.more + '<span>전체</span>'; m.onclick = () => drawer(true); tb.append(m);
+  const m = el('button', 'tb-i'); m.type = 'button'; m.id = 'tb-more'; m.innerHTML = ICON.more + '<span>전체</span>'; m.onclick = () => drawer(true); tb.append(m);
 })();
+// 메뉴 NEW — 그 화면에 24시간 안 새 것이 있고 이 브라우저에서 그 뒤로 안 열어 봤으면(2026-10-25 사장님 "메뉴에 뱃지"). 열면 꺼짐
+const seenKey = (tab) => 'barun.seen.' + tab;
+window.barunNew = (tab, at) => {
+  let seen = 0; try { seen = +localStorage.getItem(seenKey(tab)) || 0; } catch (e) { /* 없음 */ }
+  const t = at ? new Date(at).getTime() : 0;
+  const on = !!t && Date.now() - t < 24 * 3600e3 && t > seen && curTab !== tab;
+  document.querySelectorAll(`.nav-i[data-tab="${tab}"]`).forEach((b) => {
+    let n = b.querySelector('.nb.new');
+    if (!n && on) { n = el('span', 'nb new', 'NEW'); n.title = '24시간 안에 새로 생긴 것'; b.append(n); }
+    if (n) n.hidden = !on;
+  });
+  const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
+};
 // 메뉴 숫자(할 일·맡긴 일·보낸 문의) — 모듈도 이걸로 바꿈
 window.barunBadge = (name, n) => document.querySelectorAll(`[data-badge="${name}"]`).forEach((b) => { b.textContent = n > 99 ? '99+' : String(n || ''); b.hidden = !n; });
 function drawer(open) {
@@ -1210,7 +1225,9 @@ function showTab(name, push = true) {
   document.querySelectorAll('[data-tab]').forEach((b) => { if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   $('page-title').textContent = PAGES[name].label; $('page-desc').textContent = PAGES[name].desc;
   document.title = name === 'home' ? '바른청년 운영 현황' : `${PAGES[name].label} · 바른청년`;
-  try { localStorage.setItem('barun.tab', name); } catch (e) { /* 무시 */ }
+  try { localStorage.setItem('barun.tab', name); localStorage.setItem(seenKey(name), String(Date.now())); } catch (e) { /* 무시 */ }
+  document.querySelectorAll(`.nav-i[data-tab="${name}"] .nb.new`).forEach((n) => { n.hidden = true; });
+  const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
   if (push && location.hash.split('?')[0] !== '#' + name) history.replaceState(null, '', '#' + name);   // '#data?…' = 데이터 탭 보기 상태(data.js)
   drawer(false);
   if (name === 'activity') window.dispatchEvent(new Event('resize'));   // 숨어 있던 타임라인을 지금 폭으로 다시 그림
@@ -1272,6 +1289,7 @@ function renderSavings(sv) {
   if (svEdit && document.activeElement && document.activeElement.closest('#sav')) return;   // 기준을 적는 중엔 5초 갱신이 칸을 지우지 않게
   box.textContent = '';
   if (sv.error) { box.append(el('p', 'muted', '절감 장부를 읽지 못했어요: ' + sv.error)); return; }
+  window.barunNew('savings', (sv.changes || []).map((x) => x.at).sort().pop());   // 메뉴 NEW = 가장 최근 개선
   const a = sv.all || {}, w = sv.week || {}, t = sv.today || {}, hu = sv.human || {}, rate = sv.usd_krw || 1330;
   const krw = (u) => { const v = Math.round((u || 0) * rate / 1000) * 1000; return v >= 1e8 ? `${(v / 1e8).toFixed(1)}억 원` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만 원` : `${v.toLocaleString('ko-KR')}원`; };
   const hrs = (s) => (s || 0) / 3600, workdays = (s) => (hrs(s) / 8).toFixed(1);
