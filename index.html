@@ -1310,15 +1310,15 @@ function renderSavings(sv) {
   const H = el('div', 'sv-n h'), A = el('div', 'sv-n a');
   const lh = el('div', 'lab'); lh.innerHTML = `<b></b>${ico('user')} 사람 시간`;
   const la = el('div', 'lab'); la.innerHTML = `<b></b>${ico('bot')} AI 시간`;
-  const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>`;
-  const ea = el('div', 'eq'); ea.innerHTML = `AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
+  const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>${hu.checks ? ` (그중 확인만 ${hu.checks}회)` : ''}`;
+  const ea = el('div', 'eq'); ea.innerHTML = `아낀 AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
   H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
   big.append(H, el('i'), A); hero.append(big);
   const pace = el('div', 'sv-pace');
   pace.innerHTML = `<span>하루 평균 사람 ${hrs(perH).toFixed(1)}시간 · AI ${hrs(perA).toFixed(1)}시간</span><span>한 달 <b>사람 ${Math.round(hrs(perH * 30))}시간 · 근무일 ${workdays(perH * 30)}일</b> · <b>AI ${Math.round(hrs(perA * 30))}시간 · ${krw(perC * 30)}</b></span><span class="tag">예상</span>`;
   hero.append(pace);
   const mini = el('div', 'sv-mini');
-  for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], ['최근 7일', hu.week, w.secs, w.cost]]) {
+  for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], [sv.week_label || '최근 7일', hu.week, w.secs, w.cost]]) {
     const d = el('div'); d.innerHTML = `${k} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>$${(cc || 0).toFixed(2)}</b>`; mini.append(d);
   }
   hero.append(mini); box.append(hero);
@@ -1380,7 +1380,7 @@ function renderSavings(sv) {
   if (hu.changes > 60) hItems.push({ name: '손일 줄인 개선', secs: hu.changes, sub: '개선별 하루분 × 지난 날수' });
   hItems.sort((p, q) => q.secs - p.secs);
   const L = sv.labels || {};
-  const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · AI 비용 $${b.cost.toFixed(2)}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
+  const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · 아낀 AI 비용 $${b.cost.toFixed(2)}${k === 'api_cmd' ? ' · 10/25 16시 전 기록엔 감시가 30분마다 부른 확인도 섞여 실제보다 많아요' : ''}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
   two.append(
     rowsCard('사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '손 안 탄 주문 단계와 끝낸 정기 회차(①② 제외) × 손으로 할 때 분. 기준을 바꾸면 지난 날도 다시 계산.',
       (() => { const b = el('button', 'btn xs weak', svEdit ? '완료' : '기준 고치기'); b.type = 'button'; b.onclick = () => { svEdit = !svEdit; renderSavings(sv); }; return b; })()),

@@ -59,6 +59,22 @@
     box.append(tb);
   }
 
+  // 줄 요약 — 회차를 실행 방식별로(2026-10-25: 'claude · 회차 24'가 스크립트·디스코드 작업 회차까지 다 센 것).
+  // 업무 줄의 디스코드 작업 회차는 '디스코드 작업' 줄에서 세므로 '작업판 n'으로만 보이고 회차 수에는 안 넣는다(timeline.py stats).
+  function laneSub(ln) {
+    const st = ln.stats || {}, by = st.by || {};
+    const fail = st.fail ? `실패 ${st.fail}` : '';
+    const rest = [st.skips ? `건너뜀 ${st.skips}` : '', st.avg_secs ? `평균 ${dur(st.avg_secs)}` : '', st.events ? `기록 ${st.events}` : ''];
+    if (ln.id === 'tasks' || !(by.agent || by.script)) {     // 프로그램·디스코드 작업 줄: 예전처럼 회차 수
+      const s = [ln.runner, st.runs ? `회차 ${st.runs}` : '', fail, ...rest].filter(Boolean).join(' · ');
+      return { full: s, short: s };
+    }
+    const agent = by.agent ? `${ln.runner || '에이전트'} ${by.agent}` : '', script = by.script ? `스크립트 ${by.script}` : '';
+    const task = by.task ? `작업판 ${by.task}` : '', test = by.test ? `권한 시험 ${by.test}` : '';
+    const full = [agent, script + (by.shadow ? `(그중 shadow ${by.shadow})` : ''), task && `${task}(디스코드 작업 줄에서 셈)`, test, fail, ...rest].filter(Boolean).join(' · ');
+    return { full, short: [agent, script, fail, task].filter(Boolean).slice(0, 3).join(' · ') };   // 줄 이름 칸이 좁아 세 가지만 — 전체는 마우스를 올리면
+  }
+
   function ticksFor(t0, t1, width) {
     const spanH = (t1 - t0) / 36e5;
     const steps = [1, 2, 3, 6, 12, 24];
@@ -150,10 +166,10 @@
         // 줄 이름(분야 색 띠 + 이름 + 실행 방식 + 요약)
         svgEl('rect', { x: 12, y: y + 6, width: 4, height: LANE_H - 12, rx: 2, fill: ln.color }, svg);
         svgEl('text', { x: 24, y: y + 19, class: 'lane' }, svg).textContent = ln.label;
-        const st = ln.stats;
-        const sub = [ln.runner, st.runs ? `회차 ${st.runs} · 실패 ${st.fail}` : '', st.skips ? `건너뜀 ${st.skips}` : '', st.avg_secs ? `평균 ${dur(st.avg_secs)}` : '', st.events ? `기록 ${st.events}` : '']
-          .filter(Boolean).join(' · ');
-        svgEl('text', { x: 24, y: y + 35, class: 'lane-sub' }, svg).textContent = sub;
+        const sub = laneSub(ln);
+        const subEl = svgEl('text', { x: 24, y: y + 35, class: 'lane-sub' }, svg);
+        subEl.textContent = sub.short;
+        svgEl('title', {}, subEl).textContent = sub.full;   // 줄이 좁아 잘리면 마우스를 올려 전체
         svgEl('line', { x1: LABEL_W, x2: width - PAD_R, y1: y + LANE_H, y2: y + LANE_H, class: 'laneline' }, svg);
 
         // 지난 예정 시각(작은 눈금) — 회차가 빠졌으면 눈금만 남는다
