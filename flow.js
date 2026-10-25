@@ -212,6 +212,20 @@
       .fl-ev li { padding: 6px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px; }
       .fl-ev li:first-child { border-top: 0; } .fl-ev .tm { color: var(--muted); font-variant-numeric: tabular-nums; } .fl-ev .src { color: var(--muted); font-size: 11.5px; }
       .fl-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+      .fl-do { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin-bottom: 6px; }
+      .fl-a { display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 8px 10px; border-radius: 10px; background: var(--fill2); border: 1px solid transparent;
+        color: var(--ink); font: inherit; cursor: pointer; text-decoration: none; min-width: 0; }
+      .fl-a:hover { border-color: var(--line); background: var(--card); } .fl-a:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+      .fl-a > .fi { color: var(--sub); margin-top: 1px; flex: none; } .fl-a .tx { min-width: 0; display: grid; gap: 1px; }
+      .fl-a b { font-size: 13px; font-weight: 650; } .fl-a small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fl-a.main { background: var(--blue-bg); } .fl-a.main > .fi, .fl-a.main b { color: var(--blue-ink); }
+      .fl-a[disabled] { opacity: .55; cursor: progress; }
+      .fl-out .fl-in { flex: 1; min-width: 140px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; padding: 6px 8px; }
+      .fl-ob .r3 .nx { color: var(--blue-ink); font-weight: 650; white-space: nowrap; }
+      .fl-flash { animation: flflash 1.2s ease-out; border-radius: 10px; }
+      @keyframes flflash { from { box-shadow: 0 0 0 3px var(--blue); } to { box-shadow: 0 0 0 3px transparent; } }
+      @media (prefers-reduced-motion: reduce) { .fl-flash { animation: none; } }
+      @media (max-width: 560px) { .fl-do { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fl-a { padding: 7px 8px; gap: 6px; } .fl-a b { font-size: 12.5px; } }
       .fl-form { display: grid; gap: 8px; }
       .fl-form label { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
       .fl-form input, .fl-form textarea, .fl-sel { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink);
@@ -589,10 +603,11 @@
     else bits.push(stay(o.days));
     r3.append(E('span', 'sub', bits.filter(Boolean).join(' · ')));
     for (const t of o.tags || []) r3.append(E('span', 'fl-tag' + (t === '문제' ? ' l' : t === '답 옴' ? ' h' : ''), t));
+    if (o.nx) { const n = E('span', 'nx', o.nx); n.title = '다음 할 일 — 눌러서 서랍에서'; r3.append(n); }
     if ((o.human || []).length) { const h = ic('hand', 'h'); h.title = '사람 차례 카드'; r3.append(h); }
     else if ((o.zz || []).length) { const h = ic('sleep', 'h'); h.title = '미뤄 둔 카드'; r3.append(h); }
     b.append(r3);
-    b.setAttribute('aria-label', `${title} ${o.name} ${bits.join(' ')}${o.due_k === 'late' ? ' 발송기한 지남' : ''}`);
+    b.setAttribute('aria-label', `${title} ${o.name} ${bits.join(' ')}${o.due_k === 'late' ? ' 발송기한 지남' : ''}${o.nx ? ` 다음: ${o.nx}` : ''}`);
     b.onclick = () => openDr(o, b);
     return b;
   }
@@ -653,14 +668,16 @@
     body.append(now, E('div', 'fl-empty', '읽는 중…'));
     d.append(head, body); h.focus({ preventScroll: true });
     try {
-      const r = await (window.barunFetch || fetch)(`/api/flow/obj?k=${encodeURIComponent(o.k)}&id=${encodeURIComponent(o.id)}`);
+      const cx = new URLSearchParams({ k: o.k, id: o.id, stage: o.stage || '', sub: o.sub || '', days: o.days ?? '', stuck: o.stuck ? '1' : '' });
+      const r = await (window.barunFetch || fetch)(`/api/flow/obj?${cx}`);
       if (!r.ok || openObj !== o) return;
       const j = await r.json(); body.lastChild.remove();
       if (j.kind === 'o') orderBody(body, j, o); else if (j.kind === 'p') productBody(body, j, o); else askBody(body, j, o);
+      if ((j.acts || []).length) now.after(sect('할 수 있는 일', actsBox(j.acts, o, body)));
     } catch (e) { if (body.lastChild) body.lastChild.textContent = '읽기 실패 · 다시 눌러 주세요'; }
   }
   const kv = (pairs) => { const dl = E('dl', 'fl-kv'); for (const [k, v] of pairs) if (v != null && v !== '') { dl.append(E('dt', null, k), E('dd', null, noE(v))); } return dl; };
-  const sect = (t, el) => { const s = E('section'); s.append(E('h4', null, t), el); return s; };
+  const sect = (t, el, id) => { const s = E('section'); if (id) s.dataset.sec = id; s.append(E('h4', null, t), el); return s; };
   function orderBody(body, j, o) {
     const ol = E('ol', 'fl-steps');
     for (const s of j.steps) {
@@ -679,22 +696,16 @@
         if (/^https?:/.test(c.ref || '')) { const a = E('a', null, '디스코드'); a.href = c.ref; a.target = '_blank'; a.rel = 'noopener'; l.append(a); }
         box.append(l);
       }
-      body.append(sect(live.length ? `이 주문 카드 · 사람 차례 ${live.length}` : '이 주문 카드', box));
+      body.append(sect(live.length ? `이 주문 카드 · 사람 차례 ${live.length}` : '이 주문 카드', box, 'cards'));
     }
-    if ((j.handlings || []).length) body.append(sect('처리 방식 정하기', handleBox(j, o)));
-    if (j.edit) body.append(sect(`시트 칸 고치기 · ${j.edit.tab} ${j.edit.row}행`, editBox(j, o)));
+    if ((j.handlings || []).length) body.append(sect('처리 방식 정하기', handleBox(j, o), 'handle'));
+    if (j.edit) body.append(sect(`시트 칸 고치기 · ${j.edit.tab} ${j.edit.row}행`, editBox(j, o), 'edit'));
     else if (o.stage === 'new') body.append(E('div', 'fl-info', '시트 줄이 아직 없어요 — ① 주문 회차가 만들어요.'));
     const od = j.order || {}, r = (j.rows || [])[0] || {}, l = j.ledger || {};
     body.append(sect('주문', kv([['플랫폼', o.plat], ['주문번호', od.order_id], ['주문 시각', (od.ordered_at || '').replace('T', ' ').slice(0, 16)], ['결제 금액', od.paid ? won(od.paid) : ''],
       ['발송기한', od.due ? `${String(od.due).slice(0, 10)}${j.due_t ? ` (${j.due_t})` : ''}` : ''], ['플랫폼 상태', od.status_label || od.status], ['처리 방식', l.handling], ['시트', r.tab ? `${r.tab} ${r.row}행${(j.rows || []).length > 1 ? ` 외 ${j.rows.length - 1}줄` : ''}` : '']])));
     body.append(sect('구매·배송', kv([['진행상태', r.progress], ['구매처', r.shop], ['공홈주문번호', r.shop_order], ['공홈가', r.shop_price], ['해외송장', [r.intl_carrier, r.intl_tracking].filter(Boolean).join(' ')],
       ['배대지', [r.fwd_center, r.fwd_request].filter(Boolean).join(' · ')], ['배송방식', r.ship_mode], ['국내송장', r.kr_invoice || od.invoice], ['택배사', od.courier], ['보낼수량', r.send_qty], ['문제', r.problem], ['메모', r.memo]])));
-    const acts = E('div', 'fl-acts');
-    const a1 = E('button', 'btn sm', '주문 데이터에서 열기'); a1.type = 'button';
-    a1.onclick = () => { closeDr(); location.hash = '#data?' + encodeURIComponent(JSON.stringify({ t: 'sheet_rows', p: '', q: o.id })); if (window.showTab) window.showTab('data'); };
-    const st = (data.stages.find((x) => x.id === o.stage) || {}).name || '';
-    acts.append(a1, assignBtn(`${o.who || '고객'} 주문(${o.plat || ''} ${od.order_id || o.id}${r.tab ? `, ${r.tab} ${r.row}행` : ''}) — 지금 '${st}'${o.sub ? ` · ${o.sub}` : ''}${o.due_t ? ` · 발송기한 ${o.due_t}` : ''}: `));
-    body.append(acts);
     const ev = E('ul', 'fl-ev');
     for (const e of j.events || []) {
       const li = E('li'); li.append(E('span', 'tm', when(e.at)));
@@ -737,16 +748,68 @@
     f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save.click(); } });
     return f;
   }
-  // 에이전트에게 맡기기 — 공용 '맡기기' 창(index.html openAsk → #작업판 스레드)에 이 객체 설명을 미리 적어 둠, 할 말은 사람이 뒤에 이어 씀
-  function assignBtn(text) {
-    const b = E('button', 'btn sm ghost'); b.type = 'button'; b.append(ic('bot'), document.createTextNode(' 에이전트에게 맡기기'));
-    b.onclick = () => {
-      if (!window.openAsk) return;
-      window.openAsk();
-      const t = document.getElementById('task-text'); if (!t) return;
-      t.value = noE(text); setTimeout(() => { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 40);
+  // 에이전트에게 맡기기 — 공용 '맡기기' 창(index.html openAsk → #작업판 스레드)에 이 객체 설명·할 일을 미리 적어 둠, 사람이 고치고 보냄
+  function assign(text) {
+    if (!window.openAsk) return;
+    window.openAsk();
+    const t = document.getElementById('task-text'); if (!t) return;
+    t.value = noE(text); setTimeout(() => { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 40);
+  }
+  // 할 수 있는 일 — 서버가 단계·상태로 고른 조치(dashboard/flowacts.py). 맨 앞이 지금 가장 할 만한 것
+  function actsBox(list, o, body) {
+    const w = E('div'), g = E('div', 'fl-do'), out = E('div', 'fl-out'); out.hidden = true;
+    for (const a of list) {
+      const link = a.t === 'link', b = E(link ? 'a' : 'button', 'fl-a' + (a.main ? ' main' : ''));
+      if (link) { b.href = a.url; b.target = '_blank'; b.rel = 'noopener'; } else b.type = 'button';
+      const tx = E('span', 'tx'); tx.append(E('b', null, noE(a.label))); if (a.hint) tx.append(E('small', null, noE(a.hint)));
+      b.append(ic(a.icon || 'arrow'), tx); if (a.hint) b.title = noE(a.hint);
+      if (!link) b.onclick = () => runAct(a, b, out, o, body);
+      g.append(b);
+    }
+    w.append(g, out);
+    return w;
+  }
+  async function runAct(a, b, out, o, body) {
+    if (a.t === 'agent') return assign(a.text);
+    if (a.t === 'copy') {
+      try { await navigator.clipboard.writeText(a.text); if (window.toast) window.toast(`복사했어요 · ${a.text}`); } catch (e) { if (window.toast) window.toast(`복사 못 함 · ${a.text}`); }
+      return;
+    }
+    if (a.t === 'go') {
+      closeDr();
+      if (a.tab === 'data') location.hash = '#data?' + encodeURIComponent(JSON.stringify({ t: a.table || 'sheet_rows', p: '', q: a.q || '' }));
+      if (window.showTab) window.showTab(a.tab);
+      return;
+    }
+    if (a.t === 'jump') {
+      const s = body.querySelector(`[data-sec="${a.to}"]`); if (!s) return;
+      s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      s.classList.remove('fl-flash'); void s.offsetWidth; s.classList.add('fl-flash');
+      const f = s.querySelector('input, select, button'); if (f) f.focus({ preventScroll: true });
+      return;
+    }
+    if (a.t === 'do' && a.ask) return askInline(a, out, o);
+    if (a.t === 'run' && !confirm(`'${a.label}' — 지금 시작할까요?`)) return;
+    if (a.t === 'do' && a.confirm && !confirm(a.confirm)) return;
+    b.disabled = true;                                    // act()의 버튼 글 되돌리기는 아이콘을 지우므로 여기서 잠금만
+    try {
+      const r = await act(a.t === 'run' ? { action: 'run', job: a.job } : a.body, null, out);
+      if (r && r.ok && a.t === 'do') { if (a.close) closeDr(); else reopen(o); }
+    } finally { b.disabled = false; }
+  }
+  // 이유 한 줄이 필요한 조치(문제로 표시) — 결과 줄 자리에 입력칸
+  function askInline(a, out, o) {
+    out.hidden = false; out.className = 'fl-out'; out.textContent = '';
+    const i = E('input', 'fl-in'); i.type = 'text'; i.placeholder = a.ask; i.setAttribute('aria-label', a.ask);
+    const ok = E('button', 'btn sm primary', a.label); ok.type = 'button';
+    const go = async () => {
+      const why = i.value.trim(); if (!why) { i.focus(); return; }
+      ok.disabled = true;
+      const r = await act(Object.assign({}, a.body, { why, todo: '' }), null, out);
+      if (r && r.ok) reopen(o); else ok.disabled = false;
     };
-    return b;
+    ok.onclick = go; i.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+    out.append(i, ok); i.focus();
   }
   // 버튼 뒤 서랍을 새 자료로(그 객체가 다른 단계로 옮겨 갔어도 같은 id로 다시 엶)
   function reopen(o) {
@@ -829,22 +892,10 @@
     if ((j.regs || []).length) { const ul = E('ul', 'fl-ev'); for (const r of j.regs) { const li = E('li'); li.append(E('span', 'tm', when(r.at)), E('span', null, `${r.platform === 'coupang' ? '쿠팡' : '네이버'} ${r.action} ${r.ok ? '성공' : '실패'}${r.summary ? ` · ${noE(r.summary)}` : ''}`)); ul.append(li); } body.append(sect('등록 기록', ul)); }
     if ((j.history || []).length) { const ul = E('ul', 'fl-ev'); for (const h of j.history) { const li = E('li'); li.append(E('span', 'tm', when(h.at)), E('span', null, `${h.state}${h.memo ? ` · ${noE(h.memo)}` : ''}`)); ul.append(li); } body.append(sect('소싱 이력', ul)); }
     if (!ld.lead_id && !(j.listings || []).length && o.stage !== 'cost') body.append(E('div', 'fl-empty', '기록 없음'));
-    const pn = (j.listings || [])[0] || {}, st = (data.stages.find((x) => x.id === o.stage) || {}).name || '';
-    const acts = E('div', 'fl-acts');
-    acts.append(assignBtn(`${o.plat || ''} ${pn.product_no || ld.lead_id || o.id} '${o.name}' — 지금 '${st}' · ${o.sub || ''}${o.days != null ? ` · ${stay(o.days)}` : ''}: `));
-    body.append(acts);
   }
   function askBody(body, j, o) {
     const a = j.ask || {};
     body.append(sect('보낸 문의', kv([['곳', a.site], ['글번호', a.no], ['상태', a.state], ['보낸 때', (a.sent_at || '').replace('T', ' ').slice(0, 16)], ['답 기한', a.due], ['보낸 사람', a.by], ['답', a.answer], ['메모', a.memo]])));
-    const acts = E('div', 'fl-acts'), out = E('div', 'fl-out'); out.hidden = true;
-    const S = (lab, st, cls) => { const b = E('button', 'btn sm ' + cls, lab); b.type = 'button'; b.onclick = async () => { const r = await act({ action: 'ask', key: String(a.id), state: st }, b, out); if (r && r.ok) { if (st === '끝') closeDr(); else reopen(o); } }; acts.append(b); };
-    if (a.state === '답 옴') { S('답 확인함 · 끝', '끝', 'primary'); S('다시 기다림', '기다림', 'ghost'); }
-    else if (a.state === '기다림') { S('답 옴으로', '답 옴', ''); S('끝', '끝', 'ghost'); }
-    if (a.url) { const l = E('a', 'btn sm ghost', '문의 글 열기 '); l.append(ic('external')); l.href = a.url; l.target = '_blank'; l.rel = 'noopener'; acts.append(l); }
-    const g = E('button', 'btn sm ghost', '보낸 문의 화면'); g.type = 'button'; g.onclick = () => { closeDr(); window.showTab && window.showTab('asks'); }; acts.append(g);
-    acts.append(assignBtn(`${a.site || ''} 보낸 문의 ${a.no ? `#${a.no} ` : ''}'${noE(a.title || o.name || '')}' — ${a.state || ''}${o.days != null ? ` · ${stay(o.days)}` : ''}: `));
-    body.append(acts, out);
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

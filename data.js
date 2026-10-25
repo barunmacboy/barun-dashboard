@@ -23,7 +23,7 @@
     option: '옵션', progress: '진행상태', intl_tracking: '해외송장', kr_invoice: '국내송장', fwd_request: '배대지 신청번호', memo: '메모', problem: '문제', key: 'key',
     ordered_at: '주문일', claim_status: '클레임', paid: '결제', courier: '택배사', invoice: '송장', src: '출처', field: '칸', old: '전', new: '후',
     ordered: '주문일시', shop: '구매처', shop_price: '공홈가', shop_order: '공홈주문번호', ship_mode: '배송방식', intl_carrier: '해외운송사', fwd_center: '배대지센터',
-    ship_cost: '배송비', margin: '수익률', send_qty: '보낼수량', order_no: '주문번호', due: '발송기한', settle: '정산', cost: '원가', stock_note: '재고안내', point: '포인트',
+    ship_cost: '배송비', margin: '수익률', send_qty: '보낼수량', order_no: '주문번호', due: '발송기한', settle: '입금액', cost: '원가', stock_note: '재고안내', point: '포인트',
     tax_rate: '세율', handling: '처리 방식', ref: '근거', claim: '클레임', claim_at: '클레임 시각', order_id: '주문번호', line_id: '줄 id', product_id: '상품 id',
     tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내' };
   const STATES = ['후보', '정밀확인', '탈락', '외부대기', '끝'];
@@ -478,6 +478,7 @@
         const pk = ed && pending[`${rid(r)}:${c}`];
         const v = pk ? pk.new : fmt(c, r[c]);
         if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
+        else if (c === 'name' && r._url && v && !pk) td.append(prodLink(r, v.length > 60 ? v.slice(0, 59) + '…' : v));
         else td.textContent = v.length > 60 ? v.slice(0, 59) + '…' : v;
         if (ed && c === 'due' && v && !pk) { const ds = dueState(r); if (ds) { td.classList.add('due-' + ds.k); td.title = '발송기한 ' + ds.t; } }
         if (ed && NUMC.includes(c)) { td.classList.add('num'); if (/^\s*(약\s*)?-\d/.test(v)) td.classList.add('neg'); }
@@ -494,7 +495,7 @@
         if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용 — 고칠 수 있는 칸은 뗄 때 바로 고치기(press). '행' 칸은 줄 자세히·조치
           if (c === 'row') { td.classList.add('rowh'); td.title = '줄 자세히'; }
           td.onmousedown = (e) => {
-            if (e.button || e.target.closest('input,select')) return;
+            if (e.button || e.target.closest('input,select,a')) return;
             e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true;
             press = e.shiftKey || e.metaKey || e.ctrlKey ? null : { k: rid(r), c };
           };
@@ -549,6 +550,13 @@
     wrap.append(list);
     if (!last.rows.length) wrap.append(emptyBox());
   }
+  // 2026-10-25 사장님 "상품명을 클릭하면 해당 판매처의 상품페이지로": 플랫폼 주문 줄의 상품명 = 쿠팡·네이버 구매자 화면 링크(새 창). 재고 줄은 글자 그대로(고치기)
+  function prodLink(r, text) {
+    const a = E('a', 'prod-link', text); a.href = r._url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.title = `${ko(r.platform || '') || '판매처'} 상품페이지 열기`;
+    a.onclick = (e) => e.stopPropagation(); a.onmousedown = (e) => e.stopPropagation();
+    return a;
+  }
   function sheetCard(r) {
     const stock = isStock(r), pg = String(r.progress || ''), sg = stageOf(r);
     const c = E('div', 'oc' + (r.problem ? ' prob' : '') + (stock ? ' stock' : '') + (sg.stop ? ' stop' : ''));
@@ -557,7 +565,8 @@
     if (pg) top.append(E('span', 'badge ' + badgeCls(pg), pg));
     c.append(top);
     const what = stock ? [r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · ');
-    if (what) c.append(E('div', 'oc-what', what));
+    if (what && !stock && r._url && r.name) { const w = E('div', 'oc-what'); w.append(prodLink(r, r.name), r.option ? ' · ' + r.option : ''); c.append(w); }
+    else if (what) c.append(E('div', 'oc-what', what));
     const meta = E('div', 'oc-meta');
     const bits = [`${r.tab} ${r.row}행`, stock ? '재고' : ko(r.platform || ''), r.ordered ? String(r.ordered).slice(5, 10).replace('-', '/') + ' 주문' : ''];
     for (const b of bits.filter(Boolean)) meta.append(E('span', null, b));
