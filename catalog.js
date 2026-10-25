@@ -298,7 +298,7 @@
       else if (p === 'shopgap') lines.push(`구매처 엇갈림 — ${Object.entries(j.shops).map(([s, n]) => `${s} ${n}`).join(' · ')} → 하나로 정해 주세요`);
       else if (p === 'tabgap') lines.push(`시트 탭 엇갈림 — ${Object.entries(j.tabs).map(([t, n]) => `${t} ${n}줄`).join(' · ')} → 주문 데이터 화면에서 줄을 한 탭으로 옮기면 다음부터 그 탭으로 들어가요`);
       else if (p === 'costgap') lines.push('원가 엇갈림 — 아래 옵션별 원가를 보고, 묶음이 틀렸으면 옵션을 옮기고 원가가 옛값이면 새 1개 원가를 적어 주세요');
-      else if (p === 'dup') for (const x of j.dup) lines.push(`같은 플랫폼 중복 — ${PL[x.platform]} ${x.qty}개 옵션이 ${units(x.platform, x.units)}에 둘 다 판매 중(하나를 내릴지는 사장님이 정해요)`);
+      else if (p === 'dup') for (const x of j.dup) lines.push(`같은 플랫폼 중복 — ${PL[x.platform]} ${(x.qtys || [x.qty]).join('·')}개 옵션이 ${units(x.platform, x.units)}에 둘 다 판매 중(묶음이 틀렸으면 옵션 옮기기, 진짜 두 번 올린 거면 하나를 내릴지 사장님이 정해요)`);
       else if (p === 'stuck') for (const x of j.stuck) lines.push(`쿠팡 ${x.unit} ${x.status}${x.days != null ? ` ${x.days}일째` : ''}${x.note ? ` — ${x.note}` : ''}`);
       else if (p === 'halt') for (const x of j.halt) lines.push(`네이버 ${x.unit} ${x.status}`);
       else if (p === 'nvsplit') lines.push('네이버에 수량마다 따로 올라가 있어요 — 그룹상품으로 묶으면 한 페이지에서 수량을 골라요(묶기는 사장님 지시 후)');
