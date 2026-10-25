@@ -358,13 +358,15 @@
     const box = $('fl-kpis'); box.textContent = '';
     const t = data.totals, flowing = data.objs.filter((o) => o.k === 'o' && !['done'].includes(o.stage)).length;
     const work = Object.values(data.agents).filter((a) => a.state === 'running').map((a) => a.name).concat(data.tasks.filter((x) => x.state === 'running').map((x) => x.title));
-    const yday = (st.new.extra.sales || []).slice(-2, -1)[0];
+    const base = T(data.at) || new Date(), yd = new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
+    const ydk = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+    const yday = (st.new.extra.sales || []).find((x) => x.day === ydk) || { n: 0 };   // 어제 = 날짜로(주문 없는 날은 목록에 없어 끝에서 두 번째가 그저께일 수 있음)
     const K = [
       ['지금 일하는 중', `${work.length}`, work.length ? work.map(noE).join(' · ') : '모두 쉬는 중', work.length ? 'run' : '', null],
       ['사람 차례', `${t.human}`, t.snoozed ? `미룬 것 ${t.snoozed}` : '#할-일·승인', t.human ? 'bad' : '', 'human'],
       ['흐르는 주문', `${flowing}`, `발송기한 지남 ${t.late}`, '', 'late'],
       ['오래 머문 것', `${t.stuck}`, `주문 ${data.objs.filter((o) => o.stuck && o.k === 'o').length} · 상품 ${data.objs.filter((o) => o.stuck && o.k === 'p').length}`, t.stuck ? 'bad' : '', 'stuck'],
-      ['오늘 주문', `${t.today.n}건`, `${won(t.today.paid)}${yday ? ` · 어제 ${yday.n}건` : ''}`, '', null],
+      ['오늘 주문', `${t.today.n}건`, `${won(t.today.paid)} · 어제 ${yday.n}건`, '', null],
       ['준비 중 상품', `${t.products}`, '소싱·등록·심사', '', null],
     ];
     for (const [k, v, s, cls, only] of K) {
@@ -376,6 +378,7 @@
     }
   }
 
+  const cnt = (s, by) => { const n = (by[s.id] || []).length; return filtering() ? n : Math.max(n, s.count || 0); };   // 원가 확인은 목록 40개·숫자 전부
   const running = (s) => s.jobs.some((j) => (data.agents[j] || {}).state === 'running') || data.tasks.some((x) => x.state === 'running' && x.stage === s.id);
   function map(st, by) {
     const box = $('fl-map'); box.textContent = '';
@@ -398,14 +401,14 @@
     const side = E('div', 'fl-map-side'); side.append(E('span', null, '그 밖'));
     for (const s of data.stages.filter((x) => !x.n)) {
       const b = E('button', 'fl-sn' + (running(s) ? ' run' : '')); b.type = 'button';
-      b.append(E('span', null, s.name), E('b', null, String((by[s.id] || []).length)));
+      b.append(E('span', null, s.name), E('b', null, String(cnt(s, by))));
       if (s.human) b.append(hum('span', 'h', s.human));
       b.onclick = () => go(s.id); side.append(b);
     }
     box.append(side);
   }
   function node(s, by) {
-    const n = (by[s.id] || []).length;
+    const n = cnt(s, by);
     const b = E('button', 'fl-node' + (n ? ' has' : '') + (s.late ? ' hot' : '') + (running(s) ? ' run' : '')); b.type = 'button';
     b.title = `${s.n}. ${s.name} · ${s.what}${running(s) ? ' · 일하는 중' : ''}`;
     const c = E('span', 'c', String(n)); const nm = E('span', 'nm', s.name), num = E('span', 'n', `${s.n}단계`);
@@ -437,7 +440,7 @@
     const bh = E('div', 'fl-bh'), tabs = E('div', 'fl-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '흐름');
     for (const ln of data.lanes) {
       const ss = data.stages.filter((s) => s.lane === ln.id);
-      const tot = ss.reduce((a, s) => a + (by[s.id] || []).length, 0), nh = ss.reduce((a, s) => a + s.human, 0);
+      const tot = ss.reduce((a, s) => a + cnt(s, by), 0), nh = ss.reduce((a, s) => a + s.human, 0);
       const b = E('button', 'fl-tab'); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(ln.id === lane));
       b.append(document.createTextNode(ln.name), E('b', null, String(tot))); if (nh) b.append(hum('span', 'h', nh));
       b.title = ln.desc; b.onclick = () => { setLane(ln.id); render(); }; tabs.append(b);
@@ -469,7 +472,7 @@
     const h = E('header', 'fl-ch'), t = E('div', 't');
     t.append(E('span', 'no', no), E('h3', null, s.name));
     if (s.level != null) { const lv = E('span', 'fl-lv'); const i = E('i'); i.style.background = LVC[s.level]; lv.append(i, document.createTextNode(LV[s.level])); lv.title = `자동화 수준: ${LV[s.level]}`; t.append(lv); }
-    t.append(E('span', 'fl-ct', filtering() && list.length !== s.count ? `${list.length}/${s.count}` : String(list.length)));
+    t.append(E('span', 'fl-ct', filtering() && list.length !== s.count ? `${list.length}/${s.count}` : String(Math.max(list.length, s.count || 0))));
     h.title = s.what; h.append(t);
     const fl = E('div', 'fl-flags');
     if (cs.length) fl.append(hum('span', 'fl-tag h', cs.length, '사람 차례 '));
@@ -530,11 +533,16 @@
     const x = s.extra || {}, d = E('div', 'fl-info');
     const add = (t, v) => { d.append(document.createTextNode(t)); if (v != null) d.append(E('b', null, String(v))); };
     if (s.id === 'new' && x.today) { add('오늘 주문 ', `${x.today.n}건`); add(` · ${won(x.today.paid)}`); const y = (x.sales || []).slice(-7); if (y.length) { d.append(E('br')); add('7일 ', `${y.reduce((a, v) => a + v.n, 0)}건`); add(` · ${won(y.reduce((a, v) => a + v.paid, 0))}`); } return d; }
-    if (s.id === 'cost' && x.products != null) { add('원가를 모르는 상품 ', `${x.products}개`); add(` · 옵션 ${x.options}개 · 쿠팡 ${x.coupang} · 네이버 ${x.naver}`); return d; }
+    if (s.id === 'cost' && (x.units ?? x.products) != null) {
+      add('원가를 모르는 판매 단위 ', `${x.units ?? x.products}${x.pids != null ? `(상품 ${x.pids})` : ''}`); add(` · 옵션 ${x.options}개 · 쿠팡 ${x.coupang} · 네이버 ${x.naver}`);
+      if (x.shown && (x.units ?? x.products) > x.shown) add(` · 아래는 주문 많은 ${x.shown}개`);
+      return d;
+    }
     if (s.id === 'prep' && x.approval) { const ap = x.approval; add('등록 승인 카드 '); d.append(E('b', null, { pending: '답 기다림', approved: '승인됨', none: '없음' }[ap.status] || ap.status)); if (ap.n) add(` · ${ap.n}줄`); return d; }
-    if (s.id === 'source' && x.today) { add('오늘 닫은 줄 ', `${x.today.n || 0}/${x.today.target || 10}`); const r = x.run || {}; if (r.next) add(` · 다음 ⑨ ${when(r.next)}`); return d; }
-    if (s.id === 'selling' && x.onsale) { add('판매 중 '); d.append(E('b', null, `쿠팡 ${x.onsale['쿠팡']} · 네이버 ${x.onsale['네이버']}`)); add(' · 아래는 예외'); return d; }
+    if (s.id === 'source' && x.today) { add('오늘 새로 닫은 줄 ', `${x.today.closed ?? x.today.n ?? 0}/${x.today.target || 10}`); const r = x.run || {}; if (r.next) add(` · 다음 ⑨ ${when(r.next)}`); return d; }
+    if (s.id === 'selling' && x.onsale) { add(x.onsale.by ? `판매 중 ${x.onsale.by} ` : '판매 중 '); d.append(E('b', null, `쿠팡 ${x.onsale['쿠팡']} · 네이버 ${x.onsale['네이버']}`)); add(' · 아래는 예외'); return d; }
     if (s.id === 'listing' && (x.regs || []).length) { const r = x.regs[0]; add('마지막 등록 '); d.append(E('b', null, when(r.at))); add(` · ${r.platform === 'coupang' ? '쿠팡' : '네이버'} ${r.ok ? '성공' : '실패'}`); return d; }
+    if (s.id === 'asks' && x.waiting != null) { add('보낸 문의 화면 '); d.append(E('b', null, `답 옴 ${x.answered} · 기다림 ${x.waiting}`)); add(` · 2일 넘음 ${x.overdue} · 아래는 기다림과 할 일 남은 답`); return d; }
     if (s.id === 'center' && x.stock && Object.keys(x.stock).length) { add('보관 재고 '); d.append(E('b', null, Object.entries(x.stock).map(([k, v]) => `${k.replace('재고·', '')} ${v}`).join(' · '))); return d; }
     return null;
   }

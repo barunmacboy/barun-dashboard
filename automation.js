@@ -70,7 +70,7 @@
       <div class="card" id="ab-card"><div class="card-h"><h2>자동 구매</h2><span class="desc" id="ab-d">구매처별 결제 한도·최근 결제 · 멈추면 그 구매처는 결제하지 않아요</span></div>
         <p class="lead" id="ab-lead">불러오는 중</p><div class="ab-shops" id="ab-shops"></div>
         <div class="sub muted small" id="ab-other"></div></div>
-      <div class="card"><div class="card-h"><h2 id="au-flow-h">업무 흐름</h2><span class="desc">숫자 = 7일간 손 안 탄 주문 비율 · 누르면 자세히</span></div>
+      <div class="card"><div class="card-h"><h2 id="au-flow-h">업무 흐름</h2><span class="desc">숫자 = 7일간 실제로 사람 손 없이 지난 비율(그 단계를 지난 주문·일만) · 누르면 어떻게 쟀는지</span></div>
         <div class="au-leg" id="au-leg"></div><div class="au-flow" id="au-flow" role="group" aria-label="주문 흐름 단계"></div>
         <div class="au-detail" id="au-detail" aria-live="polite"></div></div>
       <div class="grid2">
@@ -102,9 +102,10 @@
   function detail(s) {
     const d = $('au-detail'); d.innerHTML = '';
     const h = E('div'); h.append(E('strong', null, `${s.n}. ${s.name}`), document.createTextNode('  '), E('span', 'badge', `수준 ${s.level} · ${s.level_name}`));
-    if (s.pct != null) h.append(document.createTextNode(' '), E('span', 'badge ' + (s.pct >= 98 ? 'ok' : s.pct >= 50 ? 'run' : 'warn'), `7일 ${s.auto}/${s.orders}건 자동`));
+    if (s.pct != null) h.append(document.createTextNode(' '), E('span', 'badge ' + (s.pct >= 98 ? 'ok' : s.pct >= 50 ? 'run' : 'warn'), `7일 ${s.auto}/${s.orders}${s.unit || '건'} 자동`));
+    else h.append(document.createTextNode(' '), E('span', 'badge', '7일 동안 이 일 없음'));
     const dl = E('dl');
-    for (const [k, v] of [['지금 방식', s.how], ['막힌 이유', s.blocker || '없음'], ['다음 단계', s.next || '유지']]) dl.append(E('dt', null, k), E('dd', null, noE(v)));
+    for (const [k, v] of [['지금 방식', s.how], ['어떻게 쟀나', s.measure || ''], ['막힌 이유', s.blocker || '없음'], ['다음 단계', s.next || '유지']]) if (v) dl.append(E('dt', null, k), E('dd', null, noE(v)));
     d.append(h, dl);
     if (s.tasks && s.tasks.length) {
       const ul = E('ul', 'list'); ul.style.marginTop = '8px';
@@ -140,8 +141,8 @@
       b.setAttribute('aria-label', `${s.n}단계 ${s.name}, 수준 ${s.level} ${s.level_name}, 자동 ${pctTxt(s.pct)}`);
       const lv = E('span', 'lv'); const dot = E('i'); dot.style.background = LV[s.level][1]; lv.append(dot, document.createTextNode(s.level_name));
       const bar = E('span', 'bar'); bar.style.background = LV[s.level][1];
-      b.append(E('div', 'n', `${s.n}`), E('div', 'nm', s.name), lv, E('div', 'pc', s.pct == null ? '·' : `${s.pct}%`), bar);
-      b.title = s.pct == null ? '주문 단위가 아닌 업무' : `7일 ${s.orders}건 중 자동 ${s.auto}건`;
+      b.append(E('div', 'n', `${s.n}`), E('div', 'nm', s.name), lv, E('div', 'pc', s.pct == null ? '없음' : `${s.pct}%`), bar);
+      b.title = s.pct == null ? '최근 7일 동안 이 일이 없었어요' : `7일 ${s.orders}${s.unit || '건'} 중 자동 ${s.auto}${s.unit || '건'}${s.measure ? ` — ${s.measure}` : ''}`;
       b.onclick = () => { pick = s.id; fl.querySelectorAll('.au-step').forEach((x) => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); detail(s); };
       fl.append(b);
     }

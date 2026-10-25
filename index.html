@@ -976,6 +976,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-work" aria-label="회차·허브" hidden>
       <div class="card" id="jobs-sec">
         <div class="card-h"><h2>자동작업</h2><span class="desc">대기열(barund)이 차례대로 실행</span></div>
+        <div id="fails24-box" hidden><div class="group-h">최근 24시간 실패</div><ul class="log" id="fails24"></ul></div>
         <div id="barund-info"></div>
         <div id="jobs"></div>
       </div>
@@ -1281,6 +1282,7 @@ const SV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오
 const openTodos = new Set();
 let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 넘음)
 let lastState = null;
+const moreRec = { events: false, worklog: false };   // 일지·알림 '더 보기' 펼침
 
 // 절감 장부 — notify/savings.py summary(): 사람 시간(손 안 탄 주문 단계 × 손으로 할 때 분)과 AI 시간(측정 종류·스크립트 회차)을 따로
 let svCounted = false, svEdit = false;   // svEdit: 사람 시간 기준(분) 고치기 켜짐
@@ -1438,10 +1440,14 @@ function render(s) {
   const stale = hbs.filter(([, h]) => h.state === 'stale');
   const agentFails = s.jobs.filter((j) => j.kind === 'agent').flatMap((j) => (j.runs || []).filter((r) => !r.skip).slice(0, 1)).filter((r) => r.end && r.rc && r.rc !== 0);
   const lcFails = s.jobs.filter((j) => j.kind === 'launchd' && j.launchd && !j.launchd.pid && j.launchd.last_exit && j.launchd.last_exit !== 0);
-  const fails = agentFails.length + lcFails.length;
-  const taskWait = (s.tasks || []).filter((t) => t.state === 'wait').length;
+  const failNow = agentFails.length + lcFails.length;   // 지금(마지막 결과) 실패 중 — 위 막대
+  const fails24 = s.fails || [];                         // 최근 24시간 실패(에이전트·스크립트·허브) — '최근 실패' 칸(2026-10-25 감사: 마지막 결과만 봐 0건)
+  const fails = failNow;
+  const taskWait = (s.tasks || []).filter((t) => t.state === 'wait').length;   // 서버가 답 기다리는 맡긴 일은 오래돼도 다 보냄
   const approvals = (s.approvals || 0) + taskWait;
-  const issues = s.issues || [];
+  const allIssues = s.issues || [];
+  const snoozed = allIssues.filter((i) => i.state === 'snoozed');   // 미룬 카드는 수에서 빼고 따로(디스코드 #상황판과 같은 기준)
+  const issues = allIssues.filter((i) => i.state !== 'snoozed');
   const busy = team.filter((m) => (m.state || '').startsWith('🟢')).length;
   const im = s.improve || {};
   // 다음 회차: 에이전트 회차와 스크립트 회차(auto-* — 2026-10-22부터 ④·⑦ 정기는 스크립트가 기준) 중 가장 이른 것
@@ -1473,10 +1479,10 @@ function render(s) {
   else al.hidden = true;
   renderSavings(sv);
   const ST = [
-    ['할 일', issues.length, '건', urgent ? `긴급 ${urgent}건` : '#할-일', urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
-    ['승인 대기', approvals, '건', taskWait ? `작업판 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', 'todo'],
+    ['할 일', issues.length, '건', [urgent ? `긴급 ${urgent}건` : '#할-일', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
+    ['승인 대기', approvals, '건', taskWait ? `맡긴 일 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
-    ['최근 실패', fails, '건', fails ? [...agentFails.map(() => '회차'), ...lcFails.map((j) => j.id)].slice(0, 3).join(', ') : '마지막 결과 기준', fails ? 'bad' : 'ok', 'work'],
+    ['최근 실패', fails24.length, '건', fails24.length ? `24시간 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
@@ -1489,6 +1495,8 @@ function render(s) {
     b.append(el('div', 'k', k), vv, el('div', 'd', d)); b.setAttribute('aria-label', `${k} ${v}${u}, ${d}`); sg.append(b);
   }
   window.barunBadge('todo', issues.length);
+  const fl = $('fails24');
+  if (fl) { $('fails24-box').hidden = !fails24.length; fl.textContent = ''; fails24.slice(0, 8).forEach((f) => fl.append(el('li', null, `${f.at ? relDay(f.at, s.now) : '지금'} · ${f.what}${f.why ? ' — ' + clean(f.why) : ''}`))); }
 
   try { window.barunOffice && window.barunOffice(s); } catch (e) { console.error('사무실', e); }
 
@@ -1501,7 +1509,7 @@ function render(s) {
     ['다음 회차', nextJob ? '' : 'idle', nextJob ? `${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '오늘 남은 회차 없음', 'work:jobs-sec'],
     ['진행 신호', stale.length ? 'warn' : '', stale.length ? `멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : `${hbs.filter(([, h]) => h.state === 'running').length}개 진행 중`, 'activity'],
     ['AI 사용량(7일)', us.blocked ? 'bad' : (p7 ?? 0) >= 85 ? 'warn' : '', us.blocked ? `한도 · ${us.until}에 풀림` : `${H5(p7)}%${uw.seven_day && uw.seven_day.resets ? ` · ${uw.seven_day.resets} 채워짐` : ''}`, 'work'],
-    ['최근 백업', s.backup.latest ? '' : 'bad', s.backup.latest ? `${s.backup.latest.slice(5).replace('-', '/')} · ${s.backup.count}일치 보관` : '없음', 'records:backup-sec'],
+    ['최근 백업', s.backup.latest ? ((s.backup.hourly || {}).fails ? 'warn' : '') : 'bad', s.backup.latest ? `${s.backup.latest.slice(5).replace('-', '/')} · ${s.backup.count}일치 보관${(s.backup.hourly || {}).last_ok ? ` · 매시 ${relDay(s.backup.hourly.last_ok, s.now)}` : ''}` : '없음', 'records:backup-sec'],
     ['기술부채', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
     ['git', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? 'GitHub와 같음' : `앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 안 올린 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
   ];
@@ -1533,17 +1541,18 @@ function render(s) {
 
   // 할 일 — 급한 것·승인 먼저, 버튼은 한 줄(주 행동 하나 + 보조)
   const tl = $('todo-list'); tl.textContent = '';
-  if (!issues.length) tl.append(el('div', 'empty', '열린 할 일 없음'));
+  if (!issues.length) tl.append(el('div', 'empty', '열린 할 일 없음' + (snoozed.length ? ` · 미룬 일 ${snoozed.length}건` : '')));
   // 묶어 보기(2026-10-22 사장님 "더 편하게"): 버튼 한 번으로 끝나는 것 · 3일 넘게 그대로인 것 — 오래된 건 한꺼번에 정리
   const oldOne = (i) => i.last && (Date.parse(s.now) - Date.parse(i.last)) > 72 * 3600e3;
-  const FIL = [['all', '전체', () => true], ['tap', '버튼 한 번', oneTap], ['old', '3일 넘음', oldOne]];
+  const FIL = [['all', '전체', () => true], ['tap', '버튼 한 번', oneTap], ['old', '3일 넘음', oldOne], ['snz', '미룸', () => true]];
   const fbar = el('div', 'todo-fil');
   for (const [k, lab, fn] of FIL) {
-    const n = issues.filter(fn).length; if (k !== 'all' && !n) continue;
+    const n = (k === 'snz' ? snoozed : issues).filter(fn).length; if (k !== 'all' && !n) continue;
     const b = el('button', 'chipbtn' + (todoFilter === k ? ' on' : ''), `${lab} ${n}`); b.type = 'button'; b.setAttribute('aria-pressed', String(todoFilter === k));
     b.onclick = () => { todoFilter = k; render(s); }; fbar.append(b);
   }
-  const shown = sorted.filter((FIL.find((f) => f[0] === todoFilter) || FIL[0])[2]);
+  if (todoFilter === 'snz' && !snoozed.length) todoFilter = 'all';
+  const shown = todoFilter === 'snz' ? snoozed : sorted.filter((FIL.find((f) => f[0] === todoFilter) || FIL[0])[2]);
   if (todoFilter === 'old' && shown.length) {
     const bulk = el('button', 'btn sm weak', `${shown.length}건 모두 처리`); bulk.type = 'button';
     bulk.onclick = async () => {
@@ -1554,7 +1563,7 @@ function render(s) {
     };
     fbar.append(bulk);
   }
-  if (issues.length) tl.append(fbar);
+  if (issues.length || snoozed.length) tl.append(fbar);
   for (const i of shown) {
     const it = el('div', 'todo' + (openTodos.has(i.key) ? ' open' : '')); it.id = 'todo-' + i.key;
     const [sl, sc] = SV[i.severity] || [i.severity || '', ''];
@@ -1562,6 +1571,7 @@ function render(s) {
     if (i.approval) meta.append(chip('승인 필요', 'run'));
     if ((i.choices || []).length) meta.append(chip('골라 주세요', 'run'));
     if (i.state === 'ack') meta.append(chip('보는 중'));
+    if (i.state === 'snoozed') meta.append(chip(`미룸${i.snooze_until ? ' · ' + relDay(i.snooze_until, s.now) + '까지' : ''}`));
     if (oldOne(i)) meta.append(chip(`${Math.floor((Date.parse(s.now) - Date.parse(i.last)) / 864e5)}일째`, 'warn'));
     meta.append(el('span', null, [dom[i.domain] || i.domain, i.last ? relDay(i.last, s.now) : '', i.count > 1 ? `${i.count}번째` : ''].filter(Boolean).join(' · ')));
     const t = el('div', 't', clean(i.title)); t.tabIndex = 0; t.setAttribute('role', 'button'); t.setAttribute('aria-expanded', String(openTodos.has(i.key)));
@@ -1622,21 +1632,28 @@ function render(s) {
     main.append(chips);
     const side = el('div', 'side');
     if (j.next) side.append(el('span', 'when', '다음 ' + j.next));
-    if (j.heartbeat && j.heartbeat.state === 'running') side.append(chip(`진행 중 · ${j.heartbeat.step || ''}`, 'run'));
-    else if (j.heartbeat && j.heartbeat.state === 'stale') side.append(chip('멈춤 의심', 'warn'));
+    // 잠금은 업무끼리·작업판 일과 나눠 씀 — 남이 쥔 잠금은 '진행 중'이 아니라 누가 쓰는지(2026-10-25 감사)
+    const hbx = j.heartbeat, other = hbx && hbx.other;
+    if (hbx && hbx.state === 'running') side.append(other ? chip(/^task-/.test(hbx.by) ? '작업판 일이 잠금 사용 중' : '다른 업무가 잠금 사용 중') : chip(`진행 중 · ${hbx.step || ''}`, 'run'));
+    else if (hbx && hbx.state === 'stale' && !other) side.append(chip('멈춤 의심', 'warn'));
     const ran = (j.runs || []).filter((x) => !x.skip), skips = (j.runs || []).filter((x) => x.skip);
-    if (skips.length && (!ran.length || skips[0].start > ran[0].start)) side.append(chip('건너뜀 · 할 일 없음'));
+    const sc = (j.script || [])[0];   // 스크립트 회차(DATA/auto/runs.jsonl) — 스크립트 업무는 자기 기록, 에이전트 업무는 자기를 대신한 스크립트의 마지막
+    if (j.kind !== 'agent' && sc && !(j.launchd && j.launchd.pid)) { side.append(el('span', 'when', '최근 ' + relDay(sc.at, s.now))); side.append(chip(sc.ok ? '정상' : '실패', sc.ok ? 'ok' : 'bad')); }
+    else if (skips.length && (!ran.length || skips[0].start > ran[0].start)) side.append(chip('건너뜀 · 할 일 없음'));
     else if (ran.length) { const x = ran[0]; side.append(chip(x.end ? (x.rc === 0 ? '정상' : `실패 rc=${x.rc}`) : '진행 중', x.end ? (x.rc === 0 ? 'ok' : 'bad') : 'run')); }
     else if (j.launchd && j.launchd.pid) side.append(chip('실행 중', 'ok'));
     else if (j.launchd && j.launchd.last_exit != null) side.append(chip(j.launchd.last_exit === 0 ? '정상' : `종료코드 ${j.launchd.last_exit}`, j.launchd.last_exit === 0 ? 'ok' : 'bad'));
     if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs weak'); b.innerHTML = `${ico('play')} 지금 실행`; b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
+    if (j.kind === 'agent' && sc && (!ran.length || sc.at > ran[0].start.replace(' ', 'T'))) main.append(el('div', 'ds', `스크립트가 대신 · 최근 ${relDay(sc.at, s.now)} ${sc.ok ? '정상' : '실패'}${sc.note ? ' · ' + clean(sc.note).slice(0, 80) : ''}`));
     r.append(main, side);
-    if ((j.runs || []).length) {
+    if ((j.runs || []).length || (j.script || []).length) {
       const more = el('div', 'more'); const d = el('details');
-      const last = ran[0];
-      d.append(el('summary', null, last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${last.secs}초` : ''}` : '이전 회차'));
-      if (last && last.summary) d.append(el('pre', null, last.summary));
-      d.append(el('pre', null, j.runs.map((x) => x.skip ? `${x.start}  건너뜀 — ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n')));
+      const last = ran[0], sk = skips[0];
+      const skNewer = sk && (!last || sk.start > last.start);   // '최근'은 실제 회차와 건너뜀 중 늦은 것(2026-10-25 감사: ③이 10-23으로 보였음)
+      d.append(el('summary', null, skNewer ? `최근 ${hm(sk.start.replace(' ', 'T'))} · 건너뜀` : last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${last.secs}초` : ''}` : sc ? `최근 ${hm(sc.at)} · 스크립트` : '이전 회차'));
+      if (last && last.summary) d.append(el('pre', null, (skNewer ? `지난 회차(${hm(last.start.replace(' ', 'T'))}) 결과\n` : '') + last.summary));
+      if ((j.script || []).length) d.append(el('pre', null, j.script.map((x) => `${x.at.replace('T', ' ')}  스크립트 ${x.ok ? '정상' : '실패'} ${Math.round(x.secs || 0)}s${x.mode && x.mode !== 'apply' ? ' (' + x.mode + ')' : ''}  ${clean(x.note || '')}`).join('\n')));
+      if ((j.runs || []).length) d.append(el('pre', null, j.runs.map((x) => x.skip ? `${x.start}  건너뜀 — ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n')));
       if (last && last.fallback) d.append(chip('Codex로 대체', 'warn'));
       more.append(d); r.append(more);
     }
@@ -1673,7 +1690,7 @@ function render(s) {
   if (!(hub.incidents || []).length) hf.append(el('li', 'empty', '최근 24시간 변화 없음'));
   for (const i of (hub.incidents || [])) {
     const li = el('li');
-    li.append(el('div', 'when', i.at.slice(11, 16)), el('div', 'src', i.label));
+    li.append(el('div', 'when', relDay(i.at, s.now)), el('div', 'src', i.label));
     const ch = el('div', 'chain');
     ch.append(el('span', 'pill det', '감지 · ' + i.detected));
     for (const st of i.steps) {
@@ -1701,7 +1718,9 @@ function render(s) {
   const SEV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오늘', 'warn'], high: ['오늘', 'warn'], info: ['참고', ''], debug: ['기록', ''] };
   const ev = $('events'); ev.textContent = '';
   if (!(s.events || []).length) ev.append(el('li', 'empty', '기록 없음'));
-  for (const e of (s.events || [])) {
+  // 서버는 오늘 것 전부를 보냄 — 처음엔 최근 40건, '더 보기'로 전부(2026-10-25 감사: 40건에서 잘려 오늘 긴급 알림이 안 보였음)
+  const evAll = s.events || [], evToday = evAll.filter((e) => (e.at || '').slice(0, 10) === s.now.slice(0, 10)).length;
+  for (const e of (moreRec.events ? evAll : evAll.slice(0, 40))) {
     const li = el('li'); li.id = 'ev-' + e.id;
     const [lab, cls] = SEV[e.severity] || [e.severity, ''];
     li.append(chip(lab, cls), document.createTextNode(' '), el('span', 'name', clean(e.title)));
@@ -1710,15 +1729,17 @@ function render(s) {
     if (e.body || e.todo) { const d = el('details'); d.append(el('summary', null, '내용')); d.append(el('pre', null, (e.body || '') + (e.todo ? '\n할 일: ' + e.todo : ''))); li.append(d); }
     ev.append(li);
   }
+  if (evAll.length > 40) { const li = el('li'); const b = el('button', 'more-link', moreRec.events ? '최근 40건만 보기' : `오늘 ${evToday}건 중 40건 · 전부 보기`); b.type = 'button'; b.style.marginLeft = '0'; b.onclick = () => { moreRec.events = !moreRec.events; render(lastState); }; li.append(b); ev.append(li); }
 
   const wl = $('worklog'); wl.textContent = '';
   if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 기록 없음'));
-  for (const l of [...s.worklog].reverse()) wl.append(el('li', null, l));
+  if (s.worklog.length > 40) { const li = el('li'); const b = el('button', 'more-link', moreRec.worklog ? '최근 40줄만 보기' : `오늘 ${s.worklog.length}줄 중 최근 40줄 · 앞 ${s.worklog.length - 40}줄 더 보기`); b.type = 'button'; b.style.marginLeft = '0'; b.onclick = () => { moreRec.worklog = !moreRec.worklog; render(lastState); }; li.append(b); wl.append(li); }
+  for (const l of [...(moreRec.worklog ? s.worklog : s.worklog.slice(0, 40))].reverse()) wl.append(el('li', null, l));
   mdRender(s.status_md || '(없음)', $('status'));
 
   const g = $('git'); g.textContent = '';
   const sync = s.git.ahead === 0 && s.git.behind === 0;
-  g.append(el('p', 'small ' + (sync ? 'muted' : ''), sync ? 'GitHub와 같음' : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`));
+  g.append(el('p', 'small ' + (sync ? 'muted' : ''), (sync ? 'GitHub와 같음' : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.fetched ? ` · GitHub ${relDay(s.git.fetched, s.now)}에 확인` : '')));
   const gl = el('ul', 'log');
   for (const c of s.git.log) { const li = el('li'); li.append(el('code', null, c.hash), document.createTextNode(' '), el('span', 'muted small', c.when + ' '), document.createTextNode(deE(c.subject))); gl.append(li); }
   g.append(gl);
@@ -1726,7 +1747,10 @@ function render(s) {
 
   const b = $('backup'); b.textContent = '';
   b.append(el('p', null, s.backup.latest ? `최근 ${s.backup.latest} · 로컬 ${s.backup.count}일치` : '로컬 백업 없음'));
-  if (s.backup.log.length) b.append(el('pre', null, s.backup.log.join('\n')));
+  const bh = s.backup.hourly;   // 매시 외부 백업은 상태 파일로(backup.log의 '매시 … 정상(1.0시간 전)' 줄은 새벽에 쓴 옛말 — 2026-10-25 감사)
+  if (bh) b.append(el('p', bh.fails ? 'bad' : 'small', `매시 외부 백업 · 마지막 성공 ${bh.last_ok ? relDay(bh.last_ok, s.now) : '없음'}${bh.files ? ` · 파일 ${bh.files}개` : ''}${bh.fails ? ` · 연속 실패 ${bh.fails}번 — ${clean(bh.last_err || '')}` : ''}`));
+  const blog = s.backup.log.filter((l) => !(bh && l.includes('매시 외부 백업')));
+  if (blog.length) b.append(el('pre', null, blog.join('\n')));
 }
 
 let busyTick = false;

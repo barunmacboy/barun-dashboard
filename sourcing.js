@@ -9,6 +9,9 @@
   // 상태 → 색(역할로): 등록=좋음, 외부대기=주의, 정밀확인=진행, 탈락=닫힘(회색), 후보=아직
   const ST = { 후보: ['var(--axis)', ''], 정밀확인: ['var(--st-run)', 'run'], 등록: ['var(--st-good)', 'ok'], 끝: ['var(--green-ink)', 'ok'],
     탈락: ['var(--muted)', ''], 외부대기: ['var(--st-warn)', 'warn'] };
+  // 외부대기가 기다리는 것(dashboard/sourcing.py _wait_kind) — 2026-10-25: 28줄을 모두 '답 기다림'으로 보이던 것
+  const WAIT = { 외부: '외부 답 기다림', 사장님: '사장님 결정 기다림', 구매처: '구매처 없음' };
+  const waits = (w) => Object.entries(w || {}).filter(([, n]) => n).map(([k, n]) => `${WAIT[k] || k} ${n}`).join(' · ');
   let timer = 0, busy = false;
 
   function install() {
@@ -30,15 +33,15 @@
     document.head.append(css);
     sec.innerHTML = `
       <div class="card hero"><h2 id="sc-title">불러오는 중</h2><p class="lead" id="sc-lead"></p><div class="stats" id="sc-stats"></div></div>
-      <div class="card"><div class="card-h"><h2>장부 400줄 어디까지 왔나</h2><span class="desc">후보·정밀확인은 열린 줄</span></div>
+      <div class="card"><div class="card-h"><h2>장부 400줄 어디까지 왔나</h2><span class="desc" id="sc-bar-desc">끝·탈락·외부대기가 닫힌 줄</span></div>
         <div class="sc-bar" id="sc-bar" role="img"></div><div class="sc-leg" id="sc-leg"></div></div>
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>⑨ 소싱 회차</h2><span class="act" id="sc-run-badge"></span></div><div id="sc-run"></div></div>
-        <div class="card"><div class="card-h"><h2>최근 7일 닫은 줄</h2><span class="desc">하루 목표 10줄</span></div><div class="sc-week" id="sc-week"></div></div>
+        <div class="card"><div class="card-h"><h2>최근 7일 새로 닫은 줄</h2><span class="desc">상태가 닫힘으로 바뀐 줄 · 하루 목표 10줄</span></div><div class="sc-week" id="sc-week"></div></div>
       </div>
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>등록 준비</h2><span class="act" id="sc-ap"></span></div><ul class="list" id="sc-ready"></ul></div>
-        <div class="card"><div class="card-h"><h2>외부 대기</h2><span class="desc">답·조건을 기다리는 줄</span></div><ul class="list" id="sc-wait"></ul></div>
+        <div class="card"><div class="card-h"><h2>외부 대기</h2><span class="desc" id="sc-wait-desc">답·결정·조건을 기다리는 줄</span></div><ul class="list" id="sc-wait"></ul></div>
       </div>
       <div class="card"><div class="card-h"><h2>방금 바뀐 줄</h2><span class="desc">상태 수정은 주문 데이터 → 소싱 장부</span></div><ul class="list sc-feed" id="sc-feed"></ul></div>
       <div class="card"><div class="card-h"><h2>다음 차례 10줄</h2></div><ul class="list" id="sc-next"></ul></div>
@@ -61,15 +64,18 @@
   const stat = (k, v, d, cls) => { const s = E('div', 'stat ' + (cls || '')); s.style.cursor = 'default'; s.append(E('div', 'k', k), E('div', 'v', v), E('div', 'd', d || '')); return s; };
 
   function render(d) {
-    const c = d.counts, ap = d.approval || {}, run = d.run || {};
+    const c = d.counts, ap = d.approval || {}, run = d.run || {}, t = d.today || {}, act = run.activity || {}, reg = d.registered || {}, man = d.manual || {};
     const pct = Math.round(d.closed / Math.max(1, d.total) * 100);
     $('sc-title').textContent = run.running ? '⑨ 소싱 회차 진행 중' : `장부 ${d.total}줄 중 ${d.closed}줄 닫음 · ${pct}%`;
-    $('sc-lead').textContent = `오늘 ${d.today.n}줄 처리 · 열린 줄 ${d.open}(원가 근거 없음 ${d.nocost}) · 등록 준비 ${d.ready.length}줄` +
+    // 2026-10-25: '오늘 처리'가 재확인 메모만 남긴 줄까지 셌음 → 상태가 실제로 바뀐 줄과 재확인을 따로
+    $('sc-lead').textContent = `오늘 상태 바뀐 줄 ${t.n}(재확인 ${t.recheck || 0}) · 남은 후보 ${d.open}(원가 근거 없음 ${d.nocost}) · 등록 준비 ${d.ready.length}줄` +
       (ap.status === 'pending' ? ' — 사장님 승인 기다림' : ap.status === 'approved' ? ' — 승인됨, 다음 회차가 등록' : '');
+    $('sc-bar-desc').textContent = '끝·탈락·외부대기가 닫힌 줄' + (man.n ? ` · 400행 밖 수동 ${man.n}줄은 빼고 셈` : '');
     const st = $('sc-stats'); st.innerHTML = '';
-    st.append(stat('오늘 처리', `${d.today.n}`, Object.entries(d.today.by).map(([k, v]) => `${k} ${v}`).join(' · ') || `목표 ${d.today.target}줄`, d.today.n ? 'run' : ''),
-      stat('등록', `${c['등록'] || 0}`, '플랫폼에 올라간 줄', ''), stat('등록 준비', `${d.ready.length}`, ap.status === 'pending' ? '승인 대기' : ap.status === 'approved' ? '승인됨' : '', d.ready.length ? 'warn' : ''),
-      stat('남은 후보', `${d.open}`, `정밀확인 ${c['정밀확인'] || 0}`, ''), stat('외부 대기', `${c['외부대기'] || 0}`, '답 기다림', c['외부대기'] ? 'warn' : ''),
+    st.append(stat('오늘 상태 바뀐 줄', `${t.n}`, [Object.entries(t.by || {}).map(([k, v]) => `${k} ${v}`).join(' · '), t.recheck ? `재확인 ${t.recheck}` : ''].filter(Boolean).join(' · ') || `목표 ${t.target}줄`, t.n ? 'run' : ''),
+      stat('등록한 조사 줄', `${c['등록'] || 0}`, reg.products != null ? `같은 물건 묶으면 ${reg.products}개` : '', ''),
+      stat('등록 준비', `${d.ready.length}`, ap.status === 'pending' ? '승인 대기' : ap.status === 'approved' ? '승인됨' : '', d.ready.length ? 'warn' : ''),
+      stat('남은 후보', `${d.open}`, `정밀확인 ${c['정밀확인'] || 0}`, ''), stat('외부 대기', `${c['외부대기'] || 0}`, waits(d.waits) || '답 기다림', c['외부대기'] ? 'warn' : ''),
       stat('탈락', `${c['탈락'] || 0}`, '이익·원가 기준 미달', ''));
     const gap = d.costgap;   // 2026-10-24 원가 원본(barun.db): 원가 빈 판매 상품 수(하루 1번)
     if (gap) st.append(stat('원가 빈 판매상품', `${gap.products}`, `옵션 ${gap.options} · 쿠팡 ${gap.coupang} · 네이버 ${gap.naver}`, gap.products ? 'warn' : ''));
@@ -89,12 +95,15 @@
       const l = E('span'); const i = E('i'); i.style.background = ST[s][0]; l.append(i, document.createTextNode(`${s} ${n}`)); leg.append(l);
     }
     const rb = $('sc-run-badge'); rb.innerHTML = '';
-    rb.append(E('span', 'badge ' + (run.running ? 'run' : 'k-idle'), run.running ? '진행 중' : '쉬는 중'));
+    rb.append(E('span', 'badge ' + (run.running || act.active ? 'run' : 'k-idle'), run.running ? '진행 중' : act.active ? '회차 밖 작업 중' : '쉬는 중'));
     const rr = $('sc-run'); rr.innerHTML = '';
     if (run.running) rr.append(E('div', null, `${hm(run.started)} 시작`));
     if (run.last) rr.append(E('div', 'muted small', `마지막 회차 ${hm(run.last.at)} ${run.last.verb}${run.last.rc && run.last.rc !== '0' ? ' (rc ' + run.last.rc + ')' : ''}`));
     else if (!run.running) rr.append(E('div', 'muted small', '아직 회차 없음'));
     if (run.next) rr.append(E('div', 'muted small', `다음 회차 ${hm(run.next)}`));
+    // 2026-10-25: 작업판·Codex가 회차 밖에서 등록해도 '쉬는 중'만 보이던 것 → 장부·등록 기록의 마지막 시각을 같이
+    if (act.ledger) rr.append(E('div', 'muted small', `장부 마지막 움직임 ${hm(act.ledger.at)} · ${act.ledger.title || act.ledger.lead_id}`));
+    if (act.reg) rr.append(E('div', 'muted small', `마지막 등록 기록 ${hm(act.reg.at)} · ${act.reg.platform === 'naver' ? '네이버' : act.reg.platform === 'coupang' ? '쿠팡' : act.reg.platform || ''} ${act.reg.action || ''}${act.reg.ok ? '' : ' (실패)'}`));
     if (run.steps && run.steps.length) { const s = E('div', 'sc-steps'); for (const x of run.steps) s.append(E('div', null, window.noEmoji ? window.noEmoji(x) : x)); rr.append(s); }
     const wk = $('sc-week'); wk.innerHTML = ''; const mx = Math.max(10, ...d.week.map((w) => w.n));
     for (const w of d.week) { const col = E('div'); col.title = `${w.day} ${w.n}줄`; const b = E('b'); b.style.height = `${w.n / mx * 100}%`; col.append(E('span', null, String(w.n)), b, E('span', null, w.day.slice(5).replace('-', '/'))); wk.append(col); }
@@ -104,13 +113,18 @@
     if (!d.ready.length) empty(ur, '없음');
     for (const r of d.ready) ur.append(li(`${r.title} · ${r.qty}개`, `계획가 ${Object.entries(r.plan || {}).map(([k, v]) => `${k === 'naver' ? '네이버' : '쿠팡'} ${won(v)}`).join(' · ')} · 원가 ${won(r.cost)} · 이익 ${won(r.profit)}`, r.lead_id, ''));
     const uw = $('sc-wait'); uw.innerHTML = '';
+    $('sc-wait-desc').textContent = waits(d.waits) || '답·결정·조건을 기다리는 줄';
     if (!d.waiting.length) empty(uw, '없음');
-    for (const r of d.waiting) uw.append(li(`${r.title} · ${r.qty}개`, r.waiting || r.reason || '', `${hm(r.updated).slice(0, 5)}부터`, 'warn'));
+    // 'n/n부터' = 외부대기로 들어온 날(이력) — 전엔 장부 동기화 시각이라 모두 오늘 날짜
+    for (const r of d.waiting) uw.append(li(`${r.title} · ${r.qty}개`, `${WAIT[r.wait] ? WAIT[r.wait] + ' — ' : ''}${r.waiting || r.reason || ''}`, `${hm(r.since || r.updated).slice(0, 5)}부터`, r.wait === '사장님' ? 'warn' : ''));
     const uf = $('sc-feed'); uf.innerHTML = '';
     if (!d.recent.length) empty(uf, '없음');
     for (const h of d.recent) {
       const l = E('li'); const b = E('div', 'b');
-      const top = E('div'); top.append(E('span', 'badge ' + (ST[h.state] || [, ''])[1], h.state), document.createTextNode(` ${h.title || h.lead_id}${h.qty ? ' · ' + h.qty + '개' : ''}`));
+      // 상태가 실제로 바뀐 이력만 그 상태 표시 — 재확인 메모('미등록'·'신규등록제외')가 '등록'으로 보이던 것(2026-10-25)
+      const moved = h.changed !== false;
+      const top = E('div'); top.append(E('span', 'badge ' + (moved ? (ST[h.state] || [, ''])[1] : ''), moved ? h.state : '재확인'),
+        document.createTextNode(` ${h.title || h.lead_id}${h.qty ? ' · ' + h.qty + '개' : ''}${moved ? (h.prev ? ` · ${h.prev}에서` : '') : ` · 상태 그대로(${h.state})`}`));
       b.append(top, E('div', 'm', h.memo || '')); l.append(E('span', 't', hm(h.at)), b); uf.append(l);
     }
     const un = $('sc-next'); un.innerHTML = '';

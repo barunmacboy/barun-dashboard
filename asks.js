@@ -26,7 +26,7 @@
     sec.innerHTML = `
       <div class="card hero"><h2 id="ak-title">불러오는 중</h2><p class="lead" id="ak-lead"></p><div class="stats" id="ak-stats"></div></div>
       <div class="card"><div class="card-h"><h2>답 옴</h2><span class="desc">조치 끝나면 [끝]</span></div><div id="ak-new"></div></div>
-      <div class="card"><div class="card-h"><h2>답 기다림</h2><span class="desc">오래된 순 · 2일 주황 · 4일 빨강</span></div><div id="ak-wait"></div></div>
+      <div class="card"><div class="card-h"><h2>답 기다림</h2><span class="desc">마지막으로 물은 때부터 · 오래된 순 · 2일 주황 · 4일 빨강</span></div><div id="ak-wait"></div></div>
       <div class="card"><div class="card-h"><h2>최근 끝난 문의</h2><span class="desc">지난 14일</span></div><div id="ak-done"></div></div>`;
     document.addEventListener('barun:page', (e) => { if (e.detail === 'asks') { load(); start(); } else stop(); });
     if (!sec.hidden) start();
@@ -38,8 +38,16 @@
   const start = () => { stop(); timer = setInterval(() => { if (!document.hidden && !$('p-asks').hidden) load(); }, 30000); };
   const stop = () => { if (timer) clearInterval(timer); timer = 0; };
   const stat = (k, v, d, cls) => { const s = E('div', 'stat ' + (cls || '')); s.style.cursor = 'default'; s.append(E('div', 'k', k), E('div', 'v', v), E('div', 'd', d || '')); return s; };
-  const day = (iso) => !iso ? '' : String(iso).slice(5, 16).replace('T', ' ').replace('-', '/');
-  const ageTxt = (a) => a < 1 ? `${Math.round(a * 24)}시간` : `${Math.floor(a)}일 ${Math.round((a % 1) * 24)}시간`;
+  // 날짜뿐인 시각('YYYY-MM-DD'·옛 'T00:00:00')은 날짜만 — 시각을 지어내지 않음(ops/asks.py day_only와 같은 규칙)
+  const dayOnly = (iso) => { const s = String(iso || ''); return s.length === 10 || s.slice(10, 19) === 'T00:00:00'; };
+  const day = (iso) => !iso ? '' : dayOnly(iso) ? String(iso).slice(5, 10).replace('-', '/') : String(iso).slice(5, 16).replace('T', ' ').replace('-', '/');
+  // 나이 = 기다림은 마지막으로 물은 때부터, 답 옴은 답 온 때부터(r.age_from). 날짜만 아는 것은 '3일+'(적어도)
+  const ageTxt = (r) => {
+    const a = r.age || 0;
+    if (r.age_exact === false) return a >= 1 ? `${Math.floor(a)}일+` : '오늘·어제';
+    const h = Math.round(a * 24);
+    return h < 24 ? `${h}시간` : `${Math.floor(h / 24)}일 ${h % 24}시간`;
+  };
 
   async function setState(id, state, b) {
     b.disabled = true;
@@ -53,13 +61,18 @@
     const d = E('div', 'ak-row');
     const body = E('div', 'ak-body');
     body.append(E('div', 'ak-t', noE(r.title) || r.no));
-    const meta = [`글 ${r.no}`, r.ref, `보냄 ${day(r.sent_at)}`, r.by].filter(Boolean).join(' · ');
+    const asked = r.state === '기다림' && r.age_from && r.age_from !== r.sent_at ? `다시 기다림 ${day(r.age_from)}` : '';
+    const got = r.state === '답 옴' && r.answered_at ? `답 옴 ${day(r.answered_at)}` : '';
+    const prev = (r.replaces || []).length ? `이전 글 ${r.replaces.map((x) => x.no).join('·')}` : '';
+    const meta = [`글 ${r.no}`, r.ref, `보냄 ${day(r.sent_at)}${dayOnly(r.sent_at) ? '(시각 모름)' : ''}`, asked, got, prev, r.by].filter(Boolean).join(' · ');
     body.append(E('div', 'ak-m', meta));
     if (r.memo) { const m = E('div', 'ak-m'); m.append(ic('edit'), document.createTextNode(noE(r.memo))); body.append(m); }
     if (r.answer) { const a = E('div', 'ak-a'); if (r.state !== '기다림') a.append(ic('chat')); a.append(document.createTextNode(noE(r.answer))); body.append(a); }
     const side = E('div', 'ak-side');
     const [lab, cls] = LVL[r.level] || ['', ''];
-    const top = E('div'); top.append(E('span', 'badge ' + cls, lab), document.createTextNode(' '), E('span', 'ak-age', r.state === '끝' ? day(r.answered_at || r.updated) : ageTxt(r.age)));
+    const age = E('span', 'ak-age', r.state === '끝' ? day(r.closed_at || r.answered_at || r.updated) : ageTxt(r));
+    age.title = r.state === '끝' ? '끝낸 때' : r.state === '답 옴' ? '답 온 지' : '마지막으로 물은 지';
+    const top = E('div'); top.append(E('span', 'badge ' + cls, lab), document.createTextNode(' '), age);
     side.append(top);
     const bt = E('div', 'ak-btns');
     if (r.url) { const a = E('a', 'btn sm ghost', '글 열기'); a.append(ic('external')); a.href = r.url; a.target = '_blank'; a.rel = 'noopener'; bt.append(a); }
@@ -76,7 +89,7 @@
     const nNew = d.answered.length, nWait = d.waiting.length, nOver = d.overdue.length;
     if (window.barunBadge) window.barunBadge('asks', nNew);   // 메뉴 숫자(답 옴)
     $('ak-title').textContent = nNew ? `답 옴 ${nNew}건 확인` : nOver ? `2일 넘게 답 없음 ${nOver}건` : nWait ? `답 기다림 ${nWait}건` : '열린 문의 없음';
-    $('ak-lead').textContent = `답 자동 확인 ${d.auto_pct ?? '—'}% · 손 모양은 직접 확인`;
+    $('ak-lead').textContent = `열린 문의 중 답 자동 확인 ${d.auto_pct ?? '—'}% · 손 모양은 직접 확인`;
     const st = $('ak-stats'); st.innerHTML = '';
     st.append(stat('답 옴', String(nNew), '확인 필요', nNew ? 'run' : ''), stat('기다림', String(nWait), Object.entries(d.by_site).map(([k, v]) => v ? `${k} ${v}` : '').filter(Boolean).join(' · ')),
       stat('2일 넘음', String(nOver), '재촉 검토', nOver ? 'warn' : 'ok'), stat('최근 끝', String(d.done.length), '지난 14일', ''));

@@ -217,7 +217,7 @@
     };
     tile('상품(실제 물건)', k.products.toLocaleString(), `판매 옵션 ${k.options.toLocaleString()}개를 묶음`);
     tile('판매 중', k.selling.toLocaleString(), `쿠팡 ${k.coupang} · 네이버 ${k.naver} · 둘 다 ${k.both}`);
-    tile('정리할 것', k.fix.toLocaleString(), '아래 칩으로 골라 보기', k.fix > 0);
+    tile('정리할 것', k.fix.toLocaleString(), '상품 수 · 한 상품이 아래 칩 여러 개에 들 수 있어요', k.fix > 0);
     tile('원가 모름(팔림)', (pc.nocost_sold || 0).toLocaleString(), `안 팔린 것 ${pc.nocost || 0}개`, (pc.nocost_sold || 0) > 0, 'nocost_sold');
     tile('판매 전 오래', (pc.stuck || 0).toLocaleString(), `쿠팡 임시저장·심사·반려`, (pc.stuck || 0) > 0, 'stuck');
     const pb = $('ct-probs'); pb.textContent = '';
@@ -324,7 +324,7 @@
     if (j.source) row('원천', `${j.source.title || j.source.source_key}${j.source.unit_price ? ` · 공홈 ${r2(j.source.unit_price)} ${j.source.currency || ''}` : ''}${j.source.user_price ? ` · 사장님 ${r2(j.source.user_price)} ${j.source.user_currency || ''}` : ''}`);
     row('구매처', j.shop ? Object.entries(j.shops).map(([s, n]) => `${s}${Object.keys(j.shops).length > 1 ? ` ${n}` : ''}`).join(' · ') : '모름');
     row('시트 탭', Object.keys(j.tabs).length ? Object.entries(j.tabs).map(([t, n]) => `${t}${n ? ` ${n}줄` : ''}`).join(' · ') : '아직 없음');
-    row('주문', `${j.orders}건${j.o30 ? ` · 30일 ${j.o30}건` : ''}${j.last ? ` · 마지막 ${when(j.last)}` : ''}`);
+    row('주문', `${j.orders}건${j.o30 ? ` · 30일 ${j.o30}건` : ''}${j.last ? ` · 마지막 ${when(j.last)}` : ''}${j.canceled ? ` · 취소·반품 ${j.canceled}건 뺌` : ''}`);
     row('시트 이름', j.sheet ? '대표 이름으로' : '판매 이름 그대로');
     body.append(kv);
     // 고치기

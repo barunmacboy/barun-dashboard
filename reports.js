@@ -22,6 +22,21 @@
   const solo = (row) => row.filter((c) => String(c).trim()).length === 1 && String(row[0]).trim();
   const editable = (r, c) => (data.editable || []).some(([a, b]) => a === r && b === c);
 
+  // 보이는 값(2026-10-25 감사: '91·'8.2%·0.0956…·2815000이 그대로 보였음). 새 격자는 ops/gridstore.shown이 서식대로 저장하고, 여기선 옛 격자 대비 —
+  // 앞 따옴표(시트의 '글자로 두기' 표시)는 떼고, 순수 숫자만 머리글로 판단: 수익률·비율 칸의 소수 → %, 금액 칸(매출·금액·수익·가격…)의 4자리 넘는 정수 → 쉼표.
+  // 번호·송장·코드·전화·ID 칸과 머리글 없는 칸은 그대로(주문번호·송장번호를 숫자로 바꾸지 않게). 환율·세율(율)은 % 칸이 아님.
+  const KEEP = /번호|송장|코드|전화|ID|id|key|날짜|일시|시각/, RATE = /률|비율|%/, MONEY = /매출|금액|수익|이익|가격|추천가|광고비|결제|정산|객단가|\(원\)/;
+  function shown(v, head) {
+    let s = String(v ?? '');
+    if (s.startsWith("'")) s = s.slice(1);
+    const h = String(head || ''), t = s.trim();
+    if (!h || KEEP.test(h) || !/^-?\d+(\.\d+)?$/.test(t)) return s;
+    if (RATE.test(h)) return t.includes('.') || +t === 0 ? `${(+t * 100).toFixed(1)}%` : s;
+    if (MONEY.test(h) && /^-?\d{4,}$/.test(t)) return (+t).toLocaleString('ko-KR');
+    return s;
+  }
+  window.barunReportCell = shown;     // 시험용(dashboard/tests/test_reports_js.py)
+
   function table(rows, head) {
     const used = new Set();
     for (const { row } of [head, ...rows].filter(Boolean)) row.forEach((c, j) => { if (String(c).trim()) used.add(j); });
@@ -33,7 +48,7 @@
     for (const { i, row } of rows) {
       const tr = E('tr');
       for (const j of cols) {
-        const v = row[j] || '';
+        const raw = row[j] || '', v = editable(i, j + 1) ? raw : shown(raw, head ? head.row[j] : '');
         const td = E('td', /^[-+]?[\d,.]+(원|%|건|개|만원)?$/.test(v.trim()) ? 'num' : v.length > 40 ? 'long' : null);
         if (v.length > 18) td.title = v;
         if (editable(i, j + 1)) {

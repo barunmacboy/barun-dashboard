@@ -402,7 +402,9 @@
   }
 
   // ── 표 그리기(주문 시트는 칸 고치기·줄 고르기) ──
-  const isStock = (r) => r && String(r.key || '').includes('#');
+  const isStock = (r) => r && String(r.key || '').includes('#');      // 플랫폼 주문이 없는 줄(고치기·줄 이름 규칙) — 재고 수는 아래 heldStock
+  // 아직 갖고 있는 재고 줄만 재고 색(서버 dbview '재고' 묶음과 같은 판단, 2026-10-25 감사) — 보낸 재고(배송중·발송됨…)·받는 분이 고객인 줄은 뺌
+  const heldStock = (r) => { const pg = String((r && r.progress) || ''); return !!r && (isStock(r) || pg.startsWith('재고')) && !/^(발송|배송)/.test(pg) && (pg.startsWith('재고') || ['', '하진실'].includes(String(r.receiver || '').trim())); };
   function canEdit(c, r) {
     const ed = last && last.edit; if (!ed) return false;
     if (ed.editable.includes(c)) return true;
@@ -461,7 +463,7 @@
     for (const r of last.rows) {
       const row = E('tr'); row.tabIndex = 0;
       if (ed && r.problem) row.classList.add('prob');
-      if (ed && (isStock(r) || String(r.progress || '').startsWith('재고'))) row.classList.add('stock');
+      if (ed && heldStock(r)) row.classList.add('stock');
       if (sel && ed && rid(sel) === rid(r)) row.classList.add('on');
       else if (ed && !r.problem && rowColor(r)) { row.classList.add('painted'); row.style.setProperty('--row-bg', rowColor(r)); }   // 시트 배경색(grid_meta)
       if (ed) {
@@ -476,11 +478,11 @@
         if (pinned(c)) td.classList.add('pin');
         if (ed && colW[c]) td.style.maxWidth = td.style.minWidth = colW[c] + 'px';
         const pk = ed && pending[`${rid(r)}:${c}`];
-        const v = pk ? pk.new : fmt(c, r[c]);
+        const v = pk ? pk.new : fmt(c, c === 'due' && ed ? dueOf(r) : r[c]);
         if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
         else if (c === 'name' && r._url && v && !pk) td.append(prodLink(r, v.length > 60 ? v.slice(0, 59) + '…' : v));
         else td.textContent = v.length > 60 ? v.slice(0, 59) + '…' : v;
-        if (ed && c === 'due' && v && !pk) { const ds = dueState(r); if (ds) { td.classList.add('due-' + ds.k); td.title = '발송기한 ' + ds.t; } }
+        if (ed && c === 'due' && v && !pk) { const ds = dueState(r); if (ds) { td.classList.add('due-' + ds.k); td.title = '발송기한 ' + ds.t; } if (dueMoved(r)) td.title = (td.title ? td.title + ' · ' : '') + `시트 처음 기한 ${r.due}에서 늘어남`; }
         if (ed && NUMC.includes(c)) { td.classList.add('num'); if (/^\s*(약\s*)?-\d/.test(v)) td.classList.add('neg'); }
         const nt = ed && noteOf(r, c);
         if (nt) {           // 칸 메모(시트의 메모 대신) — 오른쪽 위 세모, 마우스를 올리면 내용
@@ -559,7 +561,7 @@
   }
   function sheetCard(r) {
     const stock = isStock(r), pg = String(r.progress || ''), sg = stageOf(r);
-    const c = E('div', 'oc' + (r.problem ? ' prob' : '') + (stock ? ' stock' : '') + (sg.stop ? ' stop' : ''));
+    const c = E('div', 'oc' + (r.problem ? ' prob' : '') + (heldStock(r) ? ' stock' : '') + (sg.stop ? ' stop' : ''));
     const top = E('div', 'oc-top');
     top.append(E('b', 'oc-who', stock ? (r.name || '재고') : (r.receiver || '(받는 분 없음)')));
     if (pg) top.append(E('span', 'badge ' + badgeCls(pg), pg));
@@ -1565,10 +1567,14 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     return d === 0 ? ' (오늘)' : d > 0 ? ` (D-${d})` : ` (${-d}일 지남)`;
   }
   // 발송기한 상태 — 아직 안 보낸 주문만(보냈거나 취소·재고면 없음): late 지남 · today 오늘 · soon 내일·모레
+  // 2026-10-25 감사: 발송지연으로 늘린 기한은 barun.db 주문(orders.due → 서버가 _due로)에만 — 시트 '발송기한' 칸은 처음 값 그대로라 그것부터 봄
+  const dueOf = (r) => r._due || r.due || '';
+  const dueMoved = (r) => !!(r._due && r.due && String(r.due).slice(0, 10) !== r._due);      // 시트 칸(처음 기한)과 지금 기한이 다름
   function dueState(r) {
-    if (!r.due || isStock(r)) return null;
+    const due = dueOf(r);
+    if (!due || isStock(r)) return null;
     const sg = stageOf(r); if (sg.stop || sg.steps[5][1]) return null;
-    const m = String(r.due).match(/(\d{4})-(\d\d)-(\d\d)/); if (!m) return null;
+    const m = String(due).match(/(\d{4})-(\d\d)-(\d\d)/); if (!m) return null;
     const d = Math.round((new Date(+m[1], m[2] - 1, +m[3]) - new Date(new Date().toDateString())) / 864e5);
     return d < 0 ? { k: 'late', t: `${-d}일 지남` } : d === 0 ? { k: 'today', t: '오늘' } : d <= 2 ? { k: 'soon', t: `D-${d}` } : { k: 'ok', t: `D-${d}` };
   }
@@ -1615,7 +1621,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const ol = E('ol', 'ov-steps' + (sg.stop ? ' stopped' : '')); ol.setAttribute('aria-label', `진행 ${sg.done}/7 단계`);
       sg.steps.forEach(([n, ok], j) => ol.append(E('li', ok ? 'done' : j === sg.cur && !sg.stop ? 'now' : '', n)));
       box.append(ol);
-      if (!sg.stop) box.append(E('p', 'ov-next' + (sg.cur < 0 ? ' fin' : ''), sg.cur < 0 ? '배송완료' : `지금: ${sg.next}` + (ds ? ` · 발송기한 ${String(r.due).slice(5, 10).replace('-', '/')} (${ds.t})` : '')));
+      if (!sg.stop) box.append(E('p', 'ov-next' + (sg.cur < 0 ? ' fin' : ''), sg.cur < 0 ? '배송완료' : `지금: ${sg.next}` + (ds ? ` · 발송기한 ${String(dueOf(r)).slice(5, 10).replace('-', '/')} (${ds.t})` : '')));
     }
     box.append(out);
     // 할 일 카드 — 지금 단계에서 채울 칸
@@ -1640,7 +1646,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     }
     // 칸 카드: 값 누르면 복사, 고칠 수 있는 칸은 ✎, 지금 단계에서 비어 있는 칸은 '채울 칸'
     const kv = (c, opt = {}) => {
-      const pk = pending[`${rid(r)}:${c}`], raw = pk ? pk.new : r[c] == null ? '' : String(r[c]); if (!raw && !opt.always && !canEdit(c, r)) return null;   // 저장 중인 칸은 보낸 값으로
+      const pk = pending[`${rid(r)}:${c}`], raw = pk ? pk.new : opt.raw != null ? opt.raw : r[c] == null ? '' : String(r[c]); if (!raw && !opt.always && !canEdit(c, r)) return null;   // 저장 중인 칸은 보낸 값으로
       const row = E('div', 'ov-kv' + (need.has(c) ? ' need' : '')); row.append(E('span', 'ov-k', opt.label || cname(c)));
       const val = E('span', 'ov-v' + (opt.cls ? ' ' + opt.cls : '')); const shown = (opt.fmt ? opt.fmt(raw) : fmt(c, raw)) || (need.has(c) ? '채울 칸' : '—');
       val.textContent = shown + (c === 'due' && raw && dueState(r) ? dday(raw) : '');
@@ -1687,7 +1693,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       cb.onclick = () => copyText(lines.map(([k, v]) => `${k}: ${v}`).join('\n'), '받는 분 정보 복사');
       card('고객·배송지', [kv('receiver', { always: true }), kv('tel', { links: [['전화', (v) => 'tel:' + digits(v), 'tap'], ['문자', (v) => 'sms:' + digits(v), 'tap']] }),
         kv('pccc'), kv('zip'), kv('addr'), kv('ship_memo')], true, lines.length ? cb : null);
-      card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due'), kv('qty'), kv('send_qty')]);
+      card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due', { raw: dueOf(r), label: dueMoved(r) ? `발송기한(늘어남 · 처음 ${String(r.due).slice(5, 10).replace('-', '/')})` : '' }), kv('qty'), kv('send_qty')]);
     }
     card('구매(해외)', [kv('shop', { links: domain(String(r.shop || '')) ? [['열기 ↗', domain]] : [] }), kv('shop_price'), kv('shop_order'), kv('intl_carrier'), kv('intl_tracking', { links: [track] }), stock ? kv('send_qty') : null]);
     card('배대지·국내', [kv('ship_mode'), kv('fwd_center'), kv('fwd_request'), kv('kr_invoice', { links: [track] })]);
