@@ -903,7 +903,10 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 .card-facts { padding-left: 20px; margin: 10px 0; color: var(--sub); font-size: 13px; }
 #p-health .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 #p-health .stat { cursor: default; }
-#p-health .sys li { gap: 10px; }
+#p-health .sys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; margin-bottom: 12px; }
+#p-health .sys li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+#p-health .sys li > :last-child { text-align: right; }
+@media(max-width: 760px) { #p-health .sys { grid-template-columns: 1fr; } }
 #connection-notice { margin-bottom: 16px; }
 @media(max-width: 600px) { .health { width: auto; min-height: 36px; padding: 6px 9px; } .health .htxt { display: inline; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #p-health .stats { grid-template-columns: 1fr; } .nav-search input { font-size: 16px; } }
 </style>
