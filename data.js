@@ -59,9 +59,12 @@
     const tools = E('div', 'dt-tools');
     const fp = E('div', 'dt-fpanel'); fp.id = 'dt-fpanel'; fp.hidden = true;
     const au = E('div', 'dt-form dt-audit'); au.hidden = true;
+    const sc = E('div', 'dt-scroll'); sc.append(E('div', 'dt-wrap', null));   // 넘김 끝 그림자를 표 밖(겉 상자)에 겹침 — 아래 CSS
+    hNav(sc);
     card.append(E('div', 'dt-tables', null), tools, fp, au, E('div', 'dt-presets', null), E('div', 'dt-facets', null), E('div', 'dt-active', null),
-      Object.assign(E('div', 'dt-fx'), { hidden: true }), E('div', 'dt-wrap', null), E('div', 'dt-more', null));
+      Object.assign(E('div', 'dt-fx'), { hidden: true }), sc, E('div', 'dt-more', null));
     root.append(card, Object.assign(E('div', 'dt-bar'), { id: 'dt-bar', hidden: true }), Object.assign(E('div', 'card dt-detail'), { id: 'dt-detail', hidden: true }));
+    fitWatch(card);
     const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '받는 분·상품·주문번호·송장·전화'; q.setAttribute('aria-label', '찾기'); q.enterKeyHint = 'search';
     let t;
     const now = () => { clearTimeout(t); cur.q = q.value.trim(); cur.offset = 0; return load(); };
@@ -356,8 +359,9 @@
     }
     panel();
     if (sel && isSheet()) { const n = last.rows.find((x) => rid(x) === rid(sel)); if (n && n !== sel) { const st = ($('dt-detail') || {}).scrollTop; sel = n; detail(true); if (st) $('dt-detail').scrollTop = st; } }
+    const sig = ps.toString(); if (sig !== lastSig) autoW = {};   // 칸 너비는 같은 줄 묶음 동안 그대로(고칠 때마다 표가 옆으로 움직이지 않게)
     render();
-    const sig = ps.toString(); if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
+    if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; hSync(); } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
@@ -420,11 +424,9 @@
 
   function render() {
     const wrap = document.querySelector('.dt-wrap'); const sx = wrap.scrollLeft, sy = wrap.scrollTop; wrap.textContent = '';
-    if (!wrap._edge) { wrap._edge = () => { const l = wrap.scrollLeft > 2, r = wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2; wrap.classList.toggle('fade-l', l); wrap.classList.toggle('fade-r', r); };
-      wrap.addEventListener('scroll', wrap._edge, { passive: true }); window.addEventListener('resize', wrap._edge); }
-    requestAnimationFrame(wrap._edge);
     const cardsOn = viewMode() === 'cards';
     wrap.classList.toggle('cards', cardsOn);
+    requestAnimationFrame(() => { fitH(); hSync(); });
     const vb = document.querySelector('.dt-vbtn'); if (vb) { vb.textContent = cardsOn ? '표로 보기' : '카드로 보기'; vb.title = ''; }
     if (cardsOn) return renderCards(wrap);
     const ed = isSheet() ? (last.edit || {}) : null;
@@ -437,7 +439,7 @@
       th.append(all); tr.append(th);
     }
     for (const c of cols) {
-      const th = E('th'); if (ed && canEdit(c, null)) th.classList.add('edh');
+      const th = E('th'); th.dataset.c = c; if (ed && canEdit(c, null)) th.classList.add('edh');
       if (pinned(c)) th.classList.add('pin');
       const so = sortOf(c);
       th.setAttribute('aria-sort', so ? (so.d === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -452,7 +454,7 @@
       if (ed) {         // 칸 너비 끌어서 바꾸기(이 브라우저에 기억) · 두 번 누르면 원래대로
         if (colW[c]) th.style.width = th.style.minWidth = th.style.maxWidth = colW[c] + 'px';
         const rz = E('span', 'rz'); rz.title = '끌어서 너비 · 두 번 누르면 원래대로';
-        rz.onmousedown = (e) => resizeStart(e, c, th); rz.ondblclick = (e) => { e.stopPropagation(); delete colW[c]; saveW(); render(); };
+        rz.onmousedown = (e) => resizeStart(e, c, th); rz.ondblclick = (e) => { e.stopPropagation(); delete colW[c]; delete autoW[c]; saveW(); render(); };
         th.append(rz);
       }
       tr.append(th);
@@ -498,7 +500,7 @@
           if (c === 'row') { td.classList.add('rowh'); td.title = '줄 자세히'; }
           td.onmousedown = (e) => {
             if (e.button || e.target.closest('input,select,a')) return;
-            e.preventDefault(); pickCell(r, c, e.shiftKey); drag = true;
+            e.preventDefault(); pickCell(r, c, e.shiftKey, true); drag = true;
             press = e.shiftKey || e.metaKey || e.ctrlKey ? null : { k: rid(r), c };
           };
           td.onmouseenter = () => {   // 같은 칸이면 범위 아님 — 앞 칸 입력이 닫히며 표를 다시 그리면 누른 칸에 mouseenter가 또 와서 한 번 누르기가 범위 고르기로 바뀌던 것(2026-10-24 "더블클릭해야")
@@ -567,8 +569,7 @@
     if (pg) top.append(E('span', 'badge ' + badgeCls(pg), pg));
     c.append(top);
     const what = stock ? [r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · ');
-    if (what && !stock && r._url && r.name) { const w = E('div', 'oc-what'); w.append(prodLink(r, r.name), r.option ? ' · ' + r.option : ''); c.append(w); }
-    else if (what) c.append(E('div', 'oc-what', what));
+    if (what) c.append(E('div', 'oc-what', what));   // 카드 안 상품명은 글자만 — 링크면 카드 가운데를 누를 때 자세히 대신 쿠팡이 열림(2026-10-26 휴대폰 감사). 상품페이지는 자세히 머리에
     const meta = E('div', 'oc-meta');
     const bits = [`${r.tab} ${r.row}행`, stock ? '재고' : ko(r.platform || ''), r.ordered ? String(r.ordered).slice(5, 10).replace('-', '/') + ' 주문' : ''];
     for (const b of bits.filter(Boolean)) meta.append(E('span', null, b));
@@ -623,6 +624,7 @@
   const cellTd = (r, c) => { const tr = document.querySelectorAll('.dt tbody tr')[last.rows.indexOf(r)]; return tr && tr.children[visCols().indexOf(c) + 1]; };
   // ── 시트처럼 고르기: 칸 하나(cell) 또는 범위(cell~cell2) — 복사(⌘C, 탭 구분이라 엑셀·사이트 입력칸에 그대로)·붙여넣기(⌘V)·합계 ──
   const NUMC = ['qty', 'send_qty', 'shop_price', 'ship_cost', 'profit', 'point', 'margin', 'settle', 'cost', 'tax_rate'];
+  let autoW = {};   // 저절로 정한 칸 너비(snapCols) — 줄 묶음(lastSig)이 바뀔 때만 다시 잼
   let colW = {}; try { colW = JSON.parse(localStorage.getItem('barun.dt.w') || '{}') || {}; } catch (e) { colW = {}; }
   const saveW = () => { try { localStorage.setItem('barun.dt.w', JSON.stringify(colW)); } catch (e) { /* 저장소 없음 */ } };
   function resizeStart(e, c, th) {
@@ -666,19 +668,23 @@
     for (let i = g.r0; i <= g.r1; i++) for (let j = g.c0; j <= g.c1; j++) { const td = trs[i] && trs[i].children[j + 1]; if (td) td.classList.add('insel'); }
     const td = cellTd(last.rows[rowIdx(cell.k)], cell.c); if (td) td.classList.add('cur');
   }
-  function pickCell(r, c, extend) {
+  function pickCell(r, c, extend, still) {   // still = 마우스로 누름 — 표를 넘기지 않음(2026-10-26 사장님 "오른쪽 보다 누르면 왼쪽으로 전체가 움직여")
     if (extend && cell) cell2 = { k: rid(r), c }; else { cell = { k: rid(r), c }; cell2 = null; }
     paintSel();
-    const td = cellTd(r, c); if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); unhide(td); }
+    const td = cellTd(r, c); if (td) { td.tabIndex = -1; td.focus({ preventScroll: true }); if (!still) reveal(td); }
     fx();
   }
-  function unhide(td) {          // 고정 칸·머리글 밑에 가려진 칸은 옆·아래로 조금 넘겨 다 보이게(휴대폰에서 반쯤 가린 칸을 고칠 때)
-    const wrap = td.closest('.dt-wrap'); if (!wrap || td.classList.contains('pin') || td.classList.contains('pick')) return;
-    const b = td.getBoundingClientRect();
-    const edge = [...td.parentNode.children].filter((x) => x.classList.contains('pin') || x.classList.contains('pick')).reduce((m, x) => Math.max(m, x.getBoundingClientRect().right), -1e9);
-    if (edge > -1e9 && b.left < edge) wrap.scrollLeft -= edge - b.left + 2;
-    const th = wrap.querySelector('thead'), top = th ? th.getBoundingClientRect().bottom : -1e9;
+  function reveal(td, M = 44) {   // M = 양 끝 화살표·흐림(hNav) 밑에 칸이 깔리지 않게 더 넘길 폭(마우스로 누른 칸은 0 — 잘린 만큼만)          // 키보드로 옮긴 칸이 화면 밖·고정 칸·머리글 밑이면 표 안에서만 보일 만큼 넘김(scrollIntoView는 바깥 화면까지 밀어서 안 씀)
+    const wrap = td.closest('.dt-wrap'); if (!wrap) return;
+    const b = td.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+    if (!td.classList.contains('pin') && !td.classList.contains('pick')) {
+      const edge = [...td.parentNode.children].filter((x) => x.classList.contains('pin') || x.classList.contains('pick')).reduce((m, x) => Math.max(m, x.getBoundingClientRect().right), w.left);
+      if (b.left < edge + (wrap.scrollLeft > 0 ? M : 0)) wrap.scrollLeft -= edge + M - b.left;
+      else if (b.right > w.right - M && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2) wrap.scrollLeft += Math.min(b.right - w.right + M, b.left - edge - M);   // 넓은 칸이면 왼쪽 끝이 고정 칸 밑으로 숨지 않을 만큼만
+    }
+    const th = wrap.querySelector('thead'), top = th ? th.getBoundingClientRect().bottom : w.top;
     if (b.top < top) wrap.scrollTop -= top - b.top + 2;
+    else if (b.bottom > w.bottom) wrap.scrollTop += Math.min(b.bottom - w.bottom + 2, b.top - top);
   }
   const rangeText = () => { const g = rangeOf(); if (!g) return ''; const out = []; for (let i = g.r0; i <= g.r1; i++) { const l = []; for (let j = g.c0; j <= g.c1; j++) l.push(cellVal(last.rows[i], g.vc[j]).replace(/[\t\n]/g, ' ')); out.push(l.join('\t')); } return out.join('\n'); };
   async function copySel() {
@@ -696,6 +702,7 @@
   });
   function gridKey(e) {          // 화살표 옮기기(Shift = 범위) · Enter/F2 고치기 · 글자 치면 바로 고치기 · Delete 비우기 · ⌘C 복사 · Esc 풀기(시트처럼)
     if (!cell || e.target.closest('input,select')) return;
+    if (e.key === '/') e.stopPropagation();       // 칸을 고른 채 '/'(주소 치기)가 화면 전체 단축키(에이전트에게 맡기기)를 열지 않게
     const vc = visCols(), end = cell2 || cell, ri = rowIdx(end.k), ci = vc.indexOf(end.c), r0 = last.rows[rowIdx(cell.k)];
     if (ri < 0 || ci < 0 || !r0) return;
     const mv = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }[e.key];
@@ -716,6 +723,12 @@
       else if (plan.length === 1) { stage(plan[0].r, plan[0].c, '', '일괄'); render(); bar(); }
       else preview('칸 비우기', plan, [], '일괄');      // 여러 칸은 바로 저장되니 한 번 보여 주고
     } else if (e.key === 'Escape') { cell = cell2 = null; paintSel(); fx(); }
+    else if ((e.key === 'Home' || e.key === 'End') && !e.shiftKey) {     // 엑셀처럼: Home = 맨 앞 칸, End = 맨 끝 칸(⌘/Ctrl이면 맨 위·맨 아래 줄까지)
+      e.preventDefault();
+      const r2 = e.metaKey || e.ctrlKey ? last.rows[e.key === 'Home' ? 0 : last.rows.length - 1] : r0;
+      pickCell(r2, vc[e.key === 'Home' ? 0 : vc.length - 1]);
+      if (e.key === 'Home') { const w = document.querySelector('.dt-wrap'); if (w) w.scrollLeft = 0; }
+    }
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing && canEdit(cell.c, r0) && !dropOpts(r0, cell.c)) {
       e.preventDefault(); const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c, e.key);
     }
@@ -758,6 +771,66 @@
     const hs = [...tbl.querySelectorAll('thead th')]; let left = 0; const at = {};
     hs.forEach((th, i) => { if (th.classList.contains('pick') || th.classList.contains('pin')) { at[i] = left; left += th.getBoundingClientRect().width; } });
     for (const tr of tbl.querySelectorAll('tr')) [...tr.children].forEach((td, i) => { if (i in at && (td.classList.contains('pin'))) td.style.left = at[i] + 'px'; });
+    const sc = tbl.closest('.dt-scroll'); if (sc) { sc.style.setProperty('--pin-w', left + 'px'); sc.style.setProperty('--head-h', (tbl.tHead ? tbl.tHead.offsetHeight : 0) + 'px'); }   // 그림자는 고정 칸 바로 오른쪽부터, 머리글 밑부터(칸 이름이 흐려져 '··매처'로 보이던 것)
+  }
+
+  // ── 옆으로 넘기기(2026-10-26 사장님 "오른쪽으로 한번 가면 왼쪽 열들이 안 보여", "입력하고 나면 왼쪽으로 가질 않아") ──
+  //   스크롤바를 숨겨서(10/25) 가로 휠·트랙패드가 없는 마우스는 오른쪽으로 간 뒤 돌아올 길이 없었음 → 표 아래 얇은 가로 막대(끌기·누르기·
+  //   휠) + 양 끝 화살표(누르면 한 화면씩, 두 번 누르면 맨 끝) + Home/End. 운영체제 막대가 아니라 이 화면 것이라 모양은 그대로 깔끔하게
+  function hNav(sc) {
+    const wrap = () => sc.querySelector('.dt-wrap');
+    const mk = (d) => {
+      const b = E('button', 'dt-nav ' + d); b.type = 'button'; b.innerHTML = svg(d === 'l' ? 'left' : 'chevron');
+      b.setAttribute('aria-label', d === 'l' ? '왼쪽 칸 보기' : '오른쪽 칸 보기'); b.title = d === 'l' ? '왼쪽으로 · 두 번 누르면 맨 앞' : '오른쪽으로 · 두 번 누르면 맨 끝';
+      b.onmousedown = (e) => e.preventDefault();    // 고른 칸·입력칸의 초점을 뺏지 않게
+      b.onclick = () => { const w = wrap(), step = Math.max(160, (w.clientWidth - pinW(sc)) * 0.8); w.scrollBy({ left: d === 'l' ? -step : step, behavior: 'smooth' }); };
+      b.ondblclick = () => { const w = wrap(); w.scrollTo({ left: d === 'l' ? 0 : w.scrollWidth, behavior: 'smooth' }); };
+      return b;
+    };
+    const hb = E('div', 'dt-hbar'), th = E('div', 'dt-hthumb'); hb.append(th); hb.setAttribute('aria-hidden', 'true');
+    sc.append(mk('l'), mk('r'), hb);
+    th.onpointerdown = (e) => {
+      e.preventDefault(); e.stopPropagation(); th.setPointerCapture(e.pointerId); th.classList.add('on');
+      const g = hGeo(sc), x0 = e.clientX, s0 = g.w.scrollLeft;
+      th.onpointermove = (ev) => { g.w.scrollLeft = s0 + (ev.clientX - x0) * g.max / Math.max(1, g.T - g.tw); };
+      th.onpointerup = th.onpointercancel = () => { th.onpointermove = th.onpointerup = th.onpointercancel = null; th.classList.remove('on'); };
+    };
+    hb.onpointerdown = (e) => {     // 막대 빈 곳 = 그 자리로
+      if (e.target === th) return; e.preventDefault();
+      const g = hGeo(sc), x = e.clientX - hb.getBoundingClientRect().left;
+      g.w.scrollTo({ left: Math.max(0, Math.min(1, (x - g.tw / 2) / Math.max(1, g.T - g.tw))) * g.max, behavior: 'smooth' });
+    };
+    hb.addEventListener('wheel', (e) => { const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; if (!d) return; e.preventDefault(); wrap().scrollLeft += d; }, { passive: false });   // 막대 위 휠 = 옆으로
+    wrap().addEventListener('scroll', hSync, { passive: true });
+    window.addEventListener('resize', () => { fitH(); hSync(); });
+  }
+  const pinW = (sc) => parseFloat(sc.style.getPropertyValue('--pin-w')) || 0;
+  const hGeo = (sc) => {         // 고정 칸은 넘어가지 않으니 막대 길이 = 넘어가는 부분 중 보이는 몫
+    const w = sc.querySelector('.dt-wrap'), hb = sc.querySelector('.dt-hbar'), T = hb.clientWidth, p = pinW(sc);
+    return { w, T, tw: Math.max(36, T * Math.min(1, (w.clientWidth - p) / Math.max(1, w.scrollWidth - p))), max: w.scrollWidth - w.clientWidth };
+  };
+  function hSync() {          // 끝 그림자·화살표·가로 막대를 지금 넘긴 자리에 맞춤
+    const sc = document.querySelector('.dt-scroll'), w = sc && sc.querySelector('.dt-wrap'); if (!w) return;
+    const on = !w.classList.contains('cards') && w.scrollWidth > w.clientWidth + 2;
+    sc.classList.toggle('fade-l', on && w.scrollLeft > 2); sc.classList.toggle('fade-r', on && w.scrollLeft + w.clientWidth < w.scrollWidth - 2); sc.classList.toggle('has-x', on);
+    const th = sc.querySelector('.dt-hthumb'); if (!th || !on) return;
+    const g = hGeo(sc);
+    th.style.width = g.tw + 'px'; th.style.transform = `translateX(${g.max > 0 ? (g.T - g.tw) * w.scrollLeft / g.max : 0}px)`;
+  }
+  // 틀 고정(2026-10-26 사장님 "엑셀 틀 고정처럼 시트를 내려도 위 할 일·플랫폼·탭은 계속 보이게"): 표 상자 높이를 화면 바닥까지로 맞춰
+  //   화면 전체는 넘어가지 않고 표 안에서만 위아래로 넘김 — 위 찾기·할 일·플랫폼·탭 줄과 표 머리글이 늘 보임. 화면이 너무 낮으면(표 300px 아래) 전처럼 화면이 넘어감
+  let fitT = 0;
+  function fitH() {
+    const w = document.querySelector('.dt-wrap'), p = $('p-data'); if (!w || !p || p.hidden) return;
+    if (w.classList.contains('cards')) { w.style.maxHeight = w.style.minHeight = ''; return; }
+    const b = w.getBoundingClientRect(), m = p.closest('main') || p, below = m.getBoundingClientRect().bottom - b.bottom;   // 화면(문서) 높이는 창보다 작아지지 않아 그걸로 재면 표가 줄기만 함
+    const h = Math.max(300, Math.floor(innerHeight - (b.top + scrollY) - below));
+    if (Math.abs((parseFloat(w.style.maxHeight) || 0) - h) > 1) { w.style.maxHeight = h + 'px'; w.style.minHeight = Math.min(h, 320) + 'px'; hSync(); }
+  }
+  function fitWatch(card) {      // 위 줄(필터 판·걸린 필터·칸 내용 줄)·아래 줄·고른 줄 막대의 높이가 바뀌면 다시 맞춤
+    if (!window.ResizeObserver) return;
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(fitT); fitT = requestAnimationFrame(fitH); });
+    for (const k of [...card.children, $('dt-bar')]) if (k && !k.classList.contains('dt-scroll')) ro.observe(k);
   }
 
   // 칸 너비를 정수 px로 고정(2026-10-24 사장님 "열마다 살짝씩 틀어지는데 픽셀 단위로") — 저절로 정한 너비는 54.48px처럼 소수라
@@ -766,13 +839,28 @@
     const old = tbl.querySelector(':scope > colgroup'); if (old) old.remove();
     tbl.style.tableLayout = tbl.style.width = tbl.style.minWidth = '';
     const hs = tbl.tHead ? [...tbl.tHead.rows[0].cells] : []; if (!hs.length) return;
-    const x0 = hs[0].getBoundingClientRect().left, cg = E('colgroup'); let prev = 0;
-    hs.forEach((th, i) => {
-      const r = th.getBoundingClientRect().right - x0, x = Math.max(prev + 1, i === hs.length - 1 ? Math.floor(r + 0.01) : Math.round(r));   // 끝은 내림(표가 넘김 칸보다 0.5px 커져 가로 막대가 생기지 않게)
-      const col = E('col'); col.style.width = (x - prev) + 'px'; cg.append(col); prev = x;
-    });
-    tbl.insertBefore(cg, tbl.firstChild); tbl.style.width = prev + 'px'; tbl.style.minWidth = '0'; tbl.style.tableLayout = 'fixed';
-    if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { if (tbl.isConnected) { snapCols(tbl); pinLeft(tbl); } });
+    // 너비는 올림 — 반올림하면 칸이 0.5px 좁아져 꼭 맞는 글자(탭 '오큐글로'·굵은 발송기한)가 '…'로 잘렸음(2026-10-26 감사).
+    //   저절로 정한 너비보다 글자가 넓은 칸(진행상태 표시 등)은 칸 최대 너비 안에서 글자만큼 넓힘.
+    //   처음 잰 너비는 같은 줄 묶음 동안 그대로(autoW) — 긴 값을 넣으면 칸이 넓어져 오른쪽 칸이 다 밀리던 것(2026-10-26 사장님 "입력하고 나면 왼쪽으로 가질 않아").
+    //   모든 칸 너비를 이미 알면 재지 않고 바로 박음(325줄에서 고친 뒤 다시 그리기 0.2초 → 재는 단계 없음)
+    const key = (th) => th.dataset.c || th.className.split(' ')[0];       // 고르기·지우기 칸은 클래스 이름으로
+    const known = (th) => colW[key(th)] || autoW[key(th)];
+    let need;
+    if (hs.every(known)) need = hs.map(known);
+    else {
+      const fw = hs.map((th) => th.getBoundingClientRect().width); need = fw.map((w) => Math.max(1, Math.ceil(w - 0.01)));
+      if (tbl.tBodies[0]) for (const tr of tbl.tBodies[0].rows) for (let i = 0; i < tr.cells.length && i < need.length; i++) {
+        const td = tr.cells[i], over = td.scrollWidth - td.clientWidth;
+        if (over > 0 && td.colSpan === 1) need[i] = Math.max(need[i], Math.min(Math.ceil(parseFloat(getComputedStyle(td).maxWidth) || 1e4) + 1, need[i] + over));
+      }
+      const room = (tbl.closest('.dt-wrap') || {}).clientWidth || 0, fsum = fw.reduce((a, b) => a + b, 0);
+      if (room && fsum <= room + 0.5) { const ex = need.reduce((a, b) => a + b, 0) - room; if (ex > 0) need[need.length - 1] -= ex; }   // 표가 상자 안에 들어가던 것이면 올림 때문에 가로로 넘치지 않게
+      hs.forEach((th, i) => { const k = key(th); if (colW[k]) need[i] = colW[k]; else if (autoW[k]) need[i] = autoW[k]; else autoW[k] = need[i]; });
+    }
+    const cg = E('colgroup'); let sum = 0;
+    for (const w of need) { const col = E('col'); col.style.width = w + 'px'; cg.append(col); sum += w; }
+    tbl.insertBefore(cg, tbl.firstChild); tbl.style.width = sum + 'px'; tbl.style.minWidth = '0'; tbl.style.tableLayout = 'fixed';
+    if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { if (tbl.isConnected) { autoW = {}; snapCols(tbl); pinLeft(tbl); hSync(); } });   // 글꼴이 오기 전에 잰 너비는 버림
   }
 
   // 고친 칸 = 곧바로 저장(2026-10-24 사장님 "저장을 눌러야 저장돼? 그냥 입력하고 나가면 저장 안 되고?" — 시트처럼 넣으면 저장).
@@ -858,8 +946,9 @@
   function saveUI() {
     const s = document.querySelector('.dt-save'); if (!s) return;
     const n = Object.keys(pending).length;
-    s.hidden = !isSheet() || !sv.k; s.className = 'dt-save ' + sv.k; s.textContent = ''; if (s.hidden) return;
-    if (sv.k === 'saving') s.append(`저장 중… ${Math.max(n, 1)}칸`);
+    s.hidden = !isSheet(); s.className = 'dt-save ' + sv.k; s.textContent = ''; if (s.hidden) return;   // 늘 같은 자리·같은 폭 — 저장될 때마다 찾기 칸이 줄었다 늘던 것(2026-10-26 감사)
+    if (!sv.k) s.append(I('check'), ' 바로 저장');
+    else if (sv.k === 'saving') s.append(`저장 중… ${Math.max(n, 1)}칸`);
     else if (sv.k === 'ok' || sv.k === 'bad') {
       s.append(I(sv.k === 'ok' ? 'check' : 'alert'), sv.k === 'ok' ? ` 저장됨 ${sv.at}` : ` 일부 저장 못 함 ${sv.at}`);
       if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 ${lastSaved.length}칸 되돌리기 · ⌘Z`; u.onclick = undoLast; s.append(u); }
@@ -933,15 +1022,22 @@
       };
     }
     el.className = 'cell-in'; el.setAttribute('aria-label', `${r.tab} ${r.row}행 ${cname(c)}`);
-    td.textContent = ''; td.append(el); td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); unhide(td); el.focus({ preventScroll: true }); if (init != null && !opts) el.value = init; else if (el.select) el.select();   // 글자를 치며 시작하면 그 글자로 바꿈(엑셀처럼)
+    if (click) reveal(td, 0);       // 끝에 걸쳐 잘린 칸을 누르면 다 보일 만큼만(치는 글자가 보이게) — 다 보이는 칸이면 그대로
+    const wr = td.closest('.dt-wrap'), sx = wr ? wr.scrollLeft : 0, sy = wr ? wr.scrollTop : 0, wy = scrollY;
+    const stay = () => { if (wr && (wr.scrollLeft !== sx || wr.scrollTop !== sy)) { wr.scrollLeft = sx; wr.scrollTop = sy; } if (scrollY !== wy) scrollTo(scrollX, wy); };
+    const unguard = () => wr && wr.removeEventListener('scroll', stay);
+    if (wr) { wr.addEventListener('scroll', stay); setTimeout(unguard, 500); }   // 사파리는 마우스를 뗀 뒤 한 박자 늦게(rAF 뒤) 고른 글자를 보이려 표를 600px 넘김 — 그 0.5초만 막음
+    td.textContent = ''; td.append(el); el.focus({ preventScroll: true });   // 고치기 시작해도 표는 그대로(고를 때 이미 보이는 칸)
+    if (init != null && !opts) el.value = init; else if (el.select) el.select();   // 글자를 치며 시작하면 그 글자로 바꿈(엑셀처럼) — 8d81d3b에서 이 줄이 주석에 묻혀 누른 칸에 치면 옛 값 뒤에 붙던 것(2026-10-26)
+    stay(); requestAnimationFrame(stay);      // 사파리는 select()·focus가 끝에 걸친 칸을 보이려고 표를 600px씩 넘김(2026-10-26 WebKit 실측) — 누른 자리 그대로
     if (opts && click && el.showPicker) { try { el.showPicker(); } catch (e) { /* 목록 펼치기를 못 하는 브라우저 — 한 번 더 누르면 열림 */ } }
     let done = false;
     editing = { el, now };
-    const finish = (save, then) => { if (done) return; done = true; editing = null; if (save) stage(r, c, el.value.trim()); render(); bar(); if (then) then(); };
+    const finish = (save, then) => { if (done) return; done = true; editing = null; unguard(); if (save) stage(r, c, el.value.trim()); render(); bar(); if (then) then(); };
     const down = (d) => () => { const nx = last.rows[last.rows.indexOf(r) + d]; pickCell(nx || r, c); };
     el.onkeydown = (e) => {
       if (e.key === 'Enter') { e.preventDefault(); finish(true, down(1)); }   // 넣고(바로 저장) 아래 칸으로
-      else if (e.key === 'Escape') finish(false, () => pickCell(r, c));
+      else if (e.key === 'Escape') finish(false, () => pickCell(r, c, false, true));   // 그 칸 그대로 — 끝에 걸친 칸이면 넘어가던 것
       else if (e.key === 'Tab') { e.preventDefault(); finish(true, () => nextCell(r, c, e.shiftKey ? -1 : 1)); }
       else if (!opts && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.isComposing) { e.preventDefault(); finish(true, down(e.key === 'ArrowDown' ? 1 : -1)); }   // 한 줄 칸이라 위아래 = 옆 줄로(엑셀처럼)
     };
@@ -954,7 +1050,7 @@
     if (i < 0 || i >= cols.length) return;
     const tr = document.querySelectorAll('.dt tbody tr')[last.rows.indexOf(r)];
     const td = tr && tr.children[vc.indexOf(cols[i]) + 1];
-    if (td) cellEdit(td, r, cols[i]);
+    if (td) { reveal(td); cellEdit(td, r, cols[i]); }   // 화면 밖 칸에 보이지 않게 치지 않도록 표 안에서만 넘겨 보이게
   }
 
   // ── 아래 고정 막대: 고른 줄에 같은 값 · 저장이 막혔을 때(인터넷·회차·일부 못 씀)만 무엇이 왜 + 버튼 ──
@@ -1100,15 +1196,82 @@
 .th-filt .dic .ic { width: 12px; height: 12px; } .th-ar .dic .ic { width: 11px; height: 11px; }
 .ov-ed .dic .ic { width: 14px; height: 14px; }
 .sk-done .ok .dic .ic { width: 30px; height: 30px; stroke-width: 2.4; }
-/* 스크롤바는 숨김 — 옆으로 더 있으면 그쪽 끝을 흐리게(2026-10-25) */
-.dt-wrap.fade-r:not(.cards) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
-.dt-wrap.fade-l:not(.cards) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
-.dt-wrap.fade-l.fade-r:not(.cards) { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+/* 스크롤바는 숨김 — 옆으로 더 있으면 그쪽 끝을 흐리게(2026-10-25). 넘기는 상자에 mask-image를 걸면 사파리가 고정 칸과 함께
+   다시 왼쪽으로 돌아올 때 칸을 안 그려 빈칸이 됨(2026-10-26 사장님) → 겉 상자(.dt-scroll)에 그림자를 겹침(표는 그대로) */
+.dt-scroll { position: relative; }
+.dt-scroll::before, .dt-scroll::after { content: ''; position: absolute; top: 0; bottom: 0; width: 36px; pointer-events: none; z-index: 6; opacity: 0; transition: opacity .15s; }
+.dt-scroll::before { left: var(--pin-w, 0px); background: linear-gradient(to right, var(--card), transparent); }
+.dt-scroll::after { right: 0; border-radius: 0 12px 12px 0; background: linear-gradient(to left, var(--card), transparent); }
+.dt-scroll.fade-l::before, .dt-scroll.fade-r::after { opacity: 1; }
+.dt-scroll::before, .dt-scroll::after { top: var(--head-h, 0px); bottom: 16px; }   /* 머리글·아래 가로 막대 칸은 빼고 */
+/* 옆으로 넘기기: 표 아래 얇은 막대(끌기·누르기·휠) + 양 끝 화살표(2026-10-26) — 넘길 칸이 있을 때만 */
+.dt-hbar { position: relative; height: 16px; margin-left: var(--pin-w, 0px); cursor: pointer; touch-action: none; visibility: hidden; }
+.dt-scroll.has-x .dt-hbar { visibility: visible; }
+.dt-wrap.cards ~ .dt-hbar, .dt-wrap.cards ~ .dt-nav { display: none !important; }
+.dt-hbar::before { content: ''; position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--fill); }
+.dt-hthumb { position: absolute; left: 0; top: 4px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 55%, transparent); cursor: grab; }
+.dt-hbar:hover .dt-hthumb, .dt-hthumb.on { background: var(--muted); } .dt-hthumb.on { cursor: grabbing; }
+.dt-hbar:hover::before { background: var(--line); }
+.dt-nav { position: absolute; top: calc(50% - 22px); z-index: 7; width: 28px; height: 44px; border: 0; padding: 0; border-radius: 10px; display: none; place-items: center;
+  background: color-mix(in srgb, var(--card) 92%, transparent); color: var(--ink2); box-shadow: 0 1px 4px rgba(0, 0, 0, .14), inset 0 0 0 1px var(--line); cursor: pointer; opacity: .8; transition: opacity .15s; }
+.dt-nav .ic { width: 18px; height: 18px; }
+.dt-nav.l { left: calc(var(--pin-w, 0px) + 6px); } .dt-nav.r { right: 6px; }
+.dt-scroll.fade-l .dt-nav.l, .dt-scroll.fade-r .dt-nav.r { display: grid; }
+.dt-scroll:not(:hover) .dt-nav:not(:focus-visible) { opacity: 0; pointer-events: none; }   /* 표 위에 마우스가 있을 때만(칸을 가리지 않게) — 아래 막대는 늘 보임 */
+.dt-scroll:hover .dt-nav, .dt-nav:focus-visible { opacity: .95; } .dt-nav:hover { background: var(--card); color: var(--blue-ink); }
+@media (pointer: coarse) { .dt-nav { display: none !important; } }   /* 손가락은 밀어서 넘김 */
+/* 틀 고정: 표 높이를 화면 바닥까지로 맞추니(fitH) 아래 큰 여백은 줄임 — 화면 전체가 넘어가 위 줄이 사라지지 않게 */
+@media (min-width: 1024px) { main.pages:has(> #p-data:not([hidden])) { padding-bottom: 16px; } }
+.dt-wrap { overscroll-behavior: contain; }
+/* 플랫폼·탭처럼 짧은 칩 줄은 한 줄에 나란히(자리가 모자라면 저절로 다음 줄) — 노트북 낮은 화면에서 표에 줄을 더 */
+.dt-save { min-width: 180px; justify-content: center; }
+.ov-chip.ov-link { background: var(--blue-bg); color: var(--blue-ink); text-decoration: none; } .ov-chip.ov-link:hover { text-decoration: underline; }
+/* 휴대폰: 할 일 없는 저장 표시('바로 저장')는 숨김 — 카드 화면에선 한 줄을 통째로 먹음. 저장 중·저장됨·못 함은 그대로 */
+/* 휴대폰 줄 자세히(2026-10-26 감사): 붙어 있는 머리(이름·상품 두 줄·칩 세 줄)가 화면 1/3을 먹던 것 → 버튼은 오른쪽 위에 겹치고
+   상품명 한 줄(누르면 모두)·칩은 한 줄로 밀어 보기. 손가락 화면: 복사·전화·문자·입력칸을 누르기 쉬운 크기로, 입력 글자 16px(아이폰이 확대하지 않게) */
+@media (max-width: 560px) {
+  #dt-detail .ov-head { display: block; }
+  #dt-detail .ov-nav { position: absolute; top: 10px; right: calc(var(--dp, 14px) - 6px); }
+  #dt-detail .ov-pos { display: none; }
+  #dt-detail .ov-who { padding-right: 132px; }
+  #dt-detail .ov-what:not(.open) { -webkit-line-clamp: 1; }
+  #dt-detail .ov-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: calc(-1 * var(--dp, 14px)); padding-right: var(--dp, 14px); }
+  #dt-detail .ov-chips > * { flex: none; white-space: nowrap; }
+}
+@media (pointer: coarse) {
+  #dt-detail .ov-ed { min-width: 40px; min-height: 40px; margin: -8px -6px -8px 0; display: inline-grid; place-items: center; }
+  #dt-detail .ov-link { min-height: 36px; display: inline-flex; align-items: center; padding: 0 8px; }
+  #dt-detail .ov-hbtn { min-height: 36px; }
+  #p-data input:not([type=checkbox]):not([type=radio]), #p-data select, #p-data textarea, dialog input:not([type=checkbox]), dialog select, dialog textarea { font-size: 16px; }
+  #p-data input:not([type=checkbox]):not([type=radio]):not(.cell-in), #p-data select:not(.cell-in) { min-height: 40px; }   /* 표 칸 안 입력은 줄 높이 그대로 */
+  #p-data .dt-facet .chipbtn { min-height: 36px; }
+}
+@media (max-width: 760px) { .dt-save { min-width: 0; } .dt-save:not(.saving):not(.ok):not(.wait):not(.net):not(.bad) { display: none; } }
+@media (min-width: 761px) { .dt-tools { flex-wrap: nowrap; } .dt-tools .dt-q { flex: 1 1 160px; min-width: 140px; } }   /* 저장 표시가 다음 줄로 떨어져 한 줄을 먹던 것(1024 폭) — 찾기 칸이 줄어듦 */
+/* 필터·정렬·바꾼 기록 = 오른쪽 서랍(표가 아래로 밀려 안 보이던 것, 2026-10-26 감사) — 휴대폰은 전처럼 제자리 */
+@media (min-width: 761px) {
+  #dt-fpanel:not([hidden]), .dt-audit:not([hidden]) { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); z-index: 61; margin: 0; overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 20px 0 0 20px; box-shadow: -8px 0 32px rgba(0, 0, 0, .18); padding: 6px 18px 40px; }
+  #dt-fpanel:not([hidden]) { background: var(--fill2); } .dt-audit:not([hidden]) { background: var(--card); }
+  #dt-fpanel .dt-fp-h, .dt-audit .dt-fp-h { position: sticky; top: -6px; z-index: 2; background: var(--fill2); padding: 10px 0; } .dt-audit .dt-fp-h { background: var(--card); }
+}
+.dt-audit .dt-fp-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* 낮은 화면(노트북 1280×720·1024×768): 표 위 줄을 촘촘하게 — 틀 고정으로 위 줄이 늘 보이니 표에 줄을 더(2026-10-26, 720 높이에서 표 10줄 → 13줄) */
+@media (min-width: 761px) and (max-height: 820px) {
+  #p-data > .dt-card { padding-top: 12px; padding-bottom: 12px; }
+  #p-data .dt-tables { margin-bottom: 6px; } #p-data .dt-tables .tab { min-height: 30px; padding: 4px 11px; font-size: 13px; }
+  #p-data .dt-q { min-height: 36px; padding: 7px 12px; }
+  #p-data .dt-tools { margin-bottom: 6px; } #p-data .dt-tools .btn { min-height: 34px; }
+  #p-data .dt-facet { margin-bottom: 4px; } #p-data .dt-facet .chipbtn { min-height: 26px; padding: 2px 9px; font-size: 12.5px; }
+  #p-data .dt-fx { min-height: 32px; padding: 3px 8px; margin-bottom: 4px; }
+  #p-data .dt-more { margin-top: 4px; }
+}
+@media (min-width: 761px) { .dt-facets { display: flex; flex-wrap: wrap; column-gap: 20px; } .dt-facets > .dt-facet { flex: 0 1 auto; min-width: 0; } }
 .dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); }
 table.dt.sheet tr.new > td { animation: dt-new 2.6s ease-out; }
 @keyframes dt-new { from { background: var(--green-bg); } }
 table.dt tfoot td { padding: 8px 0 4px; background: var(--card); border: 0; overflow: visible; max-width: none; }
-.dt-add { position: sticky; left: 8px; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 40px); }
+.dt-add { position: sticky; left: 8px; z-index: 8; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 40px); }
 .dt-add .add { border: 1.5px dashed color-mix(in srgb, var(--blue) 55%, transparent); background: var(--blue-bg); color: var(--blue-ink); }
 .dt-add .add:hover { border-style: solid; }
 .dt-add .muted { font-size: 12.5px; }
@@ -1598,6 +1761,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     chip(r.tab); chip(stock ? '재고' : ko(r.platform || '')); chip(r.ship_mode); chip(pg, 'badge ' + badgeCls(pg));
     if (sg.ost) chip(`${ko(r.platform || '') || '플랫폼'} ${ko(sg.ost)}`, 'badge ' + (sg.delivered ? 'ok' : sg.stop ? 'bad' : 'run'));
     if (ds && ds.k !== 'ok') chip('발송기한 ' + ds.t, 'badge ' + (ds.k === 'late' ? 'bad' : 'warn'));
+    if (!stock && r._url) { const a = prodLink(r, `${ko(r.platform || '') || '판매처'} 상품페이지 ↗`); a.className = 'ov-chip ov-link'; chips.append(a); }
     const what = E('div', 'ov-what', stock ? ['재고 줄', r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · '));
     what.title = '모두 보기'; what.onclick = () => what.classList.toggle('open');     // 긴 상품명은 두 줄까지, 누르면 모두
     tt.append(E('div', 'ov-who' + (stock ? ' long' : ''), stock ? (r.name || '재고') : (r.receiver || '(받는 분 없음)')), what, chips);
@@ -1784,7 +1948,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   function auditPanel() {
     const box = document.querySelector('.dt-audit'); if (!box) return;
     box.hidden = !box.hidden; box.textContent = ''; if (box.hidden) return;
-    box.append(E('div', 'od-t', '바꾼 기록'),
+    const hd = E('div', 'dt-fp-h'); hd.append(E('b', null, '바꾼 기록'), btn('닫기', 'ghost', () => { box.hidden = true; box.textContent = ''; }));
+    box.append(hd,
       E('p', 'muted small', '묶음이나 한 칸씩 되돌려요. 그사이 또 바뀐 칸은 건너뛰어요.'));
     auditList(box, { limit: 100 });
     const dd = E('details', 'dt-all'); dd.append(E('summary', null, '지운 줄 백업(기록 전에 지운 줄 포함)'));
@@ -1909,7 +2074,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   }
 
   const typing = (e) => !!(e.target && e.target.closest && e.target.closest('input,select,textarea'));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel && !typing(e) && !document.querySelector('dialog[open]')) closeDetail(); });
+  document.addEventListener('keydown', (e) => {      // Esc = 위에 열린 서랍부터 닫기(필터·정렬 → 바꾼 기록 → 줄 자세히)
+    if (e.key !== 'Escape' || typing(e) || document.querySelector('dialog[open]')) return;
+    const fp = $('dt-fpanel'), au = document.querySelector('.dt-audit');
+    if (fp && !fp.hidden) { fp.hidden = true; panel(); } else if (au && !au.hidden) { au.hidden = true; au.textContent = ''; } else if (sel) closeDetail();
+  });
   // 닫기·새로고침: 고치던 칸까지 바로 보내고(keepalive), 회차 때문에 못 보낸 칸이나 인터넷 오류로 남은 칸이 있을 때만 붙잡음
   window.addEventListener('beforeunload', (e) => { flushNow(); if (Object.keys(pending).length && ['wait', 'net'].includes(sv.k)) { e.preventDefault(); e.returnValue = ''; } });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });   // 휴대폰에서 다른 앱으로

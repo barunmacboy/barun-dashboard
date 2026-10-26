@@ -840,7 +840,7 @@
     if (c.moved) now.append(document.createTextNode(` · ${noE(c.moved)}이 옮김`));
     else if ((c.objs || []).length) now.append(document.createTextNode(' · 이 카드의 주문이 있는 단계'));
     body.append(now);
-    if (c.todo) body.append(E('div', 'fl-todo', '할 일 · ' + noE(c.todo)));
+    if (c.todo) body.append(E('div', 'fl-todo', '할 일 · ' + noE(c.todo).replace(/\*\*/g, '')));
     const out = E('div', 'fl-out'); out.hidden = true;
     const acts = E('div', 'fl-acts');
     const B = (lab, a, cls, extra, close) => {
@@ -852,6 +852,12 @@
       if (c.approval) { B('승인', 'approve', 'primary', null, true); B('거절', 'reject', 'danger', null, true); }
       (c.choices || []).forEach((ch, k) => B(noE(ch), 'choose', k ? 'weak' : 'primary', { idx: k }, true));
       if (c.key !== 'login-needed') B('처리했어요', 'done', c.approval || (c.choices || []).length ? '' : 'primary', null, true);   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦
+      else (c.sites || []).forEach((st) => {   // 사이트 줄마다 — 자동 확인되는 곳은 확인 후, 확인 길이 없는 곳은 바로 지움(notify/logins.confirm)
+        const b = E('button', 'btn sm weak', `${st.replace(/\s*\(.*\)$/, '').slice(0, 16)} 로그인했어요`); b.type = 'button'; b.title = st;
+        b.onclick = async () => { const lab = b.textContent; b.textContent = '확인 중…'; const r = await act({ action: 'login_ok', key: st }, b, out); b.textContent = lab;
+          if (r && r.ok) { const n = data.cards.find((y) => y.id === c.id); if (n) openCard(n, lastFocus); else closeDr(); } };
+        acts.append(b);
+      });
       if (!c.ack) B('보는 중', 'ack', 'ghost');
       if (c.state !== 'snoozed') B('내일 아침 다시', 'snooze', 'ghost', null, true);
     } else acts.append(E('span', 'small muted', '이 카드는 디스코드 스레드에서 답해요.'));

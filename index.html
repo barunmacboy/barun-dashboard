@@ -1082,11 +1082,12 @@ function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = do
 async function act(body, btn) {
   if (body.action === 'reject' && !confirm('거절할까요?')) return;
   if (btn) btn.disabled = true;
+  const lab = btn && body.action === 'login_ok' ? btn.textContent : null; if (lab) btn.textContent = '확인 중…';   // 사이트 확인에 몇 초 걸림
   try {
     const r = await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json(); toast((j.ok ? '' : '실패: ') + j.msg); tick();
     return j;
-  } catch (e) { toast('실패: ' + e.message); } finally { if (btn) btn.disabled = false; }
+  } catch (e) { toast('실패: ' + e.message); } finally { if (btn) { btn.disabled = false; if (lab) btn.textContent = lab; } }
 }
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act]'); if (b) { act(Object.assign({ action: b.dataset.act }, b.dataset.key ? { key: b.dataset.key } : {}, b.dataset.job ? { job: b.dataset.job } : {}, b.dataset.idx != null ? { idx: +b.dataset.idx } : {}), b); return; }
@@ -1578,13 +1579,15 @@ function render(s) {
     const toggle = () => { it.classList.toggle('open'); openTodos[it.classList.contains('open') ? 'add' : 'delete'](i.key); t.setAttribute('aria-expanded', String(it.classList.contains('open'))); };
     t.onclick = toggle; t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
     it.append(meta, t);
-    if (i.todo) it.append(el('div', 'what', '할 일 · ' + i.todo));
+    if (i.todo) it.append(el('div', 'what', '할 일 · ' + i.todo.replace(/\*\*/g, '')));   // 디스코드용 굵게 표시는 뺌
     if (i.body) { const d = el('details'); d.append(el('summary', null, '내용 보기'), el('pre', null, i.body)); it.append(d); }
     const bs = el('div', 'btns');
     const B = (lab, a, cls) => { const b = el('button', 'btn sm ' + (cls || ''), lab); b.type = 'button'; b.dataset.act = a; b.dataset.key = i.key; bs.append(b); };
     if (i.approval) { B('승인', 'approve', 'primary'); B('거절', 'reject', 'danger'); }
     (i.choices || []).forEach((c, k) => { const b = el('button', 'btn sm ' + (k ? 'weak' : 'primary'), c); b.type = 'button'; b.dataset.act = 'choose'; b.dataset.key = i.key; b.dataset.idx = k; bs.append(b); });
     if (i.key !== 'login-needed') B('처리했어요', 'done', i.approval || (i.choices || []).length ? '' : 'weak');   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦(notify/logins)
+    // 로그인 카드: 사이트 줄마다 '로그인했어요' — 자동 확인되는 곳은 확인 후, 확인 길이 없는 곳은 바로 지움(notify/logins.confirm)
+    else (i.sites || []).forEach((st) => { const b = el('button', 'btn sm weak', `${st.replace(/\s*\(.*\)$/, '').slice(0, 16)} 로그인했어요`); b.type = 'button'; b.title = st; b.dataset.act = 'login_ok'; b.dataset.key = st; bs.append(b); });
     B('보는 중', 'ack', 'ghost'); B('내일 아침 다시', 'snooze', 'ghost');
     it.append(bs); tl.append(it);
   }
