@@ -500,7 +500,7 @@
           if (c === 'row') { td.classList.add('rowh'); td.title = '줄 자세히'; }
           td.onmousedown = (e) => {
             if (e.button || e.target.closest('input,select,a')) return;
-            e.preventDefault(); pickCell(r, c, e.shiftKey, true); drag = true;
+            e.preventDefault(); pickCell(r, c, e.shiftKey, true); drag = lastPtr !== 'touch';   // 손가락은 끌어 고르기 없음(밀면 넘김)
             press = e.shiftKey || e.metaKey || e.ctrlKey ? null : { k: rid(r), c };
           };
           td.onmouseenter = () => {   // 같은 칸이면 범위 아님 — 앞 칸 입력이 닫히며 표를 다시 그리면 누른 칸에 mouseenter가 또 와서 한 번 누르기가 범위 고르기로 바뀌던 것(2026-10-24 "더블클릭해야")
@@ -642,7 +642,9 @@
   }
   // 2026-10-24 사장님 "엑셀에 뭘 넣으려면 꼭 2번 혹은 3번을 눌러야 — 한 번만 클릭해도 넣거나 수정": 고칠 수 있는 칸은 한 번 누르면(끌지 않고 떼면)
   //   바로 입력칸(글자 전체 골라 둠 — 그대로 치거나 붙여넣으면 바뀜, 한 번 더 누르면 그 자리에 커서). 끌면 범위 고르기, Shift·⌘는 범위·고르기만
-  let press = null;
+  let press = null, lastPtr = '';
+  // 아이폰 사파리는 칸을 톡 누르면 바로 위 칸에 '마우스 들어옴'을 한 번 더 보내 두 칸 범위 고르기가 되어 입력칸이 안 열렸음(2026-10-26 WebKit 실측)
+  document.addEventListener('pointerdown', (e) => { lastPtr = e.pointerType; }, true);
   document.addEventListener('mouseup', () => {
     drag = false;
     const p = press; press = null;
@@ -1014,7 +1016,7 @@
     const opts = dropOpts(r, c);          // 선택 목록 칸(시트 드롭다운 — grid_meta). 목록 밖 지금 값도 그대로 고를 수 있게(시트도 경고만)
     if (opts) { el = E('select'); for (const o of ['', ...opts, ...(now && !opts.includes(now) ? [now] : [])]) { const x = E('option', null, o || '(비움)'); x.value = o; if (o === now) x.selected = true; el.append(x); } }
     else {
-      el = E('input'); el.value = now;
+      el = E('input'); el.value = now; if (NUMC.includes(c)) el.inputMode = 'decimal';   // 휴대폰 표 보기: 숫자 칸은 숫자 자판
       el.onpaste = (e) => {     // 엑셀·시트에서 복사한 여러 칸(탭·줄바꿈) → 이 칸부터 미리보기
         const t = (e.clipboardData || window.clipboardData).getData('text');
         if (!/[\t\n]/.test(t.replace(/\n+$/, ''))) return;
@@ -1236,14 +1238,14 @@
   #dt-detail .ov-who { padding-right: 132px; }
   #dt-detail .ov-what:not(.open) { -webkit-line-clamp: 1; }
   #dt-detail .ov-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: calc(-1 * var(--dp, 14px)); padding-right: var(--dp, 14px); }
-  #dt-detail .ov-chips > * { flex: none; white-space: nowrap; }
+  #dt-detail .ov-chips { align-items: center; } #dt-detail .ov-chips > * { flex: none; white-space: nowrap; display: inline-flex; align-items: center; min-height: 28px; }
 }
 @media (pointer: coarse) {
   #dt-detail .ov-ed { min-width: 40px; min-height: 40px; margin: -8px -6px -8px 0; display: inline-grid; place-items: center; }
   #dt-detail .ov-link { min-height: 36px; display: inline-flex; align-items: center; padding: 0 8px; }
   #dt-detail .ov-hbtn { min-height: 36px; }
   #p-data input:not([type=checkbox]):not([type=radio]), #p-data select, #p-data textarea, dialog input:not([type=checkbox]), dialog select, dialog textarea { font-size: 16px; }
-  #p-data input:not([type=checkbox]):not([type=radio]):not(.cell-in), #p-data select:not(.cell-in) { min-height: 40px; }   /* 표 칸 안 입력은 줄 높이 그대로 */
+  #p-data input:not([type=checkbox]):not([type=radio]):not(.cell-in) { min-height: 40px; } #p-data select:not(.cell-in) { height: 45px; }   /* 옆 입력칸(16px 글자 → 45px)과 같은 높이 — 라벨 줄이 어긋나던 것 */   /* 표 칸 안 입력은 줄 높이 그대로 */
   #p-data .dt-facet .chipbtn { min-height: 36px; }
 }
 @media (max-width: 760px) { .dt-save { min-width: 0; } .dt-save:not(.saving):not(.ok):not(.wait):not(.net):not(.bad) { display: none; } }

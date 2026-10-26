@@ -894,13 +894,27 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   .ov-kv { padding: 7px 0; }
 }
 @media (max-width: 380px) { .ov-pos { display: none; } }
+
+/* 정보구조·상태 안내: 기존 색·서체·카드 토큰을 그대로 사용 */
+.nav-i[hidden], .nav-g[hidden] { display: none; }
+.nav-search { margin: 4px 14px 8px; }
+.nav-search input { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--ink); font: inherit; font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.card-facts { padding-left: 20px; margin: 10px 0; color: var(--sub); font-size: 13px; }
+#p-health .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#p-health .stat { cursor: default; }
+#p-health .sys li { gap: 10px; }
+#connection-notice { margin-bottom: 16px; }
+@media(max-width: 600px) { .health { width: auto; min-height: 36px; padding: 6px 9px; } .health .htxt { display: inline; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #p-health .stats { grid-template-columns: 1fr; } .nav-search input { font-size: 16px; } }
 </style>
 </head>
 <body>
 <aside class="sidebar" id="side" aria-label="메뉴">
   <div class="brand"><span class="logo" aria-hidden="true">바</span><span><b>바른청년</b><small>운영 현황</small></span></div>
   <button class="btn primary sm ask-btn" type="button" data-open-ask><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 에이전트에게 맡기기</button>
-  <nav class="nav" id="nav"></nav>
+  <label class="nav-search"><span class="sr-only">메뉴 찾기</span><input id="nav-search" type="search" placeholder="메뉴 찾기" aria-label="메뉴 찾기"></label>
+  <nav class="nav" id="nav" aria-label="주요 메뉴"></nav>
+  <p id="nav-empty" class="muted small" role="status" hidden>찾은 메뉴가 없어요.</p>
   <div class="side-foot"><span class="upd" id="updated" role="status" aria-live="polite">불러오는 중…</span>
     <button class="icon-btn" id="logout" type="button" aria-label="로그아웃" title="로그아웃" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button>
     <button class="icon-btn" id="reload" type="button" aria-label="지금 새로고침" title="지금 새로고침"><svg class="ico" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div>
@@ -911,11 +925,12 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   <header class="topbar" id="bar">
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="전체 메뉴" aria-controls="side" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <div class="bar-t"><h1 id="page-title">한눈에</h1><p id="page-desc"></p></div>
-    <button class="health" id="health" type="button" data-goto="home" aria-label="전체 상태"><span class="htxt">확인 중</span></button>
+    <button class="health" id="health" type="button" data-goto="health" aria-label="전체 상태"><span class="htxt">확인 중</span></button>
     <button class="btn primary sm ask-btn" type="button" data-open-ask aria-label="에이전트에게 맡기기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 맡기기</button>
   </header>
 
   <main class="pages" id="pages">
+    <div id="connection-notice" class="alert" role="status" hidden></div>
     <!-- 한눈에: 결론 한 문장·숫자 → 내 차례(바로 누르기) · 맡긴 일 → 사무실 · 시스템 -->
     <section class="page" id="p-home" aria-label="한눈에">
       <div class="card status">
@@ -943,6 +958,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
             <div class="card-h"><h2>맡긴 일</h2><span id="htask-n"></span><button class="more-link" type="button" data-goto="tasks">자세히 ›</button></div>
             <ul class="tl" id="home-tasks"><li class="muted small">불러오는 중…</li></ul>
           </div>
+          <div class="card" id="health-preview"></div>
           <div class="card" id="sys-sec">
             <div class="card-h"><h2>시스템</h2></div>
             <ul class="sys" id="sys"></ul>
@@ -972,6 +988,8 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-reports" aria-label="보고서" hidden></section>
     <section class="page" id="p-sourcing" aria-label="소싱" hidden></section>
     <section class="page" id="p-auto" aria-label="자동화율" hidden></section>
+
+    <section class="page" id="p-health" aria-label="운영 건강" hidden></section>
 
     <section class="page" id="p-work" aria-label="회차·허브" hidden>
       <div class="card" id="jobs-sec">
@@ -1030,6 +1048,8 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 </dialog>
 
 <script src="config.js"></script>
+<script src="transport.js"></script>
+<script src="navigation.js"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1039,7 +1059,7 @@ async function apiFetch(path, opts = {}) {
   // Tailscale이 켜진 기기에서는 이 주소가 사설 IP로 풀려 크롬이 '로컬 네트워크 접근' 허용을 물어본다 — 오래 걸리면 안내
   const slow = API ? setTimeout(() => toast('주소창의 "로컬 네트워크 접근" 요청에서 [허용]을 눌러 주세요.'), 6000) : 0;
   let r;
-  try { r = await fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h })); } finally { clearTimeout(slow); }
+  try { r = await window.BarunTransport.request(API + path, Object.assign({ cache: 'no-store' }, opts, { headers: h })); } finally { clearTimeout(slow); }
   if (r.status === 401) { showLogin(); throw new Error('로그인 필요'); }
   return r;
 }
@@ -1166,16 +1186,11 @@ const EMOJI_RE = /(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{23
 const noEmoji = (t) => String(t ?? '').replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
 Object.assign(window, { IC, ico, dot, noEmoji });
 // [이름, 글, 그림, 숫자 표시, 설명]
-const NAV = [
-  [null, [['home', '한눈에', '지금 상황과 내 차례']]],
-  ['일', [['todo', '할 일', '#할-일 카드', 'todo'], ['tasks', '맡긴 일', '에이전트에게 맡긴 일', 'tasks'], ['asks', '보낸 문의', '배대지·구매처·쿠팡 1:1 문의', 'asks']]],
-  ['운영', [['flow', '업무 흐름', '단계별 진행과 담당'], ['catalog', '상품', '상품 대장 — 같은 물건 한 줄'], ['data', '주문 데이터', '주문 장부 보기·고치기'], ['reports', '보고서', '전체현황·매출·판매점검·설정'], ['sourcing', '소싱', '소싱 장부 진행']]],
-  ['자동화', [['auto', '자동화율', '자동 처리 비율과 로드맵'], ['work', '회차·허브', '자동작업과 이벤트 허브'], ['savings', '절감 장부', '아낀 시간과 AI 비용'], ['activity', '활동 기록', '시간순 회차와 작업']]],
-  ['기록', [['records', '일지·알림', '일지·알림·인보이스·git·백업']]],
-];
+ICON.health = ICON.work;
+const NAV = window.BARUN_NAV;
 const PAGES = Object.fromEntries(NAV.flatMap(([, items]) => items.map((x) => [x[0], { label: x[1], desc: x[2], badge: x[3] }])));
 const TABS = Object.keys(PAGES);
-const MOBILE = ['home', 'todo', 'tasks', 'data'];
+const MOBILE = ['home', 'todo', 'flow', 'data'];
 (function buildNav() {
   const nav = $('nav');
   for (const [g, items] of NAV) {
@@ -1189,7 +1204,7 @@ const MOBILE = ['home', 'todo', 'tasks', 'data'];
   }
   const tb = $('tabbar');
   for (const id of MOBILE) {
-    const b = el('button', 'tb-i'); b.type = 'button'; b.dataset.tab = id; b.innerHTML = ICON[id] + `<span>${PAGES[id].label}</span>`;
+    const b = el('button', 'tb-i'); b.type = 'button'; b.dataset.tab = id; b.innerHTML = ICON[id] + `<span>${({home:"요약",todo:"할 일",flow:"흐름",data:"주문"})[id] || PAGES[id].label}</span>`;
     if (PAGES[id].badge) { const n = el('span', 'nb'); n.dataset.badge = PAGES[id].badge; n.hidden = true; b.append(n); }
     b.onclick = () => showTab(id); tb.append(b);
   }
@@ -1215,6 +1230,12 @@ function drawer(open) {
   if (open) { const cur = $('side').querySelector('[aria-current="page"]'); (cur || $('side').querySelector('.nav-i')).focus(); }
 }
 $('menu-btn').onclick = () => drawer(true);
+$('nav-search').addEventListener('input', e => {
+  const q = e.target.value.replace(/\s+/g, '').toLowerCase();
+  document.querySelectorAll('#nav .nav-i').forEach(b => { const p = PAGES[b.dataset.tab]; b.hidden = !(p.label + ' ' + p.desc).replace(/\s+/g, '').toLowerCase().includes(q); });
+  $('nav-empty').hidden = !!document.querySelector('#nav .nav-i:not([hidden])');
+  document.querySelectorAll('#nav .nav-g').forEach(g => { let n = g.nextElementSibling, any = false; while (n && !n.classList.contains('nav-g')) { if (!n.hidden) any = true; n = n.nextElementSibling; } g.hidden = !any; });
+});
 $('scrim').onclick = () => drawer(false);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('side').classList.contains('open')) drawer(false);
@@ -1222,6 +1243,7 @@ document.addEventListener('keydown', (e) => {
 });
 let curTab = '';
 function showTab(name, push = true) {
+  if ($('nav-search').value) { $('nav-search').value = ''; $('nav-search').dispatchEvent(new Event('input')); }
   if (!TABS.includes(name)) name = 'home';
   for (const t of TABS) { const p = $('p-' + t); if (p) p.hidden = t !== name; }
   document.querySelectorAll('[data-tab]').forEach((b) => { if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -1279,7 +1301,7 @@ function mdRender(src, root) {
   }
 }
 
-const SV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오늘', 'warn'], high: ['오늘', 'warn'], info: ['참고', ''] };
+const SV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['확인 필요', 'warn'], high: ['우선 확인', 'warn'], info: ['참고', ''] };
 const openTodos = new Set();
 let todoFilter = 'all';   // 할 일 묶어 보기(전체·버튼 한 번·3일 넘음)
 let lastState = null;
@@ -1467,12 +1489,12 @@ function render(s) {
   let lvl = 'ok', htxt = '정상 운영 중';
   if (us.blocked) { ht.append('Claude 사용량 ', el('em', 'bad', '한도'), ` · ${us.until} 해제`); lvl = 'bad'; htxt = '사용량 한도'; }
   else if (bd && bd.alive === false) { ht.append('회차 대기열 ', el('em', 'bad', '멈춤')); lvl = 'bad'; htxt = '대기열 멈춤'; }
-  else if (fails) { ht.append('실패한 회차 ', el('em', 'bad', `${fails}건`)); lvl = 'bad'; htxt = `실패 ${fails}건`; }
+  else if (fails) { ht.append('마지막 실행이 실패한 작업 ', el('em', 'bad', `${fails}건`)); lvl = 'bad'; htxt = `마지막 실행 실패 ${fails}건`; }
   else if (urgent) { ht.append('급한 일 ', el('em', 'bad', `${urgent}건`)); lvl = 'warn'; htxt = `급한 일 ${urgent}건`; }
   else if (issues.length) { ht.append('확인할 일 ', el('em', null, `${issues.length}건`)); }
   else ht.textContent = '모두 정상';
   if (lvl === 'ok' && (stale.length || hubBad)) { lvl = 'warn'; htxt = stale.length ? '멈춤 의심' : '허브 확인 지연'; }
-  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt; hp.setAttribute('aria-label', '전체 상태: ' + htxt);
+  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt.replace('마지막 실행 실패', '실패'); hp.setAttribute('aria-label', '전체 상태: ' + htxt);
   $('hero-lead').textContent = `${busy}명 일하는 중` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
   if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열(barund) 응답 없음${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
@@ -1481,9 +1503,9 @@ function render(s) {
   renderSavings(sv);
   const ST = [
     ['할 일', issues.length, '건', [urgent ? `긴급 ${urgent}건` : '#할-일', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
-    ['승인 대기', approvals, '건', taskWait ? `맡긴 일 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
+    ['결정·답변 대기', approvals, '건', taskWait ? `맡긴 일 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
-    ['최근 실패', fails24.length, '건', fails24.length ? `24시간 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
+    ['24시간 실패 이력', fails24.length, '건', fails24.length ? `24시간 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
     ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
@@ -1512,7 +1534,7 @@ function render(s) {
     ['AI 사용량(7일)', us.blocked ? 'bad' : (p7 ?? 0) >= 85 ? 'warn' : '', us.blocked ? `한도 · ${us.until}에 풀림` : `${H5(p7)}%${uw.seven_day && uw.seven_day.resets ? ` · ${uw.seven_day.resets} 채워짐` : ''}`, 'work'],
     ['최근 백업', s.backup.latest ? ((s.backup.hourly || {}).fails ? 'warn' : '') : 'bad', s.backup.latest ? `${s.backup.latest.slice(5).replace('-', '/')} · ${s.backup.count}일치 보관${(s.backup.hourly || {}).last_ok ? ` · 매시 ${relDay(s.backup.hourly.last_ok, s.now)}` : ''}` : '없음', 'records:backup-sec'],
     ['기술부채', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
-    ['git', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? 'GitHub와 같음' : `앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 안 올린 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
+    ['git', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? '커밋 동기화됨' : `앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 안 올린 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
   ];
   for (const [k, c, v, go] of SYS) {
     const li = el('li'); const b = el('button'); b.type = 'button'; b.dataset.goto = go;
@@ -1559,8 +1581,9 @@ function render(s) {
     bulk.onclick = async () => {
       if (!confirm(`${shown.length}건을 모두 닫을까요? 남길 카드는 먼저 '보는 중'으로 바꿔 주세요.`)) return;
       bulk.disabled = true;
-      for (const i of shown) { try { await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'done', key: i.key, note: '현황판에서 오래된 카드 한꺼번에 정리' }) }); } catch (e) { /* 하나 실패해도 계속 */ } }
-      toast(`${shown.length}건을 닫았어요`); todoFilter = 'all'; tick();
+      let closed = 0;
+      for (const i of shown) { try { const r = await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'done', key: i.key, note: '현황판에서 오래된 카드 한꺼번에 정리' }) }); const j = await r.json(); if (r.ok && j.ok) closed++; } catch (e) { /* 실패 건은 그대로 유지 */ } }
+      toast(`${closed}건 처리${closed < shown.length ? ` · ${shown.length - closed}건은 다시 확인해 주세요` : ''}`); todoFilter = 'all'; tick();
     };
     fbar.append(bulk);
   }
@@ -1579,8 +1602,11 @@ function render(s) {
     const toggle = () => { it.classList.toggle('open'); openTodos[it.classList.contains('open') ? 'add' : 'delete'](i.key); t.setAttribute('aria-expanded', String(it.classList.contains('open'))); };
     t.onclick = toggle; t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
     it.append(meta, t);
-    if (i.todo) it.append(el('div', 'what', '할 일 · ' + i.todo.replace(/\*\*/g, '')));   // 디스코드용 굵게 표시는 뺌
-    if (i.body) { const d = el('details'); d.append(el('summary', null, '내용 보기'), el('pre', null, i.body)); it.append(d); }
+    const content = i.presentation || { action: i.todo, facts: [], effects: [] };
+    if (content.action) it.append(el('div', 'what', '할 일 · ' + content.action.replace(/\*\*/g, '')));
+    if (content.facts?.length) { const facts = el('ul', 'card-facts'); content.facts.forEach(x => facts.append(el('li', null, x))); it.append(facts); }
+    if (content.effects?.length) it.append(el('p', 'small', content.effects.join('\n')));
+    if (i.body) { const d = el('details'); d.append(el('summary', null, '전체 근거 보기'), el('pre', null, i.body)); it.append(d); }
     const bs = el('div', 'btns');
     const B = (lab, a, cls) => { const b = el('button', 'btn sm ' + (cls || ''), lab); b.type = 'button'; b.dataset.act = a; b.dataset.key = i.key; bs.append(b); };
     if (i.approval) { B('승인', 'approve', 'primary'); B('거절', 'reject', 'danger'); }
@@ -1718,7 +1744,7 @@ function render(s) {
   }
 
   // 알림 기록
-  const SEV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['오늘', 'warn'], high: ['오늘', 'warn'], info: ['참고', ''], debug: ['기록', ''] };
+  const SEV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['확인 필요', 'warn'], high: ['우선 확인', 'warn'], info: ['참고', ''], debug: ['기록', ''] };
   const ev = $('events'); ev.textContent = '';
   if (!(s.events || []).length) ev.append(el('li', 'empty', '기록 없음'));
   // 서버는 오늘 것 전부를 보냄 — 처음엔 최근 40건, '더 보기'로 전부(2026-10-25 감사: 40건에서 잘려 오늘 긴급 알림이 안 보였음)
@@ -1742,7 +1768,7 @@ function render(s) {
 
   const g = $('git'); g.textContent = '';
   const sync = s.git.ahead === 0 && s.git.behind === 0;
-  g.append(el('p', 'small ' + (sync ? 'muted' : ''), (sync ? 'GitHub와 같음' : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.fetched ? ` · GitHub ${relDay(s.git.fetched, s.now)}에 확인` : '')));
+  g.append(el('p', 'small ' + (sync ? 'muted' : ''), (sync ? (s.git.dirty.length ? '커밋은 GitHub와 같음 · 저장 전 변경 있음' : 'GitHub와 같음') : `GitHub보다 앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.fetched ? ` · GitHub ${relDay(s.git.fetched, s.now)}에 확인` : '')));
   const gl = el('ul', 'log');
   for (const c of s.git.log) { const li = el('li'); li.append(el('code', null, c.hash), document.createTextNode(' '), el('span', 'muted small', c.when + ' '), document.createTextNode(deE(c.subject))); gl.append(li); }
   g.append(gl);
@@ -1761,8 +1787,10 @@ async function tick() {
   if (busyTick) return; busyTick = true;
   try {
     const r = await apiFetch('/api/state');
-    render(await r.json());
+    if (!r.ok) throw new Error('자료를 불러오지 못했어요');
+    const fresh = await r.json(); render(fresh); window.barunHealth?.(fresh);
   } catch (e) {
+    $('connection-notice').hidden = false; $('connection-notice').textContent = '연결을 다시 확인하고 있어요. 이전에 불러온 내용은 유지됩니다.';
     $('updated').textContent = '불러오기 실패 · ' + e.message; $('updated').className = 'upd err';
   } finally { busyTick = false; }
 }
@@ -1801,5 +1829,6 @@ window.addEventListener('hashchange', route); route();
 <script src="agents.js"></script>
 <script src="tasks.js"></script>
 <script src="reports.js"></script>
+<script src="health.js"></script>
 </body>
 </html>
