@@ -93,11 +93,14 @@ button { font: inherit; color: inherit; }
 .bar-t { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 10px; }
 .bar-t h1 { font-size: 19px; letter-spacing: -.02em; margin: 0; white-space: nowrap; }
 .bar-t p { margin: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.health { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
-  background: var(--card); color: var(--ink2); box-shadow: 0 0 0 1px var(--line); white-space: nowrap; }
-.health::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--st-good); }
-.health.warn::before { background: var(--st-warn); } .health.bad { color: var(--red-ink); } .health.bad::before { background: var(--st-crit); }
-.health:focus-visible { outline: 2px solid var(--blue); }
+/* 전체 상태 칩(2026-10-27 사장님 "혼자 곡률이 다름" → 다른 버튼과 같은 10px 모서리·34px 높이, 상태는 테두리 대신 옅은 바탕색으로) */
+.health { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; line-height: 1; background: var(--green-bg); color: var(--green-ink); white-space: nowrap; transition: filter .15s; }
+.health:hover { filter: brightness(.97); }
+.health::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.health.warn { background: var(--orange-bg); color: var(--orange-ink); }
+.health.bad { background: var(--red-bg); color: var(--red-ink); }
+.health:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .topbar .ask-btn { display: none; }
 /* 화면 폭 상한 없음 — 넓은 모니터면 넓게(10/25 사장님) */
 main.pages { padding: 8px 28px 72px; }
@@ -908,7 +911,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 #p-health .sys li > :last-child { text-align: right; }
 @media(max-width: 760px) { #p-health .sys { grid-template-columns: 1fr; } }
 #connection-notice { margin-bottom: 16px; }
-@media(max-width: 600px) { .health { width: auto; min-height: 36px; padding: 6px 9px; } .health .htxt { display: inline; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #p-health .stats { grid-template-columns: 1fr; } .nav-search input { font-size: 16px; } }
+@media(max-width: 600px) { .health { width: auto; height: 32px; padding: 0 10px; } .health .htxt { display: inline; font-size: 12px; max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #p-health .stats { grid-template-columns: 1fr; } .nav-search input { font-size: 16px; } }
 </style>
 </head>
 <body>
