@@ -76,7 +76,9 @@
     for (const i of incidents) { const row = node('article', 'todo open'); row.append(node('span', 'badge', i.label), node('h3', 't', i.title), node('p', 'what', i.next)); const detail = detailNode(i.id); detail.querySelector('summary').textContent = `근거와 이력 · 재발 ${i.recur}회 · 맡긴 횟수 ${i.tries}회`; let pre = detail.querySelector('pre'); if (!pre) { pre = node('pre'); detail.append(pre); } if (pre.textContent !== i.detail) pre.textContent = i.detail; row.append(detail); issues.append(row); }
     if (incidents.some(i => i.state === 'stuck')) issues.append(action('판단할 카드 보기', 'todo', 'decisions'));
     const cv = h.monitor?.coverage || {}, coverage = section('감시가 확인할 수 있는 범위', '근거 부족은 정상 판정이 아니에요');
-    for (const [kind, unit] of [['운임', '개'], ['손익', '건']]) coverage.append(node('p', '', `${kind} · 비교 ${cv[kind + '비교'] ?? '—'}${unit} / 근거 부족 ${cv[kind + '근거부족'] ?? '—'}${unit}`));
+    for (const [kind, unit] of [['운임', '개'], ['손익', '건']]) coverage.append(node('p', '', `${kind} · 비교 ${cv[kind + '비교'] ?? '—'}${unit}${kind === '손익' ? ` (예상 ${cv['손익예상'] ?? 0}건 포함)` : ''} / 근거 부족 ${cv[kind + '근거부족'] ?? '—'}${unit}`));
+    const freightReasons = Object.entries(cv['운임부족사유'] || {}).map(([reason, count]) => `${reason} ${count}개`);
+    if (freightReasons.length) coverage.append(node('p', 'muted small', freightReasons.join(' · ')));
     coverage.append(node('p', 'muted small', `마지막 검사 ${h.monitor?.scanned_at?.replace('T', ' ') || '확인 전'} · 규칙 감시의 모델 호출 ${h.monitor?.llm_calls ?? '—'}회`));
     const freshness = section('화면 자료의 갱신 상태', '조회 실패 시 마지막 정상값을 보여 줍니다');
     const ul = node('ul', 'sys');
