@@ -29,10 +29,33 @@
     }
     intro.append(counts); p.append(intro);
     const section = (title, desc) => { const c = node('section', 'card'), hh = node('div', 'card-h'); hh.append(node('h2', '', title)); if (desc) hh.append(node('span', 'desc', desc)); c.append(hh); p.append(c); return c; };
+    const ex = h.execution || {}, active = ex.active || [], queued = ex.queue || [];
+    const duration = secs => secs >= 60 ? `${Math.floor(secs / 60)}분 ${Math.round(secs % 60)}초` : `${Math.round(secs || 0)}초`;
+    const progress = section('지금 어디까지 진행됐나요', '현재 단계와 기다리는 이유를 같은 곳에서 확인해요');
+    if (!active.length && !queued.length) progress.append(node('p', 'empty', h.execution ? '현재 실행 중이거나 차례를 기다리는 자동작업이 없어요' : '실행 상태를 확인하고 있어요'));
+    for (const r of active) {
+      const row = node('article', 'todo open');
+      row.append(node('span', 'badge', ({running:'진행 중', slow:'응답 지연', interrupted:'종료 확인 필요'})[r.status] || '확인 중'),
+        node('h3', 't', r.title), node('p', 'what', `${r.phase} · 이 단계 ${duration(r.phase_secs)} · 전체 ${duration(r.secs)}`));
+      if (r.status === 'slow') row.append(node('p', 'muted small', '응답이 늦어지고 있어요. 실제 처리 결과를 확인해요.'));
+      progress.append(row);
+    }
+    for (const r of queued) {
+      const row = node('article', 'todo open');
+      row.append(node('span', 'badge', r.state === 'running' ? '에이전트 진행' : '실행 대기'), node('h3', 't', r.title),
+        node('p', 'what', `${r.reason} · 접수 후 ${duration(r.age_secs)}`)); progress.append(row);
+    }
+    if (ex.slowest?.length) {
+      const details = node('details'); details.dataset.incident = 'execution-metrics'; details.open = opened.has('execution-metrics'); details.append(node('summary', '', `시간이 많이 든 단계 · 최근 완료 ${ex.sample_runs}회 표본`));
+      const list = node('ul', 'card-facts');
+      for (const r of ex.slowest) list.append(node('li', '', `${r.title} / ${r.phase} — ${r.count}회 · 평균 ${duration(r.avg_secs)} · 최장 ${duration(r.max_secs)}${r.fails ? ` · 실패 ${r.fails}회` : ''}`));
+      details.append(list, node('p', 'muted small', '최근 24시간의 일부 완료 기록으로 비교해요. 단계별 시간은 겹칠 수 있어 합산하지 않아요.'));
+      progress.append(details);
+    }
     const service = section('감시 기능의 동작 상태', '감지기가 연결되어 있는지 보여 줘요. 업무별 실행 결과는 실행 내역에서 확인해요.');
     const list = node('ul', 'sys');
     const sources = h.hub?.sources || {};
-    for (const v of Object.values(sources)) { const li = node('li'); li.append(node('span', 'dot ' + (v.ok ? 'ok' : v.paused ? '' : 'warn')), node('span', '', v.label), node('span', 'muted small', v.paused ? '운영 시간 밖' : v.ok ? '정상' : v.fails ? `연속 실패 ${v.fails}회` : '확인 지연')); list.append(li); }
+    for (const v of Object.values(sources)) { const li = node('li'); li.append(node('span', 'dot ' + (v.paused ? 'idle' : v.ok ? 'ok' : 'warn')), node('span', '', v.label), node('span', 'muted small', v.paused ? '운영 시간 밖' : v.running ? `확인 중 ${duration(v.secs)}` : v.ok ? '정상' : v.fails ? `연속 실패 ${v.fails}회` : '확인 지연')); list.append(li); }
     const q = h.queue || {}; const qa = q.at && Date.now() - Date.parse(q.at) < 120000;
     const li = node('li'); li.append(node('span', 'dot ' + (qa ? 'ok' : 'warn')), node('span', '', '실행 대기열'), node('span', 'muted small', qa ? '정상' : '확인 필요')); list.append(li);
     service.append(list, go('실행 내역 보기', 'work'));
