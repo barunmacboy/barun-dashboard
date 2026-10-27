@@ -65,7 +65,7 @@
     document.head.append(css);
     sec.innerHTML = `
       <div class="card hero" id="vt-hero"><h2 id="vt-title">불러오는 중</h2><p class="lead" id="vt-lead"></p><div class="vt-steps" id="vt-steps"></div><div class="stats" id="vt-stats"></div><div class="vt-acts" id="vt-acts"></div></div>
-      <div class="card" id="vt-miss-c" hidden><div class="card-h"><h2>인보이스 없음 — 받아 와야 해요</h2><span class="desc">독일 19% 상품을 샀는데 인보이스 PDF가 아직 없는 주문 · 5일 넘으면 빨강 · 받으면 [PDF 올리기]</span></div><div id="vt-miss"></div></div>
+      <div class="card" id="vt-miss-c" hidden><div class="card-h"><h2>인보이스 없음 — 받아 와야 해요</h2><span class="desc">독일 19% 상품을 샀는데 인보이스 PDF가 아직 없는 주문 · 5일 넘으면 빨강 · shop-apotheke는 매일 자동으로 받고, 나머지는 [PDF 올리기] 또는 #할-일 카드에 PDF 답글</span></div><div id="vt-miss"></div></div>
       <div class="card" id="vt-need-c" hidden><div class="card-h"><h2>확인 필요</h2><span class="desc">자동으로 못 읽은 세율·금액·주문 — 고치면 그 값이 우선해요</span></div><div id="vt-need"></div></div>
       <div class="card"><div class="card-h"><h2 id="vt-batch-h">신청 묶음</h2><span class="desc" id="vt-batch-d"></span><div class="act" id="vt-batch-act"></div></div><div id="vt-batch"></div><div id="vt-batch-sum"></div></div>
       <div class="card" id="vt-wait-c" hidden><div class="card-h"><h2>다음 달 신청으로</h2><span class="desc">인보이스 날짜가 이번 신청 기준일 뒤라 다음 1일에 같이 신청해요</span></div><div id="vt-wait"></div></div>
@@ -195,7 +195,7 @@
     if (i.kind === '혼합') t.append(E('span', 'badge warn', '19%+7% 섞임'));
     else if (i.kind === '19') t.append(E('span', 'badge run', '19%'));
     else if (i.kind === '7') t.append(E('span', 'badge', '7%'));
-    if (i.override && Object.keys(i.override).length) t.append(E('span', 'badge', '고친 값'));
+    if (i.override && (i.override.kind || i.override.gross19 != null)) t.append(E('span', 'badge', '고친 값'));
     if (i.status === '제외') t.append(E('span', 'badge bad', '제외'));
     body.append(t);
     const meta = [i.date ? `인보이스 ${md(i.date)}` : '날짜 모름', i.inv_no && i.order ? `번호 ${i.inv_no}` : '', `받음 ${md(i.got)}`].filter(Boolean).join(' · ');
@@ -238,13 +238,22 @@
     const t = E('div', 'vt-t'); t.append(E('span', null, m.shop), E('span', 'muted', `주문 ${m.order}`)); body.append(t);
     body.append(E('div', 'vt-m', [m.ordered ? `주문 ${md(m.ordered)}` : '', ...[...new Set(m.rows.map((x) => x.progress))]].filter(Boolean).join(' · ')));
     const who = E('div', 'vt-m'); who.innerHTML = ic('user'); who.append(document.createTextNode(m.rows.map((x) => `${x.receiver || '재고'} ${x.name.slice(0, 28)}${x.fwd ? ' · ' + x.fwd : ''}`).join('  /  '))); body.append(who);
-    const h = E('div', 'vt-hint'); h.innerHTML = ic('info') + ' 받는 곳: '; h.append(document.createTextNode(m.how)); body.append(h);
+    const h = E('div', 'vt-hint'); h.innerHTML = ic(m.pending ? 'clock' : m.auto ? 'zap' : 'info') + ' 받는 곳: '; h.append(document.createTextNode(m.how)); body.append(h);
+    if (m.fetch_at) body.append(E('div', 'vt-m', `마지막 자동 받기 ${md(m.fetch_at)} ${String(m.fetch_at).slice(11, 16)} · ${m.fetch_msg}`));
     const side = E('div', 'vt-side');
-    const age = E('span', 'badge ' + (m.late ? 'bad' : m.age >= 3 ? 'warn' : ''), m.age == null ? '날짜 모름' : `${m.age}일째`);
+    const age = E('span', 'badge ' + (m.pending ? '' : m.late ? 'bad' : m.age >= 3 ? 'warn' : ''), m.pending ? `발송 전 · ${m.age ?? '?'}일` : m.age == null ? '날짜 모름' : `${m.age}일째`);
     side.append(age);
     if (m.est_refund) side.append(E('div', 'vt-amt', `환급 약 ${eur(m.est_refund)}`));
-    const bt = E('div', 'vt-btns'); bt.append(btn('PDF 올리기', 'xs weak', 'up', () => uploadDlg(m.order)), btn('번호 복사', 'xs ghost', 'copy', () => copy(m.order))); side.append(bt);
+    const bt = E('div', 'vt-btns');
+    if (m.auto) bt.append(btn('자동으로 받기', 'xs primary', 'zap', (b) => fetchNow(m.order, b), '구매처 계정에서 지금 받아 오기(10~20초)'));
+    bt.append(btn('PDF 올리기', 'xs weak', 'up', () => uploadDlg(m.order)), btn('번호 복사', 'xs ghost', 'copy', () => copy(m.order))); side.append(bt);
     d.append(body, side); return d;
+  }
+  async function fetchNow(order, b) {
+    if (b) { b.disabled = true; b.dataset.t = b.textContent; b.textContent = '받는 중…'; }
+    window.toast && window.toast('구매처 계정에서 인보이스를 받는 중이에요(건당 10~20초)');
+    await act({ op: 'fetch', order: order || '' }, null);
+    if (b) { b.disabled = false; b.textContent = b.dataset.t; }
   }
   const fill = (id, nodes, empty) => { const c = $(id); c.innerHTML = ''; if (!nodes.length) c.append(E('div', 'empty', empty)); for (const n of nodes) c.append(n); };
 
@@ -265,7 +274,7 @@
     const c = d.counts, s = d.sums, fx = d.fx_eur;
     const ids = d.batch.map((i) => i.sha).join();
     if (ids !== selInit) { sel.clear(); for (const i of d.batch) if (!i.need.length || i.gross19 != null) sel.add(i.sha); selInit = ids; }   // 금액 모르는 것만 빼고 전부
-    const badge = c.missing_late + c.need + (d.days_left === 0 && c.batch ? 1 : 0);
+    const badge = c.missing_late + c.need + (c.overdue || 0) + (d.days_left === 0 && c.batch ? 1 : 0);
     window.barunBadge && window.barunBadge('vat', badge);
     window.barunNew && window.barunNew('vat', d.last_new);
     const dd = d.days_left === 0 ? '<span class="vt-dday today">오늘 신청</span>' : `<span class="vt-dday">D-${d.days_left}</span>`;
@@ -284,11 +293,12 @@
       stat('예상 환급', eur(s.batch_refund), won(s.batch_refund, fx) || `구매금의 ${Math.round(d.rate * 100)}%`, c.batch ? 'ok' : ''),
       stat('인보이스 없음', `${c.missing}<small>건</small>`, c.missing ? `놓칠 수 있는 ${eur(s.missing_refund)}` : '빠진 것 없음', c.missing_late ? 'bad' : c.missing ? 'warn' : 'ok', c.missing ? 'vt-miss-c' : ''),
       stat('확인 필요', `${c.need}<small>건</small>`, c.need ? '세율·금액·주문' : '자동 판정 끝', c.need ? 'warn' : 'ok', c.need ? 'vt-need-c' : ''),
-      stat('환급 대기', `${c.applied}<small>건</small>`, c.applied ? `신청함 ${eur(s.applied_refund)}` : '신청한 것 없음', c.applied ? 'run' : ''),
+      stat('환급 대기', `${c.applied}<small>건</small>`, c.overdue ? `${c.overdue}건 60일 넘음 — 훗타운 확인` : c.applied ? `신청함 ${eur(s.applied_refund)}` : '신청한 것 없음', c.overdue ? 'bad' : c.applied ? 'run' : ''),
       stat('받은 환급', eur(s.refunded), `${c.done}건 누계`, ''));
     const acts = $('vt-acts'); acts.innerHTML = '';
     if (c.batch) acts.append(btn(`ZIP 받기 (${c.batch}건)`, 'primary', 'down', (b) => download('batch', `세금환급_독일19_${d.apply_month}_${c.batch}건.zip`, b), 'PDF + 목록.csv — 훗타운에 올릴 묶음'),
       btn('신청했어요', 'weak', 'check', applyDlg));
+    if (c.auto) acts.append(btn(`자동으로 받기 (${c.auto}건)`, 'weak', 'zap', (b) => fetchNow('', b), '인보이스를 계정에서 받을 수 있는 구매처(shop-apotheke) 주문'));
     acts.append(btn('PDF 올리기', 'ghost', 'up', () => uploadDlg('')), btn('새로 읽기', 'ghost', 'refresh', (b) => { b.disabled = true; load(true).finally(() => { b.disabled = false; }); }));
 
     $('vt-miss-c').hidden = !d.missing.length; fill('vt-miss', d.missing.map(missRow), '');
