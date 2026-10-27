@@ -327,6 +327,12 @@
   }
 
   let seq = 0, jump = null, lastSig = '';      // jump = 다 불러온 뒤 열 줄 {tab, row}(같은 주문의 다른 줄로 갈 때) · lastSig = 지난 요청(같으면 보던 자리 그대로)
+  let lastTab = null, tailEnd = null;           // lastTab = 지난번 고른 탭(바뀌면 아래부터) · tailEnd = 아래 묶음을 다시 부를 때 맞출 줄 위치
+  function toTail(wrap, i) {     // i번째 줄(묶음 안)이 보이는 칸 맨 아래에 오게 — 표는 표 안에서, 카드는 화면을 넘겨서
+    if (wrap.classList.contains('cards')) { const n = wrap.querySelectorAll('.dt-cards > .oc')[i]; if (n) n.scrollIntoView({ block: 'end' }); return; }
+    const tb = wrap.querySelector('tbody'), tr = tb && tb.rows[Math.min(i, tb.rows.length - 1)]; if (!tr) return;
+    wrap.scrollTop += tr.getBoundingClientRect().bottom - wrap.getBoundingClientRect().bottom;
+  }
   async function load() {
     const wrap = document.querySelector('.dt-wrap'); if (!wrap) return;
     const ps = params(); ps.set('offset', cur.offset); ps.set('limit', isSheet() ? 500 : 50);   // 주문 시트는 한 번에 500줄(엑셀처럼 넘기며 보게)
@@ -345,6 +351,15 @@
       wrap.textContent = '';
       wrap.append(stateBox(noE(j.error), '필터·정렬을 확인해 주세요.', [['필터·정렬 모두 풀기', () => { cur.filters = []; cur.sort = []; cur.offset = 0; load(); }]])); return;
     }
+    // 2026-10-27 사장님 "정보가 적혀있는 하단부터": 시트 탭을 새로 열면(기본 순서·첫 묶음일 때만) 내용이 적힌 마지막 줄 + 빈 줄 2~3줄이 화면 아래에 오게 — 그 줄이 든 500줄 묶음부터
+    const tabSig = isSheet() ? JSON.stringify((cur.filters.find((x) => x.c === 'tab') || {}).vs || []) : '';
+    let tail = tailEnd; tailEnd = null;
+    if (tail == null && tabSig && tabSig !== '[]' && tabSig !== lastTab && !cur.sort.length && cur.offset === 0 && j.last_filled >= 0) {
+      tail = Math.min(j.total - 1, j.last_filled + 3);
+      const off = Math.max(0, tail - 499);
+      if (off !== cur.offset) { cur.offset = off; lastTab = tabSig; tailEnd = tail; return load(); }
+    }
+    lastTab = tabSig;
     last = j;
     for (const [c, on] of [['.dt-sbtn', isSheet()], ['.dt-abtn', isSheet()]]) { const b = document.querySelector(c); if (b) b.hidden = !on; }
     saveUI();
@@ -362,6 +377,7 @@
     const sig = ps.toString(); if (sig !== lastSig) autoW = {};   // 칸 너비는 같은 줄 묶음 동안 그대로(고칠 때마다 표가 옆으로 움직이지 않게)
     render();
     if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; hSync(); } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
+    if (tail != null) toTail(wrap, tail - cur.offset);
     const more = document.querySelector('.dt-more'); more.textContent = '';
     more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
@@ -1181,7 +1197,9 @@
     if (c) { pickCell(r, c); const td = cellTd(r, c); if (td) cellEdit(td, r, c, null, true); }     // 바로 입력 상태(사장님 "원클릭" — 넣은 뒤 칸을 또 누르지 않게)
   }
 
-  const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 파미칼: '€', 영국: '£', 호주: 'A$' };
+  const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 일본: '¥', 영국: '£', 호주: 'A$' };
+  // 일본 탭의 파미칼 줄은 공홈가가 원화 총액(sheet_book.is_famical, 2026-10-27) — 줄 단위로 ₩
+  const curOf = (tab, name) => (/패미칼|파미칼|패미컬/.test(name || '') ? '₩' : CUR[tab]);
   const SK_KEEP = ['tab', 'shop', 'center'];      // '하나 더 넣기'에서 남겨 두는 칸(같은 상자에서 여러 개 넣을 때)
   let sk = null;
   function stockDialog(tab) {
@@ -1465,8 +1483,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       go.textContent = sending ? '넣는 중…' : tab ? `${tab} 탭에 넣기` : '넣기';
       setMsg('price', priceBad() ? '숫자만(예: 24.99)' : null, priceBad());
       setMsg('qty', qtyBad() && val('qty') ? '1 이상 숫자' : '', qtyBad() && !!val('qty'));
-      money.b.textContent = CUR[tab] || '¤';
-      bsv.textContent = buy.open ? '' : [val('shop'), val('order_no'), val('price') && (CUR[tab] || '') + val('price')].filter(Boolean).join(' · ');
+      money.b.textContent = curOf(tab, val('name')) || '¤';
+      bsv.textContent = buy.open ? '' : [val('shop'), val('order_no'), val('price') && (curOf(tab, val('name')) || '') + val('price')].filter(Boolean).join(' · ');
       ssv.textContent = ship.open ? '' : [val('center'), val('tracking'), val('carrier'), val('memo')].filter(Boolean).join(' · ');
       if (step.w) step.w.sync();
     }
@@ -1594,7 +1612,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       body.hidden = true; prev.hidden = true;
       const box = E('div', 'sk-done'); box.id = 'sk-done';
       const kv = E('dl', 'sk-kv');
-      const rows = [['상품', p.name + (p.옵션 ? ` · ${p.옵션}` : '')], ['수량', p.qty + '개'], ['구매처', p.shop], ['공홈주문번호', p.order_no], ['공홈가', p.price && (CUR[done.tab] || '') + p.price],
+      const rows = [['상품', p.name + (p.옵션 ? ` · ${p.옵션}` : '')], ['수량', p.qty + '개'], ['구매처', p.shop], ['공홈주문번호', p.order_no], ['공홈가', p.price && (curOf(done.tab, p.name) || '') + p.price],
         ['배대지센터', p.center], ['해외송장', [p.해외송장, p.해외운송사].filter(Boolean).join(' · ')], ['메모', p.메모]];
       for (const [k, v] of rows) if (v) kv.append(E('dt', null, k), E('dd', null, v));
       const okI = E('div', 'ok'); okI.append(I('check')); box.append(okI, E('h3', null, `${done.tab} 탭 ${done.row ? done.row + '행' : ''}에 넣었어요`), E('p', null, '표에서 바로 고칠 수 있어요.'), kv);

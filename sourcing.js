@@ -12,6 +12,10 @@
   // 외부대기가 기다리는 것(dashboard/sourcing.py _wait_kind) — 2026-10-25: 28줄을 모두 '답 기다림'으로 보이던 것
   const WAIT = { 외부: '외부 답 기다림', 사장님: '사장님 결정 기다림', 구매처: '구매처 없음' };
   const waits = (w) => Object.entries(w || {}).filter(([, n]) => n).map(([k, n]) => `${WAIT[k] || k} ${n}`).join(' · ');
+  // 소싱 기계(2026-10-26) 찾는 곳 이름(pricing/sourcing_ledger.METHODS + 400행·사람) · 쇼핑몰
+  const SRC = { 우리판매: '우리 판매', 경쟁점: '경쟁 판매점', 순위: '해외직구 순위', 문의: '고객 문의', '400행': '400행 조사', 사람: '사람이 직접' };
+  const PLN = { naver: '네이버', coupang: '쿠팡' };
+  const num = (v) => v == null ? '—' : String(v);
   let timer = 0, busy = false;
 
   function install() {
@@ -29,10 +33,26 @@
       .sc-feed .b { flex: 1; min-width: 0; } .sc-feed .m { color: var(--sub); font-size: 13px; }
       .sc-steps { margin: 8px 0 0; padding: 10px 12px; background: var(--fill2); border-radius: var(--r-sm); font-size: 13px; color: var(--sub); }
       .sc-steps div + div { margin-top: 4px; }
-      @media (max-width: 720px) { #sc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
+      @media (max-width: 720px) { #sc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      .sc-sub { margin: 16px 0 6px; font-weight: 700; font-size: 14px; }
+      .sc-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .sc-tbl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+      .sc-tbl th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      .sc-tbl td { padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+      .sc-tbl .n { text-align: right; } .sc-tbl td.t { white-space: normal; min-width: 150px; max-width: 320px; }
+      .sc-tbl a { color: inherit; text-decoration: underline; text-decoration-color: var(--axis); text-underline-offset: 2px; }
+      .sc-share { display: grid; grid-template-columns: 104px 1fr; gap: 2px 10px; align-items: center; font-size: 13px; margin: 8px 0; }
+      .sc-share .bar { height: 10px; border-radius: 5px; background: var(--fill2); overflow: hidden; }
+      .sc-share .bar b { display: block; height: 100%; background: var(--st-run); border-radius: 5px; }
+      .sc-share .m { grid-column: 2; color: var(--muted); font-size: 12px; }`;
     document.head.append(css);
     sec.innerHTML = `
       <div class="card hero"><h2 id="sc-title">불러오는 중</h2><p class="lead" id="sc-lead"></p><div class="stats" id="sc-stats"></div></div>
+      <div class="card" id="sc-m" hidden><div class="card-h"><h2>소싱 기계</h2><span class="desc" id="sc-m-desc">찾기 → 거르기 → 올리기 → 팔리나</span></div>
+        <div class="stats" id="sc-m-stats"></div>
+        <div class="sc-sub">찾는 곳별 흐름</div><div class="sc-scroll"><table class="sc-tbl" id="sc-m-funnel"></table></div>
+        <div class="sc-sub">찾는 곳 점수 <span class="muted small" id="sc-m-wdesc"></span></div><div id="sc-m-score"></div>
+        <div class="sc-sub">올린 상품 성과 <span class="muted small" id="sc-m-pdesc"></span></div><div class="sc-scroll"><table class="sc-tbl" id="sc-m-perf"></table></div></div>
       <div class="card"><div class="card-h"><h2>장부 400줄 어디까지 왔나</h2><span class="desc" id="sc-bar-desc">끝·탈락·외부대기가 닫힌 줄</span></div>
         <div class="sc-bar" id="sc-bar" role="img"></div><div class="sc-leg" id="sc-leg"></div></div>
       <div class="grid2">
@@ -63,7 +83,68 @@
   const empty = (ul, t) => { ul.innerHTML = ''; ul.append(E('li', 'muted small', t)); };
   const stat = (k, v, d, cls) => { const s = E('div', 'stat ' + (cls || '')); s.style.cursor = 'default'; s.append(E('div', 'k', k), E('div', 'v', v), E('div', 'd', d || '')); return s; };
 
+  // 표 한 줄 — vals: 글자 또는 요소, nums: 오른쪽 맞춤할 칸 번호
+  function trow(tag, vals, nums = []) {
+    const tr = E('tr');
+    vals.forEach((v, i) => { const c = E(tag, nums.includes(i) ? 'n' : null); if (v instanceof Object && v.append) c.append(v); else c.textContent = v == null ? '' : String(v); tr.append(c); });
+    return tr;
+  }
+  const ext = (t, url) => { if (!url) return E('span', null, t); const a = E('a', null, t); a.href = url; a.target = '_blank'; a.rel = 'noopener'; return a; };
+
+  // 소싱 기계(2026-10-26 사장님 "소싱 작업의 대 혁신") — pricing/performance.summary: 깔때기 · 오늘 자동 등록 몫 · 출처 점수 · 올린 상품 성과
+  function machine(m) {
+    const box = $('sc-m'); if (!box) return;
+    box.hidden = !m;
+    if (!m) return;
+    if (m.error) { $('sc-m-desc').textContent = '못 읽었어요 — ' + m.error; return; }
+    const a = m.auto || {}, cf = m.conf || {}, W = cf.watch || 14, S = cf.stop || 30, WIN = cf.window || 30;
+    const stale = m.stale || [], watch = m.watch || [];
+    $('sc-m-desc').textContent = '찾기 → 거르기 → 올리기 → 팔리나';
+    const st = $('sc-m-stats'); st.innerHTML = '';
+    st.append(stat('오늘 자동 등록', `${a.today || 0}/${a.max || 0}`, a.on ? '조건 통과 줄은 바로 올림' : '자동 등록 꺼짐', a.today ? 'ok' : ''),
+      stat('오늘 새로 찾음', `${m.found_today || 0}`, '네 곳에서 찾은 후보', ''),
+      stat('올린 상품', `${m.total || 0}`, `팔린 것 ${m.sold || 0} · 주문 ${m.orders || 0}건`, m.sold ? 'ok' : ''),
+      stat(`${W}일째 주문 0`, `${watch.length}`, '지켜보는 중', watch.length ? 'warn' : ''),
+      stat(`${S}일 동안 안 팔림`, `${stale.length}`, stale.length ? '#할-일에 정리 제안' : '없음', stale.length ? 'warn' : ''));
+    if (m.unlinked) st.append(stat('못 이음', `${m.unlinked}`, '판매 목록에서 못 찾음', 'bad'));
+    // ① 찾는 곳별 흐름(400행 조사·사람이 직접 올린 것도 같이)
+    const fu = $('sc-m-funnel'); fu.innerHTML = '';
+    fu.append(trow('th', ['찾는 곳', '찾음', '거르기 통과', '탈락', '올림', `${W}일 안에 팔림`], [1, 2, 3, 4, 5]));
+    for (const f of m.funnel || []) fu.append(trow('td', [SRC[f.source] || f.source, num(f.found), num(f.passed), num(f.dropped), num(f.registered), num(f.sold14)], [1, 2, 3, 4, 5]));
+    // ④ 찾는 곳 점수 — 하루 찾을 몫(weights, 없으면 설정값)
+    const sc = $('sc-m-score'); sc.innerHTML = '';
+    $('sc-m-wdesc').textContent = m.weights ? '· 하루 찾을 몫을 이 비율로 나눠요' : '· 아직 자료 부족(올린 줄 3개 미만) — 하루 몫은 설정값으로';
+    for (const s of m.scores || []) {
+      const share = s.method ? (s.share != null ? s.share : s.quota) : null;
+      const row = E('div', 'sc-share'), bar = E('div', 'bar'), b = E('b');
+      b.style.width = share != null ? `${Math.round(share * 100)}%` : '0%'; bar.append(b);
+      const desc = [s.method ? `하루 몫 ${Math.round((share || 0) * 100)}%${s.share != null && s.enough ? '' : '(설정값)'}` : '하루 몫 없음',
+        `올림 ${s.n}줄 · ${WIN}일 주문 ${s.orders30}건`, s.rate != null ? `${WIN}일 환산 1줄당 ${s.rate}건` : ''].filter(Boolean).join(' · ');
+      row.append(E('span', null, SRC[s.source] || s.source), bar, E('span', 'm', desc)); sc.append(row);
+    }
+    if (m.top) sc.append(E('div', 'muted small', `${WIN}일 판매 1위: ${SRC[m.top.source] || m.top.source} · 환산 = 올린 지 ${WIN}일이 안 된 줄은 지난 날수로 나눠 ${WIN}일로 맞춤`));
+    // ③ 올린 상품 성과 — 새로 올린 순
+    const key = (r) => `${r.platform}:${r.lead_id}`;
+    const ss = new Set(stale.map(key)), ws = new Set(watch.map(key));
+    $('sc-m-pdesc').textContent = `· 새로 올린 순 · 취소·반품 뺌${m.more ? ` · 외 ${m.more}개` : ''}`;
+    const pf = $('sc-m-perf'); pf.innerHTML = '';
+    pf.append(trow('th', ['올린 날', '상품', '쇼핑몰', '찾은 곳', '자동', `${W}일`, `${WIN}일`, '상태'], [5, 6]));
+    for (const r of m.rows || []) {
+      const t = E('span'); t.append(ext(r.title, r.link || r.wing)); if (r.pid) t.append(E('span', 'muted small', ` ${r.pid}`));
+      const cls = !r.linked ? 'bad' : ss.has(key(r)) || ws.has(key(r)) ? 'warn' : r.selling ? 'ok' : 'run';
+      const word = ss.has(key(r)) ? `${S}일 안 팔림` : ws.has(key(r)) ? `${W}일째 0` : r.status;
+      const tr = trow('td', [hm(r.at).slice(0, 5), t, PLN[r.platform] || r.platform, SRC[r.source] || r.source, r.auto ? '자동' : '',
+        r.days < W ? `${r.o14} · ${r.days}일째` : `${r.o14}`, `${r.o30}`, E('span', 'badge ' + cls, word)], [5, 6]);
+      tr.children[1].className = 't';
+      if (r.orders) tr.title = `주문 ${r.orders}건 · 매출 ${won(r.sales)}${r.canceled ? ` · 취소·반품 ${r.canceled}건 뺌` : ''}`;
+      pf.append(tr);
+    }
+    if (!(m.rows || []).length) { const tr = E('tr'), td = E('td', 'muted small', '아직 소싱으로 올린 상품이 없어요'); td.colSpan = 8; tr.append(td); pf.append(tr); }
+  }
+  window.barunSourcingMachine = machine;     // 시험(dashboard/tests/test_sourcing.py)이 브라우저 없이 부름
+
   function render(d) {
+    try { machine(d.machine); } catch (e) { console.error('소싱 기계 칸', e); }    // 이 칸이 깨져도 아래 400행 화면은 그대로
     const c = d.counts, ap = d.approval || {}, run = d.run || {}, t = d.today || {}, act = run.activity || {}, reg = d.registered || {}, man = d.manual || {};
     const pct = Math.round(d.closed / Math.max(1, d.total) * 100);
     $('sc-title').textContent = run.running ? '⑨ 소싱 회차 진행 중' : `장부 ${d.total}줄 중 ${d.closed}줄 닫음 · ${pct}%`;
