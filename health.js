@@ -43,7 +43,9 @@
     for (const r of queued) {
       const row = node('article', 'todo open');
       row.append(node('span', 'badge', r.state === 'running' ? '에이전트 진행' : '실행 대기'), node('h3', 't', r.title),
-        node('p', 'what', `${r.reason} · 접수 후 ${duration(r.age_secs)}`)); progress.append(row);
+        node('p', 'what', `${r.reason} · 접수 후 ${duration(r.age_secs)}`));
+      if (r.kind === 'browser' && r.reason.includes('작업판')) row.append(go('앞선 작업 확인', 'tasks'));
+      progress.append(row);
     }
     if (ex.slowest?.length) {
       const details = node('details'); details.dataset.incident = 'execution-metrics'; details.open = opened.has('execution-metrics'); details.append(node('summary', '', `시간이 많이 든 단계 · 최근 완료 ${ex.sample_runs}회 표본`));
