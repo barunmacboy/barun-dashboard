@@ -110,7 +110,7 @@ main.pages { padding: 8px 28px 72px; }
   #p-data > .dt-card { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
 }
 .page { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
-.page[hidden] { display: none; }
+.page[hidden] { display: none !important; } /* 개별 화면의 ID 스타일보다 화면 전환 상태를 우선한다. */
 
 .tabbar, .scrim { display: none; }
 @media (max-width: 1023px) {
