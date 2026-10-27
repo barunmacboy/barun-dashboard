@@ -19,16 +19,25 @@
       brief.append(node('p', 'lead', incidents.length ? `조사·재확인 ${incidents.filter(x => ['open','held'].includes(x.state)).length} · 복구 검증 ${incidents.filter(x => x.state === 'verifying').length} · 판단 필요 ${incidents.filter(x => x.state === 'stuck').length}` : '열린 복구 사건이 없어요'));
       brief.append(node('p', 'muted small', '실행 요청과 복구 완료를 구분하고, 근거가 부족한 항목도 함께 확인해요.'), go('운영 건강 확인', 'health'));
     }
-    const opened = new Set([...p.querySelectorAll('details[open][data-incident]')].map(x => x.dataset.incident));
-    p.replaceChildren();
+    // 펼치기·키보드 초점은 같은 DOM 노드를 재사용해 자동 갱신 중에도 유지한다.
+    const kept = new Map([...p.querySelectorAll('details[data-incident]')].map(x => [x.dataset.incident, x]));
+    const keptActions = new Map([...p.querySelectorAll('button[data-health-action]')].map(x => [x.dataset.healthAction, x]));
+    const focused = p.contains(document.activeElement) ? document.activeElement : null;
+    const action = (text, page, id) => { const b = keptActions.get(id) || go(text, page); b.dataset.healthAction = id; return b; };
+    const fragment = document.createDocumentFragment();
+    const detailNode = id => {
+      const d = kept.get(id) || node('details'); d.dataset.incident = id;
+      if (!d.querySelector('summary')) d.append(node('summary'));
+      return d;
+    };
     const intro = node('section', 'card');
     intro.append(node('h2', '', '문제 발견부터 복구 확인까지'), node('p', 'lead', '자동 조치 → 정상 동작 확인 → 해결. 반복되거나 확인되지 않으면 원인 조사로 이어집니다.'));
     const counts = node('div', 'stats');
     for (const [label, val, desc] of [['조사·재확인', incidents.filter(x => ['open', 'held'].includes(x.state)).length, '담당자가 원인을 확인해요'], ['복구 검증', incidents.filter(x => x.state === 'verifying').length, '실제 정상 동작을 확인해요'], ['판단 필요', incidents.filter(x => x.state === 'stuck').length, '다음 조치를 정해야 해요']]) {
       const n = node('div', 'stat'); n.append(node('div', 'k', label), node('div', 'v', val), node('div', 'd', desc)); counts.append(n);
     }
-    intro.append(counts); p.append(intro);
-    const section = (title, desc) => { const c = node('section', 'card'), hh = node('div', 'card-h'); hh.append(node('h2', '', title)); if (desc) hh.append(node('span', 'desc', desc)); c.append(hh); p.append(c); return c; };
+    intro.append(counts); fragment.append(intro);
+    const section = (title, desc) => { const c = node('section', 'card'), hh = node('div', 'card-h'); hh.append(node('h2', '', title)); if (desc) hh.append(node('span', 'desc', desc)); c.append(hh); fragment.append(c); return c; };
     const ex = h.execution || {}, active = ex.active || [], queued = ex.queue || [];
     const duration = secs => secs >= 60 ? `${Math.floor(secs / 60)}분 ${Math.round(secs % 60)}초` : `${Math.round(secs || 0)}초`;
     const progress = section('지금 어디까지 진행됐나요', '현재 단계와 기다리는 이유를 같은 곳에서 확인해요');
@@ -44,11 +53,12 @@
       const row = node('article', 'todo open');
       row.append(node('span', 'badge', r.state === 'running' ? '에이전트 진행' : '실행 대기'), node('h3', 't', r.title),
         node('p', 'what', `${r.reason} · 접수 후 ${duration(r.age_secs)}`));
-      if (r.kind === 'browser' && r.reason.includes('작업판')) row.append(go('앞선 작업 확인', 'tasks'));
+      if (r.kind === 'browser' && r.reason.includes('작업판')) row.append(action('앞선 작업 확인', 'tasks', r.id));
       progress.append(row);
     }
     if (ex.slowest?.length) {
-      const details = node('details'); details.dataset.incident = 'execution-metrics'; details.open = opened.has('execution-metrics'); details.append(node('summary', '', `시간이 많이 든 단계 · 최근 완료 ${ex.sample_runs}회 표본`));
+      const details = detailNode('execution-metrics'); details.querySelector('summary').textContent = `시간이 많이 든 단계 · 최근 완료 ${ex.sample_runs}회 표본`;
+      for (const child of [...details.children]) if (child.tagName !== 'SUMMARY') child.remove();
       const list = node('ul', 'card-facts');
       for (const r of ex.slowest) list.append(node('li', '', `${r.title} / ${r.phase} — ${r.count}회 · 평균 ${duration(r.avg_secs)} · 최장 ${duration(r.max_secs)}${r.fails ? ` · 실패 ${r.fails}회` : ''}`));
       details.append(list, node('p', 'muted small', '최근 24시간의 일부 완료 기록으로 비교해요. 단계별 시간은 겹칠 수 있어 합산하지 않아요.'));
@@ -60,11 +70,11 @@
     for (const v of Object.values(sources)) { const li = node('li'); li.append(node('span', 'dot ' + (v.paused ? 'idle' : v.ok ? 'ok' : 'warn')), node('span', '', v.label), node('span', 'muted small', v.paused ? '운영 시간 밖' : v.running ? `확인 중 ${duration(v.secs)}` : v.ok ? '정상' : v.fails ? `연속 실패 ${v.fails}회` : '확인 지연')); list.append(li); }
     const q = h.queue || {}; const qa = q.at && Date.now() - Date.parse(q.at) < 120000;
     const li = node('li'); li.append(node('span', 'dot ' + (qa ? 'ok' : 'warn')), node('span', '', '실행 대기열'), node('span', 'muted small', qa ? '정상' : '확인 필요')); list.append(li);
-    service.append(list, go('실행 내역 보기', 'work'));
+    service.append(list, action('실행 내역 보기', 'work', 'runs'));
     const issues = section('복구가 필요한 일', '현재 상태와 다음 조치');
     if (!incidents.length) issues.append(node('p', 'empty', s.sections?.operations?.state !== 'ok' || h.errors?.incidents ? '복구 상태를 아직 확인하지 못했어요' : '열린 복구 사건이 없어요'));
-    for (const i of incidents) { const row = node('article', 'todo open'); row.append(node('span', 'badge', i.label), node('h3', 't', i.title), node('p', 'what', i.next)); const detail = node('details'); detail.dataset.incident = i.id; detail.open = opened.has(i.id); detail.append(node('summary', '', `근거와 이력 · 재발 ${i.recur}회 · 맡긴 횟수 ${i.tries}회`), node('pre', '', i.detail)); row.append(detail); issues.append(row); }
-    if (incidents.some(i => i.state === 'stuck')) issues.append(go('판단할 카드 보기', 'todo'));
+    for (const i of incidents) { const row = node('article', 'todo open'); row.append(node('span', 'badge', i.label), node('h3', 't', i.title), node('p', 'what', i.next)); const detail = detailNode(i.id); detail.querySelector('summary').textContent = `근거와 이력 · 재발 ${i.recur}회 · 맡긴 횟수 ${i.tries}회`; let pre = detail.querySelector('pre'); if (!pre) { pre = node('pre'); detail.append(pre); } if (pre.textContent !== i.detail) pre.textContent = i.detail; row.append(detail); issues.append(row); }
+    if (incidents.some(i => i.state === 'stuck')) issues.append(action('판단할 카드 보기', 'todo', 'decisions'));
     const cv = h.monitor?.coverage || {}, coverage = section('감시가 확인할 수 있는 범위', '근거 부족은 정상 판정이 아니에요');
     for (const [kind, unit] of [['운임', '개'], ['손익', '건']]) coverage.append(node('p', '', `${kind} · 비교 ${cv[kind + '비교'] ?? '—'}${unit} / 근거 부족 ${cv[kind + '근거부족'] ?? '—'}${unit}`));
     coverage.append(node('p', 'muted small', `마지막 검사 ${h.monitor?.scanned_at?.replace('T', ' ') || '확인 전'} · 규칙 감시의 모델 호출 ${h.monitor?.llm_calls ?? '—'}회`));
@@ -73,6 +83,8 @@
     for (const [k, v] of Object.entries(s.sections || {})) { const r = node('li'); r.append(node('span', 'dot ' + (v.state === 'ok' ? 'ok' : 'warn')), node('span', '', names[k] || k), node('span', 'muted small', v.state === 'ok' ? '최신 확인' : v.last_ok ? `마지막 정상 ${v.last_ok.slice(11)}` : '아직 확인 못함')); ul.append(r); }
     freshness.append(ul);
     for (const key of Object.keys(h.errors || {})) freshness.append(node('p', 'warn', `${{queue:'대기열',monitor:'감시',incidents:'복구'}[key] || key} 자료를 읽지 못했어요`));
+    p.replaceChildren(fragment);
+    if (focused?.isConnected) focused.focus({preventScroll: true});
   }
   window.barunHealth = draw;
   window.addEventListener('barun:page', () => { if (current) draw(current); });
