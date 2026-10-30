@@ -25,7 +25,7 @@
     ordered: '주문일시', shop: '구매처', shop_price: '공홈가', shop_order: '공홈주문번호', ship_mode: '배송방식', intl_carrier: '해외운송사', fwd_center: '배대지센터',
     ship_cost: '배송비', margin: '수익률', send_qty: '보낼수량', order_no: '주문번호', due: '발송기한', settle: '입금액', cost: '원가', stock_note: '재고안내', point: '포인트',
     tax_rate: '세율', handling: '처리 방식', ref: '근거', claim: '클레임', claim_at: '클레임 시각', order_id: '주문번호', line_id: '줄 id', product_id: '상품 id',
-    tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내' };
+    tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내', nation: '국가' };
   const STATES = ['후보', '정밀확인', '탈락', '외부대기', '끝'];
   // 보기 상태 = 표·찾기·할 일 묶음·열 필터·정렬·페이지·숨긴 열·고정 열 — 주소(#data?…)에 남아 새로고침·공유해도 그대로, '보기 저장'은 이 브라우저(localStorage)에
   const DEF = (t) => ({ table: t, q: '', preset: t === 'sheet_rows' ? '진행 중' : t === 'order_ledger' ? '미정' : '', offset: 0, filters: [], sort: [], hide: [],
@@ -35,6 +35,7 @@
   let cur = DEF('sheet_rows'), last = null, sel = null, built = false;
   let cell2 = null, drag = false;   // 범위 고르기 끝 칸(Shift·끌기) — 합계·복사용
   let cell = null;       // 주문 시트에서 고른 칸 {k: 탭:행, c} — 위 '칸 내용' 줄에 전체 값(엑셀 수식 입력줄처럼, 10/23 사장님)
+  let queued = {};                               // 회차 중 서버 대기열에 들어간 칸 {tab:row:col → {new, by, at}}(ops/orderedit.py, 2026-10-28) — 끝나면 서버가 저장
   let pending = {}, picked = new Set();          // 주문 시트: 아직 저장 안 한 칸 {tab:row:col → edit}(고치면 곧바로 저장 — autoSave), 고른 줄 {tab:row}
   const isSheet = () => cur.table === 'sheet_rows';
   const rid = (r) => `${r.tab}:${r.row}`;
@@ -361,6 +362,13 @@
     }
     lastTab = tabSig;
     last = j;
+    queued = {};      // 서버 대기열(회차 중 고친 칸) — 새로 불러올 때마다 서버 것으로(다른 사람이 고친 대기 칸도 보임)
+    if (isSheet()) {
+      const ids = (last.cols || []).map((x) => (typeof x === 'string' ? x : x.c || x.id));
+      for (const e of last.queued || []) { const c = ids.find((x) => sheetCol(x) === e.col); if (c) queued[`${e.tab}:${e.row}:${c}`] = e; }
+      if (sv.k === 'queued' && !Object.keys(queued).length) sv = { k: 'ok', at: new Date().toTimeString().slice(0, 5) };   // 회차가 끝나 서버가 저장함
+      if (Object.keys(queued).length) pollQueued();
+    }
     for (const [c, on] of [['.dt-sbtn', isSheet()], ['.dt-abtn', isSheet()]]) { const b = document.querySelector(c); if (b) b.hidden = !on; }
     saveUI();
     if (!isSheet()) { const b = document.querySelector('.dt-audit'); if (b) b.hidden = true; }
@@ -434,7 +442,7 @@
   const rowName = (r) => (isStock(r) ? r.rkey : r.key) || '';      // 바꾼 기록·색·메모가 줄을 따라가는 이름
   const ident = (r) => ({ 상품명: r.name || '', 공홈주문번호: r.shop_order || '', 수령인: r.receiver || '' });
 
-  const cellVal = (r, c) => { const p = pending[`${rid(r)}:${c}`]; return p ? p.new : (r[c] == null ? '' : String(r[c])); };
+  const cellVal = (r, c) => { const k = `${rid(r)}:${c}`, p = pending[k], q = queued[k]; return p ? p.new : q ? String(q.new ?? '') : (r[c] == null ? '' : String(r[c])); };
   const noteOf = (r, c) => ((r._meta || {}).notes || {})[c];
   const rowColor = (r) => (r._meta || {}).ucolor || (r._meta || {}).color || '';
 
@@ -495,8 +503,8 @@
         const td = E('td');
         if (pinned(c)) td.classList.add('pin');
         if (ed && colW[c]) td.style.maxWidth = td.style.minWidth = colW[c] + 'px';
-        const pk = ed && pending[`${rid(r)}:${c}`];
-        const v = pk ? pk.new : fmt(c, c === 'due' && ed ? dueOf(r) : r[c]);
+        const pk = ed && pending[`${rid(r)}:${c}`], qk = ed && !pk && queued[`${rid(r)}:${c}`];
+        const v = pk ? pk.new : qk ? String(qk.new ?? '') : fmt(c, c === 'due' && ed ? dueOf(r) : r[c]);
         if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
         else if (c === 'name' && r._url && v && !pk) td.append(prodLink(r, v.length > 60 ? v.slice(0, 59) + '…' : v));
         else td.textContent = v.length > 60 ? v.slice(0, 59) + '…' : v;
@@ -509,7 +517,8 @@
         }
         if (ed && canEdit(c, r)) {
           td.classList.add('ed'); if (!nt) td.title = '눌러서 고치기 · 바로 저장';
-          if (pk) td.classList.add('dirty'); else if (justSaved.has(`${rid(r)}:${c}`)) td.classList.add('saved');
+          if (pk) td.classList.add('dirty'); else if (qk) { td.classList.add('queued'); td.title = `회차가 끝나면 저장돼요 — ${qk.by || ''} ${String(qk.at || '').slice(11, 16)}에 고침`.trim(); }
+          else if (justSaved.has(`${rid(r)}:${c}`)) td.classList.add('saved');
           td.ondblclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
         }
         if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용 — 고칠 수 있는 칸은 뗄 때 바로 고치기(press). '행' 칸은 줄 자세히·조치
@@ -885,6 +894,9 @@
   //   잠깐(0.4초) 모아 한 번에 보내고, 보내는 사이 고친 칸은 다음 번에. 막대의 [시트에 저장]은 없앰 — 위 '저장됨'에서 [되돌리기](⌘Z)
   function stage(r, c, val, op) {
     const k = `${rid(r)}:${c}`, f = flying[k], old = f ? f.new : (r[c] == null ? '' : String(r[c]));   // 보내는 중인 칸은 보낸 값이 지금 값
+    const q = !f && queued[k];   // 서버 대기열에 든 칸: 대기 값 그대로면 할 일 없음, 시트 값으로 되돌리면 그 값을 보내 서버 대기를 지움
+    if (q && val === String(q.new ?? '')) { delete pending[k]; queueSave(); return; }
+    if (q && val === old) { pending[k] = { tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old, new: val, ident: ident(r), op: op || '칸', c }; queueSave(); return; }
     if (val === old) { if (f) pending[k] = f; else delete pending[k]; }
     else pending[k] = { tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old, new: val, ident: ident(r), op: op || '칸', c };
     queueSave();
@@ -895,11 +907,12 @@
   const rowOfEdit = (e) => last && last.rows.find((x) => x.tab === e.tab && String(x.row) === String(e.row));
   function queueSave(ms) {
     clearTimeout(saveT);
+    if (sv.k === 'wait' && retryT) { saveUI(); bar(); return; }   // 회차 중 — 새로 고친 칸도 1분 재시도가 모아 보냄(고칠 때마다 보내면 막힘이 쌓임)
     if (!saving && Object.keys(pending).length) { sv = { k: 'saving' }; saveUI(); }
     saveT = setTimeout(() => autoSave(false), ms == null ? 400 : ms);
   }
-  async function autoSave(force, unload) {
-    clearTimeout(saveT); clearTimeout(retryT);
+  async function autoSave(force, unload, retry) {
+    clearTimeout(saveT); clearTimeout(retryT); retryT = 0;
     if (saving && !unload) { again = true; return; }
     const sent = Object.entries(pending).filter(([k, e]) => flying[k] !== e);
     if (!sent.length) { if (!saving && sv.k === 'saving') { sv = { k: '' }; saveUI(); } return; }
@@ -907,7 +920,7 @@
     sv = { k: 'saving' }; saveUI(); bar();
     const ops = new Set(sent.map(([, e]) => e.op || '칸'));
     let j;
-    try { j = await post({ kind: 'sheet_edit', edits: sent.map(([, { op, c, ...e }]) => e), op: ops.size === 1 ? [...ops][0] : '일괄', force: !!force }, true); }
+    try { j = await post({ kind: 'sheet_edit', edits: sent.map(([, { op, c, ...e }]) => e), op: ops.size === 1 ? [...ops][0] : '일괄', force: !!force, ...(retry ? { retry: true } : {}) }, true); }
     catch (err) {
       saving = false; for (const [k] of sent) delete flying[k];
       sv = { k: 'net', msg: `저장 실패: ${err.message}. 주황 칸은 [다시 저장]으로` };
@@ -915,9 +928,24 @@
     }
     saving = false; for (const [k] of sent) delete flying[k];
     const msg = String(j.msg || j.error || '');
+    if (/끝나자마자 저장할게요|기다리던 \d+칸을 지웠어요/.test(msg)) {   // 2026-10-28: 회차 중이면 서버 대기열(ops/orderedit) — 끝나면 서버가 저장, 화면은 다시 안 보냄
+      const failed = new Set((msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
+      const hh = new Date().toTimeString().slice(0, 5);
+      for (const [k, e] of sent) {
+        if (pending[k] === e) delete pending[k];
+        if (failed.has(`${e.tab} ${e.row}행 ${e.col}`)) continue;
+        const r = rowOfEdit(e), orig = r ? (r[e.c] == null ? '' : String(r[e.c])) : null;
+        if (orig !== null && e.new === orig) delete queued[k]; else queued[k] = { new: e.new, by: '나', at: `T${hh}` };
+        const td = r && cellTd(r, e.c); if (td) td.classList.remove('dirty');
+      }
+      sv = failed.size ? { k: 'bad', at: hh, msg: noE(msg) } : { k: 'queued', at: hh, msg: noE(msg) };
+      saveUI(); bar(); render(); pollQueued();
+      if (again || Object.keys(pending).some((k) => !flying[k])) { again = false; queueSave(0); }
+      return;
+    }
     if (/회차가 시트를 쓰는 중/.test(msg)) {        // 시트를 쓰는 회차가 끝나면 — 1분마다 다시(그동안 칸은 주황색 그대로)
       sv = { k: 'wait', msg: `${noE(msg).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 자동 저장` };
-      saveUI(); bar(); retryT = setTimeout(() => autoSave(false), 60000); return;
+      saveUI(); bar(); retryT = setTimeout(() => autoSave(false, false, true), 60000); return;   // retry = 자동 재시도(오류 장부는 첫 번만 셈)
     }
     const failed = new Set((msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
     const failedRows = new Set((msg.match(/• \S+ \d+행:/g) || []).map((s) => s.slice(2, -1)));    // 줄 통째로 못 씀(쓰는 순간 줄이 바뀜)
@@ -943,6 +971,11 @@
     if (again || Object.keys(pending).some((k) => !flying[k])) { again = false; queueSave(0); }
   }
   const busyTyping = () => { const a = document.activeElement; return !!(editing || (a && a.closest && a.closest('#p-data') && a.closest('input,select,textarea'))); };
+  let queuedT = 0;
+  function pollQueued() {   // 대기 칸이 있으면 1분마다 다시 불러와 서버가 저장했는지 봄(회차 끝 → 대기 저장)
+    clearTimeout(queuedT);
+    if (Object.keys(queued).length) queuedT = setTimeout(() => reloadWhenIdle(0), 60000);
+  }
   let reloadT = 0;
   function reloadWhenIdle(ms) {        // 고치는 중(입력칸·끌기·대화창)이면 기다렸다가 다시 불러옴 — 입력하던 칸이 사라지지 않게
     clearTimeout(reloadT);
@@ -971,6 +1004,7 @@
       s.append(I(sv.k === 'ok' ? 'check' : 'alert'), sv.k === 'ok' ? ` 저장됨 ${sv.at}` : ` 일부 저장 못 함 ${sv.at}`);
       if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 ${lastSaved.length}칸 되돌리기 · ⌘Z`; u.onclick = undoLast; s.append(u); }
     } else if (sv.k === 'wait') s.append(I('clock'), ` 회차 끝나면 저장 · ${n}칸`);
+    else if (sv.k === 'queued') s.append(I('clock'), ` 회차 끝나면 서버가 저장 · ${Object.keys(queued).length}칸`);
     else if (sv.k === 'net') s.append(I('alert'), ` 저장 안 됨 · ${n}칸`);
     s.title = sv.msg || '고친 칸은 바로 저장';
   }
@@ -1161,22 +1195,36 @@
     IB(b, 'plus', r ? `${r.tab} ${r.row}행으로 재고 줄 추가` : '재고 줄 추가');
     b.disabled = !r;
   }
-  async function stockCopy(r, b, force) {
+  const copyWait = {};          // 회차가 끝나길 기다리는 재고 복사(탭#행 → 남은 횟수) — 같은 줄을 여러 번 눌러도 한 번만 기다림
+  async function stockCopy(r, b, force, retry) {
     if (!r) return;
     if (!String(r.name || '').trim()) { toast('상품명이 비어 복사 불가 · [재고 넣기]로', true); return; }
+    const wk = `${r.tab}#${r.row}`;
+    if (!retry && !force && copyWait[wk]) { toast(`${r.tab} ${r.row}행은 회차가 끝나면 자동으로 넣어요`, false, 3600); return; }
     const label = b && b.textContent; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'stock_copy', tab: r.tab, row: r.row, key: r.key || '', ident: ident(r) };   // 값은 서버가 지금 시트에서 다시 읽어 복사
     if (force) payload.force = true;
+    if (retry) payload.retry = true;     // 자동 재시도 — 오류 장부는 첫 번만 셈
     let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
     if (b) { b.disabled = false; b.textContent = label; }
     const m = String(j.msg || '');
     if (j.ok) {
+      delete copyWait[wk];
       const pos = m.match(/(\S+) (\d+)행/);
       newRow = pos ? { tab: pos[1], row: +pos[2] } : null;
       toast(`${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 · ${r.row}행 상품 정보 복사`, false, 3600);
       load(); loadTables(); return;
     }
-    if (/회차가 시트를 쓰는 중/.test(m) && confirm(m + '\n\n그래도 넣을까요?')) { stockCopy(r, b, true); return; }
+    if (/회차가 시트를 쓰는 중/.test(m)) {
+      if (!retry && confirm(m + '\n\n그래도 넣을까요?\n[취소]하면 회차가 끝난 뒤 자동으로 넣어요')) { stockCopy(r, b, true); return; }
+      const left = retry ? (copyWait[wk] || 0) - 1 : 30;     // 1분마다 30번(30분)까지
+      if (left > 0) {
+        copyWait[wk] = left; setTimeout(() => stockCopy(r, null, false, true), 60000);
+        if (!retry) toast(`${noE(m).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 ${r.row}행 재고 줄 자동 추가`, false, 4800);
+        return;
+      }
+      delete copyWait[wk];
+    }
     toast(m, true);
   }
   function showFlash() {        // load()가 그린 뒤 — 새 줄로 가서 반짝이고 빈 칸 하나를 골라 둠(바로 적기 시작하게). 지금 보기에 없으면 그 탭 전체로 한 번 바꿔 봄
@@ -1197,9 +1245,10 @@
     if (c) { pickCell(r, c); const td = cellTd(r, c); if (td) cellEdit(td, r, c, null, true); }     // 바로 입력 상태(사장님 "원클릭" — 넣은 뒤 칸을 또 누르지 않게)
   }
 
-  const CUR = { 미국: '$', 오큐글로: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 일본: '¥', 영국: '£', 호주: 'A$' };
+  const CUR = { 미국: '$', 미국애견: '$', 프로헬스: '$', 독일: '€', 프랑스: '€', 이태리: '€', 일본: '¥', 기타유럽: '€', 호주: 'A$' };
   // 일본 탭의 파미칼 줄은 공홈가가 원화 총액(sheet_book.is_famical, 2026-10-27) — 줄 단위로 ₩
-  const curOf = (tab, name) => (/패미칼|파미칼|패미컬/.test(name || '') ? '₩' : CUR[tab]);
+  // 기타유럽(2026-10-30 옛 영국 탭)은 국가 칸으로 통화가 정해짐 — 영국 상품(압타밀, sheet_book.COUNTRY_RULES)만 £
+  const curOf = (tab, name) => (/패미칼|파미칼|패미컬/.test(name || '') ? '₩' : tab === '기타유럽' && /압타밀|aptamil/i.test(name || '') ? '£' : CUR[tab]);
   const SK_KEEP = ['tab', 'shop', 'center'];      // '하나 더 넣기'에서 남겨 두는 칸(같은 상자에서 여러 개 넣을 때)
   let sk = null;
   function stockDialog(tab) {
