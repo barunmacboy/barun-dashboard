@@ -41,7 +41,7 @@
     const strip = E('div', 'pa-strip'); strip.id = 'pa-strip'; st.append(strip);
     const ls = E('div', 'card'); ls.append(E('div', 'card-h')); ls.firstChild.append(E('h2', null, '주문마다'), E('span', 'desc', '기한 넘김과 사람이 해야 하는 것이 먼저'));
     const tabs = E('div', 'pa-tabs'); tabs.id = 'pa-tabs';
-    for (const [k, label] of [['human', '사람이 해야 해요'], ['late', '발송기한 넘김'], ['all', '전부']]) {
+    for (const [k, label] of [['human', '사람이 해야 해요'], ['late', '막힌 주문(기한 넘김·너무 오래)'], ['all', '전부']]) {
       const b = E('button', null, label); b.dataset.k = k; b.setAttribute('aria-pressed', String(k === filter));
       b.onclick = () => { filter = k; for (const x of tabs.children) x.setAttribute('aria-pressed', String(x.dataset.k === k)); renderOrders(); };
       tabs.append(b);
@@ -62,14 +62,14 @@
 
   function renderOrders() {
     const ol = $('pa-orders'); if (!ol || !data) return; ol.innerHTML = '';
-    const rows = data.orders.filter((o) => filter === 'all' || (filter === 'late' ? o.late : o.actor.includes('human')));
+    const rows = data.orders.filter((o) => filter === 'all' || (filter === 'late' ? (o.late || o.over) : o.actor.includes('human')));
     if (!rows.length) { ol.append(E('li', null, filter === 'human' ? '사람이 해야 하는 주문이 없어요' : '없어요')); return; }
     for (const o of rows.slice(0, 80)) {
       const li = E('li');
-      const t = E('div', 't'); if (o.late) t.append(E('span', 'pa-late', '기한 넘김 · '));
+      const t = E('div', 't'); if (o.late) t.append(E('span', 'pa-late', '기한 넘김 · ')); else if (o.over) t.append(E('span', 'pa-late', '너무 오래 머묾 · '));
       t.append(document.createTextNode(`${o.where} ${o.receiver} · ${o.product}`));
       li.append(t, E('span', 'pa-who ' + whoCls(o), o.who),
-        E('div', 's', `${o.stage_name} → ${o.next}` + (o.due ? ` · 발송기한 ${o.due.slice(5)}` : '') + (o.by ? ` · ${o.by}` : '')));
+        E('div', 's', `${o.stage_name}` + (o.hours != null ? `(${Math.round(o.hours)}시간째)` : '') + ` → ${o.next}` + (o.due ? ` · 발송기한 ${o.due.slice(5)}` : '') + (o.by ? ` · ${o.by}` : '')));
       ol.append(li);
     }
   }
@@ -81,7 +81,7 @@
       stat('발송기한 넘김', `${s['발송기한 넘김']}건`, ''), stat('사람이 볼 판단할 일', `${s['사람이 볼 사안']}건`, `열린 사안 ${s['열린 사안']}건 중`));
     $('pa-at').textContent = d.at ? `${d.at.slice(5, 16).replace('T', ' ')}에 다시 셈(매시간)` : '';
     const strip = $('pa-strip'); strip.innerHTML = '';
-    for (const x of d.stages) { const b = E('div', 'pa-st'); b.append(E('div', 'nm', x.name), E('div', 'nx', x.next), E('div', 'n', String(x.n))); strip.append(b); }
+    for (const x of d.stages) { const b = E('div', 'pa-st'); b.append(E('div', 'nm', x.name), E('div', 'nx', x.next), E('div', 'n', String(x.n)), E('div', 'nx', x.n && x.max_hours ? `가장 오래 ${Math.round(x.max_hours)}시간째` : '')); strip.append(b); }
     renderOrders();
     const cl = $('pa-cases'); cl.innerHTML = '';
     if (!d.cases.length) cl.append(E('li', null, '열린 판단할 일이 없어요'));
