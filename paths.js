@@ -49,9 +49,11 @@
     const ol = E('ul', 'pa-list'); ol.id = 'pa-orders'; ls.append(tabs, ol);
     const cs = E('div', 'card'); cs.append(E('div', 'card-h')); cs.firstChild.append(E('h2', null, '판단할 일(사안)'), E('span', 'desc', '에이전트가 먼저 하고, 못 하면 사람에게 와요 · 해결되면 저절로 닫혀요'));
     const cl = E('ul', 'pa-list'); cl.id = 'pa-cases'; cs.append(cl);
+    const sk = E('div', 'card'); sk.append(E('div', 'card-h')); sk.firstChild.append(E('h2', null, '재고(물건 장부)'), E('span', 'desc', '산 물건 중 아직 고객에게 안 붙은 것 — 매시간 다시 셈'));
+    const sl = E('ul', 'pa-list'); sl.id = 'pa-stock'; sk.append(sl);
     const rm = E('div', 'card'); rm.append(E('div', 'card-h')); rm.firstChild.append(E('h2', null, '구조 재설계 진척'), E('span', 'desc', '할 일마다 끝 · 진행 중 · 할 일'));
     const rl = E('ul', 'pa-list pa-rm'); rl.id = 'pa-roadmap'; rm.append(rl);
-    sec.append(st, ls, cs, rm);
+    sec.append(st, ls, cs, sk, rm);
     document.addEventListener('barun:page', (e) => { if (e.detail === 'paths') { load(); start(); } else stop(); });
     if (location.hash.split('?')[0] === '#paths') { load(); start(); }   // 이 화면 주소로 바로 열면 첫 'barun:page'가 설치 전에 지나감
     return true;
@@ -86,6 +88,13 @@
     const cl = $('pa-cases'); cl.innerHTML = '';
     if (!d.cases.length) cl.append(E('li', null, '열린 판단할 일이 없어요'));
     for (const c of d.cases) { const li = E('li'); li.append(E('div', 't', c.title), E('span', 'pa-who ' + whoCls(c), c.who), E('div', 's', c.why || '')); cl.append(li); }
+    const sl = $('pa-stock'); sl.innerHTML = '';
+    const sd = d.stock || { items: [] };
+    if (!sd.items.length) sl.append(E('li', null, '재고가 없어요'));
+    for (const g of sd.items.slice(0, 40)) {
+      const li = E('li'); li.append(E('div', 't', `${g.name}`), E('span', 'pa-who ' + (g.what === '재고' ? 'agent' : 'human'), `${g.what} ${g.n}통`),
+        E('div', 's', `${g.site} 주문 ${g.orders}` + (g.where ? ` · ${g.where}` : ''))); sl.append(li);
+    }
     const rl = $('pa-roadmap'); rl.innerHTML = '';
     for (const t of d.roadmap) { const li = E('li'); li.append(E('span', 'mk', { done: '끝', doing: '진행 중', todo: '할 일' }[t.state] || t.state), E('div', 't', `${t.phase}단계 · ${t.title}`)); rl.append(li); }
   }
