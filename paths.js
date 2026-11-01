@@ -51,9 +51,11 @@
     const cl = E('ul', 'pa-list'); cl.id = 'pa-cases'; cs.append(cl);
     const sk = E('div', 'card'); sk.append(E('div', 'card-h')); sk.firstChild.append(E('h2', null, '재고(물건 장부)'), E('span', 'desc', '산 물건 중 아직 고객에게 안 붙은 것 — 매시간 다시 셈'));
     const sl = E('ul', 'pa-list'); sl.id = 'pa-stock'; sk.append(sl);
+    const ad = E('div', 'card'); ad.append(E('div', 'card-h')); ad.firstChild.append(E('h2', null, '연결부 — 어디가 자동인가'), E('span', 'desc', '빈칸(—)이 다음에 자동으로 만들 곳'));
+    const al = E('ul', 'pa-list'); al.id = 'pa-adapters'; ad.append(al);
     const rm = E('div', 'card'); rm.append(E('div', 'card-h')); rm.firstChild.append(E('h2', null, '구조 재설계 진척'), E('span', 'desc', '할 일마다 끝 · 진행 중 · 할 일'));
     const rl = E('ul', 'pa-list pa-rm'); rl.id = 'pa-roadmap'; rm.append(rl);
-    sec.append(st, ls, cs, sk, rm);
+    sec.append(st, ls, cs, sk, ad, rm);
     document.addEventListener('barun:page', (e) => { if (e.detail === 'paths') { load(); start(); } else stop(); });
     if (location.hash.split('?')[0] === '#paths') { load(); start(); }   // 이 화면 주소로 바로 열면 첫 'barun:page'가 설치 전에 지나감
     return true;
@@ -95,6 +97,13 @@
       const li = E('li'); li.append(E('div', 't', `${g.name}`), E('span', 'pa-who ' + (g.what === '재고' ? 'agent' : 'human'), `${g.what} ${g.n}통`),
         E('div', 's', `${g.site} 주문 ${g.orders}` + (g.where ? ` · ${g.where}` : ''))); sl.append(li);
     }
+    const al = $('pa-adapters'); al.innerHTML = '';
+    const A = d.adapters || { shops: [], forwarders: [] };
+    const cap = (v) => (v ? (v.startsWith('auto') ? '자동' : '사람') : '—');
+    for (const s of A.shops) { const li = E('li'); li.append(E('div', 't', `구매처 ${s.site}`), E('span', 'pa-who ' + (s.cart ? 'agent' : 'human'), s.cart ? (s.pay === 'human' ? '결제만 사람' : '자동으로 사요') : '사람이 사요'),
+      E('div', 's', `주문 읽기 ${cap(s.read)} · 담기 ${cap(s.cart)} · 결제 ${cap(s.pay)} · 주문 메일 ${cap(s.mail)}`)); al.append(li); }
+    for (const f of A.forwarders) { const li = E('li'); li.append(E('div', 't', `배대지 ${f.name}`), E('span', 'pa-who agent', ''),
+      E('div', 's', `현황 ${cap(f.status)} · 신청 ${cap(f.apply)} · 배송비 결제 ${cap(f.pay)} · 1:1 ${cap(f.ask)}`)); al.append(li); }
     const rl = $('pa-roadmap'); rl.innerHTML = '';
     for (const t of d.roadmap) { const li = E('li'); li.append(E('span', 'mk', { done: '끝', doing: '진행 중', todo: '할 일' }[t.state] || t.state), E('div', 't', `${t.phase}단계 · ${t.title}`)); rl.append(li); }
   }
