@@ -35,7 +35,7 @@
     const top = sec.lastChild;
     top.append(E('div', 'card-h', null));
     top.firstChild.append(E('h2', null, '주문 경로'), E('span', 'desc', '진행 중인 주문이 어디까지 왔고, 누가 하고 있는지'));
-    const big = E('div', 'pa-big'); big.id = 'pa-big'; top.append(big, E('div', 'desc', ''));
+    const big = E('div', 'pa-big'); big.id = 'pa-big'; const tr = E('div', 'desc', ''); tr.id = 'pa-trend'; top.append(big, tr, E('div', 'desc', ''));
     top.lastChild.id = 'pa-at';
     const st = E('div', 'card'); st.append(E('div', 'card-h')); st.firstChild.append(E('h2', null, '단계마다 몇 건'), E('span', 'desc', '왼쪽에서 오른쪽으로 진행해요'));
     const strip = E('div', 'pa-strip'); strip.id = 'pa-strip'; st.append(strip);
@@ -83,6 +83,8 @@
     const big = $('pa-big'); big.innerHTML = '';
     big.append(stat('진행 중인 주문', `${s['진행 중']}건`, ''), stat('사람이 해야 하는 몫', `${s['사람이 해야 하는 몫 %']}%`, `${s['사람이 해야 해요']}건 · 목표 2% 미만`),
       stat('발송기한 넘김', `${s['발송기한 넘김']}건`, ''), stat('사람이 볼 판단할 일', `${s['사람이 볼 사안']}건`, `열린 사안 ${s['열린 사안']}건 중`));
+    const T = d.trend || [];
+    $('pa-trend').textContent = T.length ? '나아지는 정도(하루 평균 · 사람이 해야 하는 몫): ' + T.map((x) => `${x.day.slice(5)} ${x['사람 몫 %']}%`).join(' → ') : '';
     $('pa-at').textContent = d.at ? `${d.at.slice(5, 16).replace('T', ' ')}에 다시 셈(매시간)` : '';
     const strip = $('pa-strip'); strip.innerHTML = '';
     for (const x of d.stages) { const b = E('div', 'pa-st'); b.append(E('div', 'nm', x.name), E('div', 'nx', x.next), E('div', 'n', String(x.n)), E('div', 'nx', x.n && x.max_hours ? `가장 오래 ${Math.round(x.max_hours)}시간째` : '')); strip.append(b); }
