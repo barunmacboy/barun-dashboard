@@ -7,7 +7,8 @@
   const LVL = { new: ['답 옴', 'run'], bad: ['4일+', 'bad'], warn: ['2일+', 'warn'], wait: ['기다림', ''], ok: ['끝', 'ok'] };
   const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
   const ic = (name) => { const e = E('span', 'ak-i'); e.innerHTML = window.ico ? window.ico(name) : ''; return e; };
-  let timer = 0, busy = false;
+  let timer = 0, busy = false, loaded = false;
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');   // 2026-11-06: 글 주소는 http(s)만 — javascript: 링크 막기
 
   function install() {
     const sec = $('p-asks'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
@@ -21,11 +22,14 @@
       .ak-age { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
       .ak-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
       .ak-i { display: inline-flex; margin-right: 5px; color: var(--muted); vertical-align: -2px; } .ak-site .ak-i { margin: 0 0 0 4px; }
-      @media (max-width: 720px) { .ak-row { flex-wrap: wrap; } .ak-side { flex-direction: row; width: 100%; justify-content: space-between; } #ak-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
+      .ak-mob { display: none; } .ak-side > div:first-child { white-space: nowrap; }
+      /* 2026-11-06: 폰에서 출처 칸이 폭 1/4을 먹고 '답 옴 3일 17시간'이 버튼 밑으로 접혀서 — 출처·나이는 설명 줄로 옮김 */
+      @media (max-width: 720px) { .ak-row { flex-wrap: wrap; } .ak-site, .ak-side .ak-age { display: none; } .ak-mob { display: inline; font-weight: 600; color: var(--ink2); }
+        .ak-side { flex-direction: row; width: 100%; justify-content: space-between; align-items: center; } #ak-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }`;
     document.head.append(css);
     sec.innerHTML = `
       <div class="card hero"><h2 id="ak-title">불러오는 중</h2><p class="lead" id="ak-lead"></p><div class="stats" id="ak-stats"></div></div>
-      <div class="card"><div class="card-h"><h2>답 옴</h2><span class="desc">조치 끝나면 [끝]</span></div><div id="ak-new"></div></div>
+      <div class="card"><div class="card-h"><h2>답 옴</h2><span class="desc">조치 끝나면 [끝냈어요]</span></div><div id="ak-new"></div></div>
       <div class="card"><div class="card-h"><h2>답 기다림</h2><span class="desc">마지막으로 물은 때부터 · 오래된 순 · 2일 주황 · 4일 빨강</span></div><div id="ak-wait"></div></div>
       <div class="card"><div class="card-h"><h2>최근 끝난 문의</h2><span class="desc">지난 14일</span></div><div id="ak-done"></div></div>`;
     document.addEventListener('barun:page', (e) => { if (e.detail === 'asks') { load(); start(); } else stop(); });
@@ -49,12 +53,16 @@
     return h < 24 ? `${h}시간` : `${Math.floor(h / 24)}일 ${h % 24}시간`;
   };
 
+  // 2026-11-06: 실패해도 아무 말 없이 버튼만 다시 켜져 된 줄 알던 것 → 실패를 알리고, 응답을 못 읽으면 중복 누르기 전에 확인하라고
   async function setState(id, state, b) {
     b.disabled = true;
     try {
       const r = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'ask', key: id, state }) });
-      const j = await r.json(); if (window.toast) window.toast(j.msg); load();
-    } catch (e) { b.disabled = false; }
+      const j = await r.json().catch(() => ({ ok: false, msg: `응답을 읽지 못했어요(${r.status}) — 목록을 다시 보고 확인해 주세요` }));
+      if (window.toast) window.toast((j.ok ? '' : '실패: ') + (j.msg || ''));
+      if (!j.ok) b.disabled = false;
+      load();
+    } catch (e) { b.disabled = false; if (window.toast) window.toast('실패: ' + e.message); }
   }
 
   function row(r) {
@@ -64,8 +72,9 @@
     const asked = r.state === '기다림' && r.age_from && r.age_from !== r.sent_at ? `다시 기다림 ${day(r.age_from)}` : '';
     const got = r.state === '답 옴' && r.answered_at ? `답 옴 ${day(r.answered_at)}` : '';
     const prev = (r.replaces || []).length ? `이전 글 ${r.replaces.map((x) => x.no).join('·')}` : '';
+    const mob = E('span', 'ak-mob', `${r.site} · ${r.state === '끝' ? day(r.closed_at || r.answered_at || r.updated) : ageTxt(r)} · `);
     const meta = [`글 ${r.no}`, r.ref, `보냄 ${day(r.sent_at)}${dayOnly(r.sent_at) ? '(시각 모름)' : ''}`, asked, got, prev, r.by].filter(Boolean).join(' · ');
-    body.append(E('div', 'ak-m', meta));
+    const mm = E('div', 'ak-m'); mm.append(mob, document.createTextNode(meta)); body.append(mm);
     if (r.memo) { const m = E('div', 'ak-m'); m.append(ic('edit'), document.createTextNode(noE(r.memo))); body.append(m); }
     if (r.answer) { const a = E('div', 'ak-a'); if (r.state !== '기다림') a.append(ic('chat')); a.append(document.createTextNode(noE(r.answer))); body.append(a); }
     const side = E('div', 'ak-side');
@@ -75,8 +84,8 @@
     const top = E('div'); top.append(E('span', 'badge ' + cls, lab), document.createTextNode(' '), age);
     side.append(top);
     const bt = E('div', 'ak-btns');
-    if (r.url) { const a = E('a', 'btn sm ghost', '글 열기'); a.append(ic('external')); a.href = r.url; a.target = '_blank'; a.rel = 'noopener'; bt.append(a); }
-    if (r.state !== '끝') { const b = E('button', 'btn sm', '끝'); b.type = 'button'; b.title = '조치까지 끝났으면'; b.onclick = () => setState(r.id, '끝', b); bt.append(b); }
+    if (safeUrl(r.url)) { const a = E('a', 'btn sm ghost', '글 열기'); a.append(ic('external')); a.href = safeUrl(r.url); a.target = '_blank'; a.rel = 'noopener'; bt.append(a); }
+    if (r.state !== '끝') { const b = E('button', 'btn sm', '끝냈어요'); b.type = 'button'; b.title = '조치까지 끝났으면'; b.onclick = () => setState(r.id, '끝', b); bt.append(b); }
     if (r.state === '답 옴') { const b = E('button', 'btn sm ghost', '다시 물었어요'); b.type = 'button'; b.onclick = () => setState(r.id, '기다림', b); bt.append(b); }
     side.append(bt);
     const site = E('div', 'ak-site', r.site); if (!r.auto) { site.append(ic('hand')); site.title = '답을 직접 확인하는 곳'; }
@@ -91,7 +100,7 @@
     $('ak-title').textContent = nNew ? `답 옴 ${nNew}건 확인` : nOver ? `2일 넘게 답 없음 ${nOver}건` : nWait ? `답 기다림 ${nWait}건` : '열린 문의 없음';
     $('ak-lead').textContent = `열린 문의 중 답 자동 확인 ${d.auto_pct ?? '—'}% · 손 모양은 직접 확인`;
     const st = $('ak-stats'); st.innerHTML = '';
-    st.append(stat('답 옴', String(nNew), '확인 필요', nNew ? 'run' : ''), stat('기다림', String(nWait), Object.entries(d.by_site).map(([k, v]) => v ? `${k} ${v}` : '').filter(Boolean).join(' · ')),
+    st.append(stat('답 옴', String(nNew), '확인 필요', nNew ? 'run' : ''), stat('기다림', String(nWait), Object.entries(d.by_site || {}).map(([k, v]) => v ? `${k} ${v}` : '').filter(Boolean).join(' · ')),
       stat('2일 넘음', String(nOver), '재촉 검토', nOver ? 'warn' : 'ok'), stat('최근 끝', String(d.done.length), '지난 14일', ''));
     fill('ak-new', d.answered, '없음');
     fill('ak-wait', [...d.waiting].sort((a, b) => b.age - a.age), '없음');
@@ -100,8 +109,16 @@
 
   async function load() {
     if (busy) return; busy = true;
-    try { const r = await (window.barunFetch || fetch)('/api/asks'); if (r.ok) render(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+    // 2026-11-06: 서버가 503이면 제목이 '불러오는 중'에 영영 멈춰 있던 것 → 실패를 보이고, 전에 읽은 목록은 그대로 둠
+    try {
+      const r = await (window.barunFetch || fetch)('/api/asks');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      render(await r.json()); loaded = true;
+    } catch (e) {
+      if (e.message === '로그인 필요') return;
+      $('ak-lead').textContent = `보낸 문의를 읽지 못했어요(${e.message}) — 잠시 뒤 다시 읽어요.` + (loaded ? ' 아래는 마지막으로 읽은 목록이에요.' : '');
+      if (!loaded) $('ak-title').textContent = '읽지 못했어요';
+    } finally { busy = false; }
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

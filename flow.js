@@ -29,12 +29,16 @@
 
   const won = (n) => `${(+n || 0).toLocaleString('ko-KR')}원`;
   const T = (iso) => { if (!iso) return null; const d = new Date(String(iso).slice(0, 19)); return isNaN(d) ? null : d; };
+  // 2026-11-06: 서버 시각은 시간대 없는 한국 시각인데 기기 시계와 바로 비교해서, 한국 밖·시계 어긋난 기기는 '9시간 전'·'내일'로 틀렸음
+  //   → 서버 at과 기기 시계 차이를 15분 단위로 맞춰 둠(캐시 몇 초 차이는 무시)
+  let skew = 0;
+  const nowD = () => new Date(Date.now() - skew);
   function when(iso) {          // 방금 · 12분 전 · 오늘 20:50 · 어제 20:50 · 내일 08:00 · 10-22 20:50
     const d = T(iso); if (!d) return '';
-    const s = (Date.now() - d) / 1000;
+    const n = nowD(), s = (n - d) / 1000;
     if (s >= 0 && s < 60) return '방금';
     if (s >= 0 && s < 3600) return `${Math.floor(s / 60)}분 전`;
-    const hm = d.toTimeString().slice(0, 5), day = Math.round((new Date(new Date().toDateString()) - new Date(d.toDateString())) / 864e5);
+    const hm = d.toTimeString().slice(0, 5), day = Math.round((new Date(n.toDateString()) - new Date(d.toDateString())) / 864e5);
     return day === 0 ? `오늘 ${hm}` : day === 1 ? `어제 ${hm}` : day === -1 ? `내일 ${hm}` : `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${hm}`;
   }
   const stay = (d) => (d == null ? '' : d < 1 ? '오늘 들어옴' : d >= 365 ? `${Math.floor(d / 365)}년 넘게` : `${Math.floor(d)}일째`);
@@ -107,10 +111,11 @@
       .fl-col.late { box-shadow: inset 0 3px 0 var(--st-crit); } .fl-col.stuck { box-shadow: inset 0 3px 0 var(--st-warn); } .fl-col.run { box-shadow: inset 0 3px 0 var(--st-run); }
       .fl-col.flash { animation: fl-flash 1.6s ease-out; }
       @keyframes fl-flash { from { outline: 3px solid var(--blue); } to { outline: 3px solid transparent; } }
-      .fl-col.shut { all: unset; box-sizing: border-box; flex: 0 0 48px; background: var(--fill2); border-radius: var(--r-sm); display: flex; flex-direction: column; align-items: center;
-        gap: 8px; padding: 10px 0; cursor: pointer; scroll-snap-align: start; }
+      /* 2026-11-06: 빈 칸을 48px 세로글로 접었더니 한글이 한 글자씩 세로로(주/문/들/어/옴) 읽기 어려웠음 → 좁은 가로 칸에 '이름 0' */
+      .fl-col.shut { all: unset; box-sizing: border-box; flex: 0 0 132px; background: var(--fill2); border-radius: var(--r-sm); display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; align-content: flex-start;
+        gap: 6px; padding: 11px 10px; cursor: pointer; scroll-snap-align: start; }
       .fl-col.shut:hover { background: var(--hover); } .fl-col.shut:focus-visible { outline: 2px solid var(--blue); }
-      .fl-col.shut .vn { writing-mode: vertical-rl; font-size: 12.5px; color: var(--muted); letter-spacing: .06em; white-space: nowrap; }
+      .fl-col.shut .vn { font-size: 13px; color: var(--muted); word-break: keep-all; line-height: 1.3; flex: 1 1 60px; min-width: 0; }
       .fl-col.shut .fl-ct { color: var(--muted); }
       .fl-ch { padding: 11px 10px 9px; display: grid; gap: 7px; border-bottom: 1px solid var(--line); flex: none; }
       .fl-ch .t { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -128,7 +133,7 @@
       .fl-body > details > summary::-webkit-details-marker { display: none; }
       .fl-body > details > summary::before { content: "▸"; color: var(--muted); } .fl-body > details[open] > summary::before { content: "▾"; }
       .fl-body > details[open] { display: grid; gap: 6px; } .fl-body > details .fl-ag { background: var(--fill2); }
-      .fl-ch .no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: var(--sub); }
+      .fl-col.shut .no, .fl-ch .no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: var(--sub); }
       .fl-ch h3 { margin: 0; font-size: 14.5px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .fl-lv { font-size: 11px; color: var(--sub); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
       .fl-lv i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -173,6 +178,10 @@
       .fl-more { all: unset; box-sizing: border-box; text-align: center; padding: 6px; border-radius: 8px; font-size: 12.5px; color: var(--blue-ink); cursor: pointer; }
       .fl-more:hover { background: var(--hover); } .fl-more:focus-visible { outline: 2px solid var(--blue); }
       .fl-empty { font-size: 12.5px; color: var(--muted); padding: 10px; text-align: center; background: var(--card); border-radius: 10px; }
+      /* 2026-11-06: 칸반·흐름 지도가 오른쪽에서 잘려도 더 있다는 표시가 없었음 → 넘치는 쪽 가장자리 흐림 */
+      .fl-cols.fade-r, .fl-map.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
+      .fl-cols.fade-l, .fl-map.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px); mask-image: linear-gradient(90deg, transparent, #000 40px); }
+      .fl-cols.fade-l.fade-r, .fl-map.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
       .fl-info { background: var(--card); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--sub); line-height: 1.5; }
       .fl-info b { color: var(--ink2); font-variant-numeric: tabular-nums; }
 
@@ -281,7 +290,8 @@
     $('fl-q').addEventListener('input', (e) => { flt.q = e.target.value.trim().toLowerCase(); render(); });
     chips('fl-only', [['', '전체'], ['late', '늦은 것'], ['human', '사람 차례'], ['stuck', '오래 머문 것']], 'only');
     chips('fl-plat', [['', '모든 플랫폼'], ['쿠팡', '쿠팡'], ['네이버', '네이버']], 'plat');
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('fl-dr').hidden) closeDr(); });
+    // 2026-11-06: 서랍에서 연 '맡기기' 창(dialog)에서 Esc를 누르면 서랍까지 같이 닫혔음 → 위에 창이 열려 있으면 그것만
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('fl-dr').hidden && !document.querySelector('dialog[open]')) closeDr(); });
     document.addEventListener('barun:page', (e) => { shown = e.detail === 'flow'; if (shown) { load(); start(); } else { stop(); closeDr(); } });
     document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (shown) { load(); start(); } });
     NARROW.addEventListener('change', () => { if (data) render(); });
@@ -295,6 +305,9 @@
       b.onclick = () => { flt[key] = v; chips(id, opts, key); render(); }; box.append(b);
     }
   }
+  const edges = (el) => { if (!el) return; const f = () => { el.classList.toggle('fade-l', el.scrollLeft > 2); el.classList.toggle('fade-r', el.scrollLeft + el.clientWidth < el.scrollWidth - 2); };
+    if (!el._edge) { el._edge = f; el.addEventListener('scroll', f, { passive: true }); } requestAnimationFrame(el._edge); };
+  window.addEventListener('resize', () => document.querySelectorAll('.fl-cols, .fl-map').forEach((x) => x._edge && x._edge()));
   function start() { stop(); timer = setInterval(load, 20000); }
   function stop() { clearInterval(timer); timer = 0; }
 
@@ -303,8 +316,15 @@
     const my = ++seqN;
     try {
       const r = await (window.barunFetch || fetch)('/api/flow' + (fresh ? '?fresh=1' : ''));
-      if (r.ok) { const j = await r.json(); if (my < applied) return; applied = my; data = j; render(); $('fl-upd').textContent = `${when(data.at)} 갱신`; }
-    } catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      const j = await r.json(); if (my < applied) return; applied = my; data = j;
+      const sa = T(j.at); if (sa) skew = Math.round((Date.now() - sa) / 9e5) * 9e5;
+      render(); $('fl-upd').textContent = `${when(data.at)} 갱신`;
+    } catch (e) {   // 2026-11-06: 503이면 빈 화면에 아무 말이 없던 것 → 갱신 자리에 실패, 처음이면 칸반 자리에도
+      if (e.message === '로그인 필요' || my < applied) return;
+      $('fl-upd').textContent = `읽지 못함(${e.message})${data ? ` · ${when(data.at)} 자료` : ''}`;
+      if (!data) { const b = $('fl-lanes'); b.textContent = ''; b.append(E('div', 'fl-empty', `업무 흐름을 읽지 못했어요(${e.message}) — 20초 뒤 다시 읽어요.`)); }
+    } finally { busy = false; }
   }
   // 버튼 — 할 일·주문 데이터 화면과 같은 길. out(결과 줄)이 있으면 거기에, 시트가 회차 중이면 '그래도 하기'
   async function act(body, btn, out) {
@@ -358,13 +378,14 @@
     const box = $('fl-kpis'); box.textContent = '';
     const t = data.totals, flowing = data.objs.filter((o) => o.k === 'o' && !['done'].includes(o.stage)).length;
     const work = Object.values(data.agents).filter((a) => a.state === 'running').map((a) => a.name).concat(data.tasks.filter((x) => x.state === 'running').map((x) => x.title));
-    const base = T(data.at) || new Date(), yd = new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
+    const base = T(data.at) || nowD(), yd = new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
     const ydk = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
     const yday = (st.new.extra.sales || []).find((x) => x.day === ydk) || { n: 0 };   // 어제 = 날짜로(주문 없는 날은 목록에 없어 끝에서 두 번째가 그저께일 수 있음)
     const K = [
       ['지금 일하는 중', `${work.length}`, work.length ? work.map(noE).join(' · ') : '모두 쉬는 중', work.length ? 'run' : '', null],
-      ['사람 차례', `${t.human}`, t.snoozed ? `미룬 것 ${t.snoozed}` : '#할-일·승인', t.human ? 'bad' : '', 'human'],
-      ['흐르는 주문', `${flowing}`, `발송기한 지남 ${t.late}`, '', 'late'],
+      // 2026-11-06: 주문 경로 화면(진행 중 26 · 판단할 일 79)과 숫자가 달라 헷갈려서 — 무엇을 세는지 이름에(여기는 카드 수, 국내 배송 중 포함 시트 줄)
+      ['사람 차례 카드', `${t.human}`, `#할-일·승인 카드${t.snoozed ? ` · 미룬 것 ${t.snoozed}` : ''}`, t.human ? 'bad' : '', 'human'],
+      ['진행 중 주문(배송 중 포함)', `${flowing}`, `국내 배송 중 ${data.objs.filter((o) => o.k === 'o' && o.stage === 'transit').length} · 발송기한 지남 ${t.late}`, '', 'late'],
       ['오래 머문 것', `${t.stuck}`, `주문 ${data.objs.filter((o) => o.stuck && o.k === 'o').length} · 상품 ${data.objs.filter((o) => o.stuck && o.k === 'p').length}`, t.stuck ? 'bad' : '', 'stuck'],
       ['오늘 주문', `${t.today.n}건`, `${won(t.today.paid)} · 어제 ${yday.n}건`, '', null],
       ['준비 중 상품', `${t.products}`, '소싱·등록·심사', '', null],
@@ -406,6 +427,7 @@
       b.onclick = () => go(s.id); side.append(b);
     }
     box.append(side);
+    edges(box);
   }
   function node(s, by) {
     const n = cnt(s, by);
@@ -450,7 +472,7 @@
     const cols = E('div', 'fl-cols'); cols.dataset.lane = lane; cols.setAttribute('role', 'tabpanel');
     for (const s of data.stages.filter((x) => x.lane === lane)) cols.append(column(s, by[s.id] || [], cards));
     wrap.append(bh, cols); box.append(wrap);
-    cols.scrollLeft = keepL;
+    cols.scrollLeft = keepL; edges(cols);
     box.querySelectorAll('.fl-body').forEach((l) => { if (keepT[l.dataset.sid]) l.scrollTop = keepT[l.dataset.sid]; });
   }
 
@@ -462,7 +484,7 @@
     const isRun = running(s), no = s.n ? String(s.n) : '·';
     if (!list.length && !cs.length && !isRun && !opened[s.id]) {        // 빈 단계 — 좁게 접어 둠
       const c = E('button', 'fl-col shut'); c.type = 'button'; c.dataset.sid = s.id;
-      c.append(E('span', 'no', no), E('span', 'fl-ct', '0'), E('span', 'vn', s.name));
+      c.append(E('span', 'no', no), E('span', 'vn', s.name), E('span', 'fl-ct', '0'));
       c.title = `${s.n ? `${s.n}. ` : ''}${s.name} · 비어 있음`;
       c.setAttribute('aria-label', `${s.name} 0건, 펼치기`); c.onclick = () => { opened[s.id] = true; render(); };
       return c;
@@ -569,7 +591,8 @@
     return box;
   }
   function task(t) {
-    const box = E('a', 'fl-ag'); box.href = t.url || '#'; if (t.url) { box.target = '_blank'; box.rel = 'noopener'; } box.style.textDecoration = 'none'; box.style.color = 'inherit'; box.style.display = 'block';
+    const ok = /^https?:\/\//i.test(t.url || '');   // 2026-11-06: 주소 없는 일은 href='#'이라 누르면 주소가 바뀌고 맨 위로 튀었음 → 링크 아님
+    const box = E(ok ? 'a' : 'div', 'fl-ag'); if (ok) { box.href = t.url; box.target = '_blank'; box.rel = 'noopener'; } box.style.textDecoration = 'none'; box.style.color = 'inherit'; box.style.display = 'block';
     const h = E('div', 't'); h.append(ic('chat'), E('span', 'nm', noE(t.title) || '맡긴 일'), E('span', 'fl-st ' + (t.state === 'running' ? 'run' : 'wait'), t.state === 'running' ? '일하는 중' : '차례 기다림'));
     box.append(h); if (t.doing) box.append(E('div', 'd', noE(t.doing))); if (t.secs) box.append(E('div', 'x', `맡긴 일 · ${secs(t.secs)}`));
     return box;
@@ -678,11 +701,12 @@
     try {
       const cx = new URLSearchParams({ k: o.k, id: o.id, stage: o.stage || '', sub: o.sub || '', days: o.days ?? '', stuck: o.stuck ? '1' : '' });
       const r = await (window.barunFetch || fetch)(`/api/flow/obj?${cx}`);
-      if (!r.ok || openObj !== o) return;
-      const j = await r.json(); body.lastChild.remove();
+      if (openObj !== o) return;
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);   // 2026-11-06: 503이면 '읽는 중…'에 영영 멈춰 있었음
+      const j = await r.json(); if (openObj !== o) return; body.lastChild.remove();
       if (j.kind === 'o') orderBody(body, j, o); else if (j.kind === 'p') productBody(body, j, o); else askBody(body, j, o);
       if ((j.acts || []).length) now.after(sect('할 수 있는 일', actsBox(j.acts, o, body)));
-    } catch (e) { if (body.lastChild) body.lastChild.textContent = '읽기 실패 · 다시 눌러 주세요'; }
+    } catch (e) { if (openObj === o && body.lastChild) body.lastChild.textContent = `읽지 못했어요(${e.message}) · 다시 눌러 주세요`; }
   }
   const kv = (pairs) => { const dl = E('dl', 'fl-kv'); for (const [k, v] of pairs) if (v != null && v !== '') { dl.append(E('dt', null, k), E('dd', null, noE(v))); } return dl; };
   const sect = (t, el, id) => { const s = E('section'); if (id) s.dataset.sec = id; s.append(E('h4', null, t), el); return s; };

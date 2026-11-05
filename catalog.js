@@ -134,7 +134,8 @@
     $('ct-sort').value = flt.sort;
     $('ct-sort').onchange = (e) => { flt.sort = e.target.value; keep(); render(); };
     $('ct-more').onclick = () => { limit += PAGE * 2; render(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('ct-dr').hidden) closeDr(); });
+    // 2026-11-06: 서랍 위 '맡기기' 창(dialog)에서 Esc를 누르면 창과 서랍이 같이 닫혔음 → 위에 열린 창이 있으면 그것만
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('ct-dr').hidden && !document.querySelector('dialog[open]')) closeDr(); });
     document.addEventListener('barun:page', (e) => { shown = e.detail === 'catalog'; if (shown) { load(); start(); } else { stop(); closeDr(); } });
     document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (shown) { load(); start(); } });
     if (!sec.hidden) { shown = true; load(); start(); }
@@ -148,8 +149,13 @@
     const my = ++seqN;
     try {
       const r = await (window.barunFetch || fetch)('/api/catalog' + (fresh ? '?fresh=1' : ''));
-      if (r.ok) { const j = await r.json(); if (my < applied) return; applied = my; data = j; render(); $('ct-upd').textContent = `${when(data.at)} 갱신`; }
-    } catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      const j = await r.json(); if (my < applied) return; applied = my; data = j; render(); $('ct-upd').textContent = `${when(data.at)} 갱신`;
+    } catch (e) {   // 2026-11-06: 503이면 빈 화면에 아무 말이 없던 것 → 갱신 자리에 실패, 처음이면 목록 자리에도
+      if (e.message === '로그인 필요') return;
+      $('ct-upd').textContent = `읽지 못함(${e.message})${data ? ` · ${when(data.at)} 자료` : ''}`;
+      if (!data) { $('ct-list').textContent = ''; $('ct-list').append(E('div', 'ct-empty', `상품 대장을 읽지 못했어요(${e.message}) — 잠시 뒤 다시 읽어요.`)); }
+    } finally { busy = false; }
   }
   async function act(body, btn, out) {
     const lab = btn ? btn.textContent : '';
@@ -208,6 +214,9 @@
   function render() {
     if (!data) return;
     if (data.empty) { $('ct-list').innerHTML = '<div class="ct-empty">상품 대장이 아직 없어요 — python -m pricing.catalog 만들기</div>'; return; }
+    // 2026-11-06: 칸 '원가 모름(팔림) 0' 옆 칩 '원가 모름 82'가 같은 걸 다르게 센 것처럼 보여서 — 안 팔린 쪽임을 이름에
+    for (const p of data.problems) if (p.code === 'nocost' && p.label === '원가 모름') p.label = '원가 모름(안 팔림)';
+    if (flt.p && !data.problems.some((p) => p.code === flt.p && p.n)) { flt.p = ''; keep(); }   // 저장해 둔 칩이 0건이 되면 보이지 않는 거르기로 빈 목록만 남던 것
     data.labels = Object.fromEntries(data.problems.map((p) => [p.code, p.label]));
     const k = data.kpi, pc = Object.fromEntries(data.problems.map((p) => [p.code, p.n]));
     const kp = $('ct-kpis'); kp.textContent = '';
@@ -218,7 +227,7 @@
     tile('상품(실제 물건)', k.products.toLocaleString(), `판매 옵션 ${k.options.toLocaleString()}개를 묶음`);
     tile('판매 중', k.selling.toLocaleString(), `쿠팡 ${k.coupang} · 네이버 ${k.naver} · 둘 다 ${k.both}`);
     tile('정리할 것', k.fix.toLocaleString(), '상품 수 · 한 상품이 아래 칩 여러 개에 들 수 있어요', k.fix > 0);
-    tile('원가 모름(팔림)', (pc.nocost_sold || 0).toLocaleString(), `안 팔린 것 ${pc.nocost || 0}개`, (pc.nocost_sold || 0) > 0, 'nocost_sold');
+    tile('원가 모름 · 팔린 상품', (pc.nocost_sold || 0).toLocaleString(), `안 팔린 상품 ${pc.nocost || 0}개도 원가 모름`, (pc.nocost_sold || 0) > 0, 'nocost_sold');
     tile('판매 전 오래', (pc.stuck || 0).toLocaleString(), `쿠팡 임시저장·심사·반려`, (pc.stuck || 0) > 0, 'stuck');
     const pb = $('ct-probs'); pb.textContent = '';
     const chip = (code, label, n) => {
@@ -271,11 +280,16 @@
     if (!again) { d.textContent = ''; d.append(E('div', 'ct-empty', '읽는 중…')); }
     try {
       const r = await (window.barunFetch || fetch)(`/api/catalog/obj?id=${encodeURIComponent(id)}`);
-      if (!r.ok || openId !== id) return;
-      const j = await r.json();
-      if (j.error) { d.textContent = ''; d.append(E('div', 'ct-empty', j.error)); return; }
+      if (openId !== id) return;
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);   // 2026-11-06: 503이면 '읽는 중…'에 영영 멈춰 있었음
+      const j = await r.json(); if (openId !== id) return;
+      if (j.error) throw new Error(j.error);
       draw(d, j, again);
-    } catch (e) { d.textContent = ''; d.append(E('div', 'ct-empty', '읽기 실패 · 다시 눌러 주세요')); }
+    } catch (e) {
+      if (openId !== id) return;
+      d.textContent = ''; const x = E('button', 'ct-x'); x.append(ic('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = closeDr;
+      d.append(x, E('div', 'ct-empty', `읽지 못했어요(${e.message}) · 다시 눌러 주세요`)); x.focus();
+    }
   }
   function form(title, fields, btnLabel, onSave, hint) {
     const f = E('div', 'ct-form'); f.append(E('h4', null, title));
@@ -363,7 +377,7 @@
       const m = E('span', 'm');
       m.append(document.createTextNode([ST[o.status] || o.status, o.cost ? `원가 ${won(o.cost.krw)}(${ORIGIN(o.cost.origin)}${o.cost.est ? ' · 추정' : ''})` : '원가 모름',
         o.how ? `묶은 근거: ${o.how}` : '', o.tab ? `탭 ${o.tab}` : ''].filter(Boolean).join(' · ') + ' '));
-      if (o.url) { const a = E('a', null, '판매 화면'); a.href = o.url; a.target = '_blank'; a.rel = 'noopener'; m.append(a); }
+      if (/^https?:\/\//i.test(o.url || '')) { const a = E('a', null, '판매 화면'); a.href = o.url; a.target = '_blank'; a.rel = 'noopener'; m.append(a); }
       const mvb = E('button', 'btn sm weak', '옮기기'); mvb.type = 'button'; mvb.style.marginLeft = '6px';
       m.append(mvb);
       li.append(t, right, m);

@@ -14,7 +14,9 @@
   const I = (n, cls) => { const e = E('span', 'dic' + (cls ? ' ' + cls : '')); e.innerHTML = svg(n); return e; };
   const IB = (b, n, label, after) => { b.textContent = ''; if (after) b.append(label, I(n)); else b.append(I(n), label); return b; };   // 글 + 그림 버튼
   const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
-  const fetchJ = async (p, opts) => (await (window.barunFetch || fetch)(p, opts)).json();
+  // 2026-11-06: 503 같은 HTML 오류 페이지면 .json()이 'Unexpected token <'을 그대로 보여 줬음 → 상태 번호로(오류로 던져 저장은 '저장 안 됨'·다시 저장 길로)
+  const readJ = async (r) => { try { return await r.json(); } catch (e) { throw new Error(`서버가 응답하지 않아요(${r.status})`); } };
+  const fetchJ = async (p, opts) => readJ(await (window.barunFetch || fetch)(p, opts));
   const won = (v) => (+v).toLocaleString('ko-KR') + '원';
   const COLNAME = { lead_id: '줄', title: '상품', quantity: '수량', state: '상태', profit: '이익', cost_krw: '도착원가', market_krw: '시장가', plan: '계획가',
     marks: '표시', reason: '판정 이유', waiting: '대기', updated: '고친 시각', source_key: '원천', country: '나라', site: '판매처', currency: '통화', unit_price: '단가', fx_krw: '환율',
@@ -273,10 +275,12 @@
       const chosen = new Set(same ? ex.vs : []);
       const find = inp('값 찾기'); find.type = 'search'; find.setAttribute('aria-label', '값 찾기');
       const list = E('div', 'dt-vals'); const note = E('div', 'muted small');
-      let tm;
+      let tm, fseq = 0;
       const fill = async () => {
         const ps = params(); ps.set('col', c); ps.set('find', find.value.trim()); ps.set('limit', '300');
-        let j; try { j = await fetchJ('/api/db/values?' + ps.toString()); } catch (e) { note.textContent = '값 목록을 못 불러왔어요: ' + e.message; return; }
+        const my = ++fseq;      // 2026-11-06: 빨리 치면 늦게 온 옛 답이 새 목록을 덮던 것 — 마지막 요청만 그림
+        let j; try { j = await fetchJ('/api/db/values?' + ps.toString()); } catch (e) { if (my === fseq) note.textContent = '값 목록을 못 불러왔어요: ' + e.message; return; }
+        if (my !== fseq) return;
         if (j.error) { note.textContent = j.error; return; }
         list.textContent = '';
         for (const [v, cnt] of j.values) {
@@ -583,7 +587,7 @@
   }
   // 2026-10-25 사장님 "상품명을 클릭하면 해당 판매처의 상품페이지로": 플랫폼 주문 줄의 상품명 = 쿠팡·네이버 구매자 화면 링크(새 창). 재고 줄은 글자 그대로(고치기)
   function prodLink(r, text) {
-    const a = E('a', 'prod-link', text); a.href = r._url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    const a = E('a', 'prod-link', text); if (/^https?:\/\//i.test(String(r._url || ''))) a.href = r._url;   // 2026-11-06: javascript: 같은 주소는 링크로 안 씀 a.target = '_blank'; a.rel = 'noopener noreferrer';
     a.title = `${ko(r.platform || '') || '판매처'} 상품페이지 열기`;
     a.onclick = (e) => e.stopPropagation(); a.onmousedown = (e) => e.stopPropagation();
     return a;
@@ -602,6 +606,7 @@
     for (const b of bits.filter(Boolean)) meta.append(E('span', null, b));
     const ds = !stock && dueState(r); if (ds) meta.append(E('span', 'oc-due ' + ds.k, '기한 ' + ds.t));
     if (sg.ost) meta.append(E('span', 'oc-ost ' + (sg.delivered ? 'ok' : ''), ko(r.platform || '') + ' ' + ko(sg.ost)));
+    if (sg.mismatch) { const w = E('span', 'badge warn', '상태 다름'); w.title = `시트는 '${pg}', ${ko(r.platform || '') || '플랫폼'}은 '${ko(sg.ost)}' — 시트 진행상태를 확인해 주세요`; meta.append(w); }
     c.append(meta);
     if (!stock && !sg.stop) {              // 7단계 가는 막대 + 지금 단계 이름
       const bar = E('div', 'oc-steps'); bar.setAttribute('aria-label', `진행 ${sg.done}/7 단계`);
@@ -641,6 +646,7 @@
     sel = null; detail(); render();
     const n = document.querySelectorAll('.dt-cards > .oc')[i];
     if (n) { n.scrollIntoView({ block: 'nearest' }); n.focus({ preventScroll: true }); }      // 휴대폰: 보던 카드로 돌아옴
+    else { const tr = i >= 0 && document.querySelectorAll('.dt tbody tr')[i]; if (tr && pageOn()) tr.focus({ preventScroll: true }); }   // 2026-11-06: 표 보기는 닫으면 초점이 문서 처음으로 사라졌음
     if (history.state && history.state.dt) {
       if (location.hash === pushedAt) { try { history.back(); } catch (e) { /* 없음 */ } } else history.replaceState(null, '', location.href);
     }
@@ -982,6 +988,7 @@
   function reloadWhenIdle(ms) {        // 고치는 중(입력칸·끌기·대화창)이면 기다렸다가 다시 불러옴 — 입력하던 칸이 사라지지 않게
     clearTimeout(reloadT);
     reloadT = setTimeout(async () => {
+      if (!pageOn()) return;      // 2026-11-06: 다른 화면에 있으면 다시 읽지 않음(돌아오면 barunData가 새로 읽음)
       if (saving || Object.keys(pending).length || drag || busyTyping() || document.querySelector('dialog[open]')) return reloadWhenIdle(1500);
       const a = document.activeElement, had = !!(a && a.closest && a.closest('table.dt'));
       await load();
@@ -1149,19 +1156,33 @@
   async function post(payload, keep) {      // keep = 창이 닫혀도 끝까지 보냄(keepalive, 64KB 아래만)
     const body = JSON.stringify(Object.assign({ action: 'db' }, payload));
     const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: !!keep && new TextEncoder().encode(body).length < 60000 });
-    return r.json();
+    return readJ(r);
   }
+  // 줄 옮기기·나누기·순서·문제 표시가 회차 쓰기에 막히면 1분마다 30번까지 저절로 다시 보냄(재고 복사와 같은 대기) — 서버가 매번 key·ident로 같은 줄인지 다시 확인. 지우기는 늦게 실행되지 않게 넣지 않음
+  const ROW_WAIT_OPS = ['move', 'split', 'reorder', 'problem', 'unproblem'], rowWait = {};
   async function doAct(payload, btn, out) {
     if (payload.confirm && !confirm(payload.confirm)) return;
     delete payload.confirm;
+    const wk = payload.kind === 'sheet_row' && ROW_WAIT_OPS.includes(payload.op) ? `${payload.op}#${payload.tab}#${payload.row}` : '';
+    if (wk && payload.force) delete rowWait[wk];
+    if (wk && payload.retry && !(wk in rowWait)) return;          // '그래도 하기'로 이미 끝낸 대기
     const label = btn && btn.textContent;
     if (btn) { btn.disabled = true; if (payload.kind.startsWith('sheet')) btn.textContent = '시트에 쓰는 중…'; }
     try {
       const j = await post(payload);
-      toast(String(j.msg || '').split('\n')[0].slice(0, 90), !j.ok);
-      if (out) {
+      const busy = /회차가 시트를 쓰는 중/.test(j.msg);
+      if (wk && busy && !payload.force) {
+        const left = payload.retry ? (rowWait[wk] || 0) - 1 : 30;
+        if (left > 0) {
+          rowWait[wk] = left;
+          setTimeout(() => doAct(Object.assign({}, payload, { retry: true }), null, out), 60000);
+          j.msg = `${noE(j.msg).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 자동으로 할게요`;
+        } else delete rowWait[wk];
+      } else if (wk) delete rowWait[wk];
+      if (!(payload.retry && busy)) toast(String(j.msg || '').split('\n')[0].slice(0, 90), !j.ok);
+      if (out && !(payload.retry && busy)) {
         out.textContent = ''; out.append(I(j.ok ? 'check' : 'alert'), ' ', noE(j.msg)); out.hidden = false;
-        if (/회차가 시트를 쓰는 중/.test(j.msg)) { const b = E('button', 'btn sm weak', '그래도 하기'); b.type = 'button'; b.onclick = () => doAct(Object.assign({}, payload, { force: true }), b, out); out.append(' ', b); }
+        if (busy) { const b = E('button', 'btn sm weak', '그래도 하기'); b.type = 'button'; b.onclick = () => doAct(Object.assign({}, payload, { force: true, retry: undefined }), b, out); out.append(' ', b); }
       }
       if (j.ok && !payload.kind.endsWith('preview')) { load(); loadTables(); }
       return j;
@@ -1821,6 +1842,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const pg = String(r.progress || ''), ost = (r._ost || [])[0] || '', claim = (r._ost || [])[1] || '';
     let n = 0; for (const [re, k] of STAGE) if (re.test(pg)) n = Math.max(n, k);
     if (REBUY_RE.test(pg)) n = 1;                    // 구매처가 취소함 → 다시 구매할 차례
+    const sheetN = n;                                // 시트 진행상태만으로 본 단계(플랫폼 상태와 다른지 보려고)
     if (P_SENT.includes(ost)) n = Math.max(n, 6);
     const delivered = P_DONE.includes(ost); if (delivered) n = 7;
     const field = [!!(r.order_no || r.ordered), !!r.shop_order, !!r.intl_tracking, !!r.fwd_request, !!r.kr_invoice, false, false];
@@ -1828,7 +1850,9 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const steps = names.map((nm, j) => [nm, j < n || (!REBUY_RE.test(pg) && field[j])]);
     const curI = steps.findIndex((s) => !s[1]);
     const stop = !REBUY_RE.test(pg) && (STOP_RE.test(pg) || /CANCEL|RETURN|EXCHANGE/.test(ost) || /^(CANCEL|RETURN|EXCHANGE)(?!_REJECT)/.test(claim));
-    return { steps, cur: curI, next: curI < 0 ? '배송완료' : STEP_NEXT[curI], done: steps.filter((s) => s[1]).length, stop, rebuy: REBUY_RE.test(pg), delivered,
+    // 2026-11-06 UX 검토: 시트는 '매입완료(해외송장대기)'인데 플랫폼은 배송완료 — 막대만 배송완료로 올라가 둘이 말없이 어긋나 보였음 → '상태 다름'
+    const mismatch = !!pg && !stop && (P_SENT.includes(ost) || delivered) && sheetN > 0 && sheetN < 6;
+    return { steps, cur: curI, next: curI < 0 ? '배송완료' : STEP_NEXT[curI], done: steps.filter((s) => s[1]).length, stop, rebuy: REBUY_RE.test(pg), delivered, mismatch,
       ost: ost && !['PAYED', 'ACCEPT', 'INSTRUCT', 'PLACE'].includes(ost) ? ost : '', claim };
   }
   function dday(v) {
@@ -1867,6 +1891,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const chip = (t, cls) => { if (t) chips.append(E('span', cls || 'ov-chip', t)); };
     chip(r.tab); chip(stock ? '재고' : ko(r.platform || '')); chip(r.ship_mode); chip(pg, 'badge ' + badgeCls(pg));
     if (sg.ost) chip(`${ko(r.platform || '') || '플랫폼'} ${ko(sg.ost)}`, 'badge ' + (sg.delivered ? 'ok' : sg.stop ? 'bad' : 'run'));
+    if (sg.mismatch) chip('상태 다름 · 시트 진행상태 확인', 'badge warn');
     if (ds && ds.k !== 'ok') chip('발송기한 ' + ds.t, 'badge ' + (ds.k === 'late' ? 'bad' : 'warn'));
     if (!stock && r._url) { const a = prodLink(r, `${ko(r.platform || '') || '판매처'} 상품페이지 ↗`); a.className = 'ov-chip ov-link'; chips.append(a); }
     const what = E('div', 'ov-what', stock ? ['재고 줄', r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · '));
@@ -1997,7 +2022,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     jump = { tab: o.tab, row: o.row }; toast('주문번호로 찾는 중'); load();
   }
   document.addEventListener('keydown', (e) => {      // 자세히가 열려 있으면 [ ] 로 위·아래 줄
-    if (!sel || !last || typing(e) || (e.key !== '[' && e.key !== ']')) return;
+    if (!sel || !last || typing(e) || !pageOn() || (e.key !== '[' && e.key !== ']')) return;
     const i = last.rows.includes(sel) ? last.rows.indexOf(sel) : last.rows.findIndex((x) => isSheet() && rid(x) === rid(sel)), j = i + (e.key === ']' ? 1 : -1);
     if (j >= 0 && j < last.rows.length) { e.preventDefault(); openRow(last.rows[j]); }
   });
@@ -2200,8 +2225,9 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   }
 
   const typing = (e) => !!(e.target && e.target.closest && e.target.closest('input,select,textarea'));
+  function pageOn() { const p = $('p-data'); return !!p && !p.hidden; }   // 2026-11-06: 주문 장부 화면이 보일 때만 단축키
   document.addEventListener('keydown', (e) => {      // Esc = 위에 열린 서랍부터 닫기(필터·정렬 → 바꾼 기록 → 줄 자세히)
-    if (e.key !== 'Escape' || typing(e) || document.querySelector('dialog[open]')) return;
+    if (e.key !== 'Escape' || typing(e) || !pageOn() || document.querySelector('dialog[open]')) return;
     const fp = $('dt-fpanel'), au = document.querySelector('.dt-audit');
     if (fp && !fp.hidden) { fp.hidden = true; panel(); } else if (au && !au.hidden) { au.hidden = true; au.textContent = ''; } else if (sel) closeDetail();
   });

@@ -4,7 +4,8 @@
 // 그리기: 빈 줄로 나뉜 덩어리마다 — 첫 칸만 있는 줄은 소제목, 그 다음 줄은 머리글, 나머지는 표(덩어리 안에서 늘 빈 열은 뺌).
 (() => {
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
-  const fetchJ = async (p, opts) => (await (window.barunFetch || fetch)(p, opts)).json();
+  // 2026-11-06: 503 '{}'도 자료로 받아 render가 data.tabs에서 깨지고 '불러오는 중'도 없이 멈췄음 → 응답 코드부터 확인
+  const fetchJ = async (p, opts) => { const r = await (window.barunFetch || fetch)(p, opts); if (!r.ok) throw new Error(`서버 응답 ${r.status}`); return r.json(); };
   const DESC = { 전체현황: '진행 중 주문 요약', 매출분석: '이번 달 매출·순이익', 판매점검: '쿠팡 판매 점검(⑦)',
     메일정리: '네이버 메일 정리(⑤)', 설정: '환율·탭 기본값 · 노란 칸 수정은 다음 갱신부터 반영' };
   let cur = '전체현황', data = null, pending = {}, note = '';
@@ -49,7 +50,9 @@
       const tr = E('tr');
       for (const j of cols) {
         const raw = row[j] || '', v = editable(i, j + 1) ? raw : shown(raw, head ? head.row[j] : '');
-        const td = E('td', /^[-+]?[\d,.]+(원|%|건|개|만원)?$/.test(v.trim()) ? 'num' : v.length > 40 ? 'long' : null);
+        const hd = head ? String(head.row[j] || '') : '';
+        const td = E('td', /^[-+]?[\d,.]+(원|%|건|개|만원)?$/.test(v.trim()) && !KEEP.test(hd) ? 'num' : v.length > 40 ? 'long' : KEEP.test(hd) ? 'id' : null);
+        if (hd) td.dataset.h = hd;   // 폰 카드 보기의 칸 이름
         if (v.length > 18) td.title = v;
         if (editable(i, j + 1)) {
           const k = `${i}:${j + 1}`, inp = E('input', 'rep-in'); inp.value = k in pending ? pending[k].new : v;
@@ -61,7 +64,12 @@
       }
       tb.append(tr);
     }
-    t.append(tb); wrap.append(t); return wrap;
+    t.append(tb); wrap.append(t);
+    // 2026-11-06: PC에서 오른쪽 칸(공홈주문번호 등)이 잘려도 옆으로 밀 수 있다는 표시가 없었음 → 넘치면 오른쪽 흐림 + 안내 한 줄
+    const hint = E('div', 'rep-hint', '옆으로 밀면 칸이 더 있어요 →'); hint.hidden = true;
+    const edge = () => { const over = wrap.scrollWidth > wrap.clientWidth + 2; hint.hidden = !over; wrap.classList.toggle('more-r', over && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2); };
+    wrap.addEventListener('scroll', edge, { passive: true }); wrap._edge = edge; requestAnimationFrame(edge);
+    const box = E('div'); box.append(wrap, hint); return box;
   }
 
   // ── 매출분석 그래프(보고서 'report' 동작의 그래프 정의 + 격자의 숫자) — 색: 네이버 3번(청록)·쿠팡 2번(주황)·합계 1번(파랑), 검사기 통과 ──
@@ -188,21 +196,40 @@
     if (note) { const o = E('span', 'rep-out', note); o.setAttribute('role', 'status'); b.append(o); }
   }
 
+  // 2026-11-06: 탭을 빨리 바꾸면 늦게 온 앞 탭 답이 뒤 탭 자리에 그려졌음 → 마지막 요청만. 실패하면 [저장] 버튼이 '저장 중…'에 멈춰 있던 것도 다시 그림.
+  let seq = 0;
   async function load() {
     const box = card(); if (!box) return;
-    try { data = await fetchJ('/api/db/grid?tab=' + encodeURIComponent(cur)); } catch (e) { box.querySelector('.rep-body').textContent = '불러오지 못했어요: ' + e.message; return; }
-    if (data.error) { box.querySelector('.rep-body').textContent = data.error; return; }
-    render();
+    const my = ++seq; let j;
+    try { j = await fetchJ('/api/db/grid?tab=' + encodeURIComponent(cur)); } catch (e) { if (my !== seq) return; box.querySelector('.rep-body').textContent = '보고서를 읽지 못했어요: ' + e.message; bar(); return; }
+    if (my !== seq) return;
+    if (j.error || !Array.isArray(j.grid)) { box.querySelector('.rep-body').textContent = j.error || '보고서 자료 모양이 달라요'; bar(); return; }
+    data = j; render();
   }
 
   function build() {
     const panel = document.getElementById('p-reports'); if (!panel || card()) return;
+    const css = E('style'); css.textContent = `
+      .rep-wrap.more-r { box-shadow: inset 0 0 0 1px var(--line), inset -18px 0 14px -12px rgba(0, 0, 0, .18); }
+      .rep-hint { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
+      table.rep td.id { white-space: normal; word-break: break-all; min-width: 110px; max-width: 200px; }
+      /* 2026-11-06 폰: 표가 4칸만 보이고 나머지는 잘려서 — 줄마다 카드(칸 이름: 값) */
+      @media (max-width: 640px) {
+        .rep-wrap { box-shadow: none; overflow: visible; } .rep-hint { display: none; }
+        table.rep, table.rep tbody, table.rep tr, table.rep td { display: block; width: 100%; box-sizing: border-box; }
+        table.rep thead { display: none; } table.rep tr { border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; }
+        table.rep td { border-top: 0; padding: 3px 0; max-width: none; white-space: normal; word-break: break-all; text-align: left !important; min-width: 0 !important; }
+        table.rep td[data-h]::before { content: attr(data-h) ' '; color: var(--muted); font-size: 12px; margin-right: 6px; }
+        table.rep td:empty { display: none; }
+      }`;
+    document.head.append(css);
     const c = E('div', 'card'); c.id = 'rep-card';
     const h = E('div', 'card-h'); h.append(E('h2', null, '시트 보고서'), E('span', 'desc rep-desc', ''));
     c.append(h, E('div', 'rep-tabs'), Object.assign(E('div', 'rep-bar'), { hidden: true }), E('div', 'rep-body'));
     panel.prepend(c);
   }
 
+  if (window.addEventListener) window.addEventListener('resize', () => document.querySelectorAll('#rep-card .rep-wrap').forEach((w) => w._edge && w._edge()));
   window.barunReports = () => { build(); load(); };
   const pr = document.getElementById('p-reports');
   if (pr) {      // 보고서 화면이 '숨김 → 보임'으로 바뀔 때만 새로 읽음(같은 값을 다시 써도 바뀜 신호가 와서, 고치던 칸·도움말이 지워지던 것)

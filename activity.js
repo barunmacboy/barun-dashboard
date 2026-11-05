@@ -15,6 +15,16 @@
   const LABEL_W = 230, LANE_H = 44, GROUP_H = 26, AXIS_H = 34, PAD_R = 18;
 
   let hours = 24, data = null, pinned = null;
+  // 2026-11-06 폰: 기호 설명 16개가 한 화면을 다 채우고 그림은 3시간쯤만 보여서 — 좁은 화면은 설명을 접고 처음부터 표로
+  const NARROW = matchMedia('(max-width: 720px)');
+  let tableOn = NARROW.matches;
+  (() => { const st = document.createElement('style'); st.textContent = `
+    @media (max-width: 720px) {   /* 폰 표: 칸 다섯 개를 좁게 나눠 시각이 한 글자씩 꺾였음 → 줄마다 '시각 · 줄 · 종류 · 상태' 한 줄 + 내용 */
+      #act-table { max-height: 70vh; } #act-table table, #act-table tbody, #act-table tr { display: block; } #act-table thead { display: none; }
+      #act-table tr { padding: 8px 0; border-bottom: 1px solid var(--line); } #act-table td { display: inline; border: 0; padding: 0 6px 0 0; font-size: 12px; color: var(--muted); }
+      #act-table td:last-child { display: block; font-size: 13.5px; color: var(--ink); margin-top: 2px; }
+      .act-legend summary { cursor: pointer; padding: 4px 0; } }`; document.head.append(st); })();
+  const applyView = () => { const t = $('act-table'), c = $('act-chart'); if (!t || !c) return; t.hidden = !tableOn; c.hidden = NARROW.matches && tableOn; };
   try { hours = +localStorage.getItem('barun.activity.hours') || 24; } catch (e) { /* 저장소 없음 */ }
 
   const $ = (id) => document.getElementById(id);
@@ -41,6 +51,8 @@
     }
     box.append(seg);
     const lg = h('div', 'legend');
+    let lgBox = lg;
+    if (NARROW.matches) { lgBox = h('details', 'act-legend'); lgBox.append(h('summary', 'small muted', '기호 설명'), lg); }
     const item = (sw, text) => { const s = h('span', 'lg'); s.append(sw, document.createTextNode(text)); lg.append(s); };
     for (const k of ['ok', 'fail', 'running', 'stale']) { const sw = h('span', 'sw bar ' + STATUS[k].cls, STATUS[k].icon); item(sw, STATUS[k].label); }
     item(h('span', 'sw bar planned'), '예정');
@@ -52,11 +64,13 @@
     item(h('span', 'sw tri'), '프로그램');
     item(h('span', 'sw dia'), '허브 감지→처리');
     item(h('span', 'sw tick'), '쓰기');
-    box.append(lg);
-    const tb = h('button', 'linkbtn', '표로 보기');
+    box.append(lgBox);
+    const lab = () => (tableOn ? (NARROW.matches ? '그림으로 보기' : '표 닫기') : '표로 보기');
+    const tb = h('button', 'linkbtn', lab());
     tb.type = 'button';
-    tb.onclick = () => { const t = $('act-table'); t.hidden = !t.hidden; tb.textContent = t.hidden ? '표로 보기' : '표 닫기'; };
+    tb.onclick = () => { tableOn = !tableOn; applyView(); tb.textContent = lab(); if (!tableOn) render(); };
     box.append(tb);
+    applyView();
   }
 
   // 줄 요약 — 회차를 실행 방식별로(2026-10-25: 'claude · 회차 24'가 스크립트·디스코드 작업 회차까지 다 센 것).
@@ -296,19 +310,33 @@
     table.append(tb); t.append(table);
   }
 
+  // 2026-11-06: 503이면 '{}'를 자료로 삼아 TypeError 글이 그대로 보이고 마지막 정상 그림도 지워졌음 → 응답 확인, 실패하면 이전 그림 유지 + 안내 한 줄.
+  // 화면이 숨겨진 동안에도 1분마다 7일 치까지 읽던 것 → 보일 때만 읽고, 보이게 되면 그때 폭으로 다시 그림(숨김 상태에선 폭 0이라 640px로 그려졌음).
+  let seq = 0;
   async function load() {
     controls();
+    const my = ++seq;
     try {
       const r = await (window.barunFetch || fetch)(`/api/timeline?hours=${hours}`, { cache: 'no-store' });
-      data = await r.json();
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      const j = await r.json(); if (my !== seq) return;
+      if (!j || !Array.isArray(j.lanes)) throw new Error('자료 모양이 달라요');
+      data = j;
       render(); showPinned();
     } catch (e) {
-      $('act-chart').textContent = '타임라인을 불러오지 못했습니다: ' + e;
+      if (my !== seq || e.message === '로그인 필요') return;
+      const wrap = $('act-chart'), tipNode = $('act-tip');
+      const note = h('p', 'muted small', `타임라인을 읽지 못했어요(${e.message}) — 잠시 뒤 다시 읽어요.` + (data ? ' 아래는 마지막으로 읽은 그림이에요.' : ''));
+      note.className = 'muted small act-err';
+      if (!data) { wrap.textContent = ''; wrap.append(tipNode, note); } else { wrap.querySelector('.act-err')?.remove(); wrap.prepend(note); }
     }
   }
+  const visible = () => { const p = $('p-activity'); return !document.hidden && (!p || !p.hidden); };
 
-  window.addEventListener('resize', () => { clearTimeout(window.__actRs); window.__actRs = setTimeout(render, 150); });
+  window.addEventListener('resize', () => { clearTimeout(window.__actRs); window.__actRs = setTimeout(() => { if (visible()) render(); }, 150); });
+  NARROW.addEventListener('change', () => { tableOn = NARROW.matches; controls(); if (visible()) render(); });
+  document.addEventListener('barun:page', (e) => { if (e.detail === 'activity') load(); });
   window.barunReloadTimeline = load;
   load();
-  setInterval(load, 60000);
+  setInterval(() => { if (visible()) load(); }, 60000);
 })();

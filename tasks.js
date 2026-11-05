@@ -9,7 +9,14 @@
   const ST = { run: ['일하는 중', 'run'], wait: ['승인·답 대기', 'warn'], queued: ['차례 대기', 'warn'], fail: ['실패', 'bad'], done: ['끝', 'ok'] };
   const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
   const ic = (name) => (window.ico ? window.ico(name) : '');
-  let timer = 0, busy = false, showDone = false;
+  let timer = 0, busy = false, showDone = false, loaded = false, sameState = '';
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');   // 2026-11-06: 디스코드 주소는 http(s)만
+  // 2026-11-06: 스레드 이름이 '미국'·'이태리'뿐이면 무슨 일인지 몰라서 — 짧은 제목엔 요약 첫 줄을 붙임
+  const headline = (t) => {
+    const tt = noE(t.title).trim(), first = noE(t.summary || t.doing || '').split('\n').map((x) => x.trim()).find(Boolean) || '';
+    if (!tt) return first.slice(0, 70) || '(제목 없음)';
+    return tt.length < 8 && first ? `${tt} — ${first.length > 60 ? first.slice(0, 59) + '…' : first}` : tt;
+  };
 
   function install() {
     const page = $('p-tasks'); if ($('tk-sec') || !page) return !!$('tk-sec');
@@ -58,9 +65,10 @@
     const r = E('div', 'tk-row');
     const top = E('div', 'tk-t');
     const [lab, cls] = ST[t.state] || [t.state, ''];
-    top.append(E('span', 'badge ' + cls, lab));
-    if (t.url) { const a = E('a', null, noE(t.title) || '(제목 없음)'); a.href = t.url; a.target = '_blank'; a.rel = 'noopener'; a.title = '디스코드에서 열기'; top.append(a); }
-    else top.append(E('span', null, noE(t.title) || '(제목 없음)'));
+    if (t.state !== sameState) top.append(E('span', 'badge ' + cls, lab));   // 2026-11-06: 열린 일이 모두 같은 상태면 줄마다 같은 꼬리표를 반복하지 않음(머리의 숫자로)
+    const url = safeUrl(t.url);
+    if (url) { const a = E('a', null, headline(t)); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.title = '디스코드에서 열기'; top.append(a); }
+    else top.append(E('span', null, headline(t)));
     const min = t.state === 'run' ? `${dur(t.secs)}째` : ['wait', 'queued'].includes(t.state) ? `${dur(t.secs)}째 대기` : hm(t.last);
     top.append(E('span', 'tk-min', min));
     r.append(top);
@@ -75,23 +83,26 @@
     //   대기: 끝내기 · 끝·실패: 목록에서 지우기(디스코드 스레드·기록은 남음)
     const bar = E('div', 'tk-btns');
     const btn = (icon, label, cls, action, ask) => {
-      const b = E('button', 'btn sm ' + cls); b.innerHTML = ic(icon); b.append(document.createTextNode(' ' + label)); b.type = 'button';
+      // 2026-11-06: '끝내기'의 네모(stop) 그림이 체크박스처럼 보여서 — 그림 없이 글자 버튼으로
+      const b = E('button', 'btn sm ' + cls); if (icon) b.innerHTML = ic(icon); b.append(document.createTextNode((icon ? ' ' : '') + label)); b.type = 'button';
       b.onclick = async () => {
         if (ask && !confirm(ask)) return;
         b.disabled = true;
+        // 2026-11-06: 실패·응답 못 읽음도 조용히 넘어가 된 줄 알던 것 → 실패라고 알림
         try {
           const res = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, key: t.id }) });
-          const j = await res.json(); if (window.toast) window.toast(j.msg);
-        } catch (e) { /* 토큰 창 */ } finally { load(); }
+          const j = await res.json().catch(() => ({ ok: false, msg: `응답을 읽지 못했어요(${res.status}) — 목록을 다시 보고 확인해 주세요` }));
+          if (window.toast) window.toast((j.ok ? '' : '실패: ') + (j.msg || ''));
+        } catch (e) { if (window.toast && e.message !== '로그인 필요') window.toast('실패: ' + e.message); } finally { b.disabled = false; load(); }
       };
       bar.append(b);
     };
     const tt = noE(t.title);
     if (t.state === 'run') btn('pause', '멈춤', 'ghost', 'task_stop', `'${tt}' 지금 하던 것만 멈출까요? 답글을 달면 이어 가요.`);
-    if (['run', 'wait', 'queued'].includes(t.state)) btn('stop', '끝내기', 'ghost', 'task_close', `'${tt}' 일을 끝낼까요? 기다리던 답글·승인 버튼도 거둬요.`);
+    if (['run', 'wait', 'queued'].includes(t.state)) btn('', '끝내기', '', 'task_close', `'${tt}' 일을 끝낼까요? 기다리던 답글·승인 버튼도 거둬요.`);
     if (['done', 'fail'].includes(t.state)) btn('trash', '목록에서 지우기', 'ghost', 'task_hide', null);
     else btn('trash', '끝내고 지우기', 'ghost', 'task_hide', `'${tt}' 일을 끝내고 목록에서 뺄까요? 스레드·기록은 남아요.`);
-    if (t.url) { const a = E('a', 'btn sm ghost'); a.innerHTML = ic('external'); a.append(document.createTextNode(' 디스코드')); a.href = t.url; a.target = '_blank'; a.rel = 'noopener'; bar.append(a); }
+    if (url) { const a = E('a', 'btn sm ghost'); a.innerHTML = ic('external'); a.append(document.createTextNode(' 디스코드')); a.href = url; a.target = '_blank'; a.rel = 'noopener'; bar.append(a); }
     r.append(bar);
     return r;
   }
@@ -108,6 +119,7 @@
     const L = $('tk-list'); L.innerHTML = '';
     const open = d.tasks.filter((t) => t.state !== 'done');
     const done = d.tasks.filter((t) => t.state === 'done');
+    const ss = new Set(open.map((t) => t.state)); sameState = open.length > 1 && ss.size === 1 ? [...ss][0] : '';
     if (!open.length) L.append(E('p', 'muted small', '진행·대기 중인 일 없음'));
     for (const t of open) L.append(row(t));
     if (done.length) {
@@ -123,8 +135,15 @@
 
   async function load() {
     if (busy) return; busy = true;
-    try { const r = await (window.barunFetch || fetch)('/api/tasks'); if (r.ok) render(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+    // 2026-11-06: 503이면 목록이 빈 채로 아무 말이 없어 '맡긴 일 없음'처럼 보이던 것 → 처음 못 읽으면 알림(읽은 적 있으면 그대로 둠)
+    try {
+      const r = await (window.barunFetch || fetch)('/api/tasks');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      render(await r.json()); loaded = true;
+    } catch (e) {
+      const L = $('tk-list');
+      if (!loaded && L && e.message !== '로그인 필요') { L.textContent = ''; L.append(E('p', 'muted small', `맡긴 일을 읽지 못했어요(${e.message}) — 잠시 뒤 다시 읽어요.`)); }
+    } finally { busy = false; }
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

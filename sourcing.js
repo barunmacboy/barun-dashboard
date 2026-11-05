@@ -16,7 +16,7 @@
   const SRC = { 우리판매: '우리 판매', 경쟁점: '경쟁 판매점', 순위: '해외직구 순위', 문의: '고객 문의', '400행': '400행 조사', 사람: '사람이 직접' };
   const PLN = { naver: '네이버', coupang: '쿠팡' };
   const num = (v) => v == null ? '—' : String(v);
-  let timer = 0, busy = false;
+  let timer = 0, busy = false, loaded = false;
 
   function install() {
     const sec = $('p-sourcing'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
@@ -65,7 +65,7 @@
       </div>
       <div class="card"><div class="card-h"><h2>방금 바뀐 줄</h2><span class="desc">상태 수정은 주문 데이터 → 소싱 장부</span></div><ul class="list sc-feed" id="sc-feed"></ul></div>
       <div class="card"><div class="card-h"><h2>다음 차례 10줄</h2></div><ul class="list" id="sc-next"></ul></div>
-      <div class="card"><div class="card-h"><h2>원가 빈 판매 상품</h2><span class="desc" id="sc-gap-at">팔린 순 · 원가는 #할-일 카드 답글로</span></div><ul class="list" id="sc-gap"></ul></div>`;
+      <div class="card"><div class="card-h"><h2>원가 빈 등록상품</h2><span class="desc" id="sc-gap-at">팔린 순 · 원가는 #할-일 카드 답글로</span></div><ul class="list" id="sc-gap"></ul></div>`;
     // 보임·숨김은 index.html이 'barun:page'로 알려 줌(2026-10-22 리뉴얼 — 탭 덧붙이기·showTab 덮어쓰기 없앰)
     document.addEventListener('barun:page', (e) => { if (e.detail === 'sourcing') { load(); start(); } else stop(); });
     if (!sec.hidden) { load(); start(); }
@@ -89,7 +89,7 @@
     vals.forEach((v, i) => { const c = E(tag, nums.includes(i) ? 'n' : null); if (v instanceof Object && v.append) c.append(v); else c.textContent = v == null ? '' : String(v); tr.append(c); });
     return tr;
   }
-  const ext = (t, url) => { if (!url) return E('span', null, t); const a = E('a', null, t); a.href = url; a.target = '_blank'; a.rel = 'noopener'; return a; };
+  const ext = (t, url) => { if (!/^https?:\/\//i.test(url || '')) return E('span', null, t); /* 2026-11-06: 긁어 온 후보 주소는 http(s)만 링크로 */ const a = E('a', null, t); a.href = url; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
   // 소싱 기계(2026-10-26 사장님 "소싱 작업의 대 혁신") — pricing/performance.summary: 깔때기 · 오늘 자동 등록 몫 · 출처 점수 · 올린 상품 성과
   function machine(m) {
@@ -159,7 +159,8 @@
       stat('남은 후보', `${d.open}`, `정밀확인 ${c['정밀확인'] || 0}`, ''), stat('외부 대기', `${c['외부대기'] || 0}`, waits(d.waits) || '답 기다림', c['외부대기'] ? 'warn' : ''),
       stat('탈락', `${c['탈락'] || 0}`, '이익·원가 기준 미달', ''));
     const gap = d.costgap;   // 2026-10-24 원가 원본(barun.db): 원가 빈 판매 상품 수(하루 1번)
-    if (gap) st.append(stat('원가 빈 판매상품', `${gap.products}`, `옵션 ${gap.options} · 쿠팡 ${gap.coupang} · 네이버 ${gap.naver}`, gap.products ? 'warn' : ''));
+    // 2026-11-06: 상품 대장 '원가 모름'(같은 물건 묶음 수)과 숫자가 달라 헷갈려서 — 이건 쿠팡·네이버 등록상품 수(같은 물건이 둘에 있으면 2)
+    if (gap) st.append(stat('원가 빈 등록상품', `${gap.products}`, `쿠팡 ${gap.coupang} · 네이버 ${gap.naver} 등록 · 옵션 ${gap.options}`, gap.products ? 'warn' : ''));
     const ug = $('sc-gap'); ug.innerHTML = '';
     if (!gap) empty(ug, '아직 안 셈');
     else if (!gap.list.length) empty(ug, '없음');
@@ -172,8 +173,8 @@
     bar.setAttribute('aria-label', d.order.map((s) => `${s} ${c[s] || 0}`).join(', '));
     for (const s of d.order) {
       const n = c[s] || 0; if (!n) continue;
-      const seg = E('span'); seg.style.flex = String(n); seg.style.background = ST[s][0]; seg.title = `${s} ${n}줄`; bar.append(seg);
-      const l = E('span'); const i = E('i'); i.style.background = ST[s][0]; l.append(i, document.createTextNode(`${s} ${n}`)); leg.append(l);
+      const seg = E('span'); seg.style.flex = String(n); seg.style.background = (ST[s] || ['var(--muted)'])[0]; seg.title = `${s} ${n}줄`; bar.append(seg);
+      const l = E('span'); const i = E('i'); i.style.background = (ST[s] || ['var(--muted)'])[0]; l.append(i, document.createTextNode(`${s} ${n}`)); leg.append(l);
     }
     const rb = $('sc-run-badge'); rb.innerHTML = '';
     rb.append(E('span', 'badge ' + (run.running || act.active ? 'run' : 'k-idle'), run.running ? '진행 중' : act.active ? '회차 밖 작업 중' : '쉬는 중'));
@@ -215,8 +216,16 @@
 
   async function load() {
     if (busy) return; busy = true;
-    try { const r = await (window.barunFetch || fetch)('/api/sourcing'); if (r.ok) render(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+    // 2026-11-06: 503이면 '불러오는 중'에 멈춰 있던 것 → 실패를 보임(읽은 적 있으면 화면은 그대로)
+    try {
+      const r = await (window.barunFetch || fetch)('/api/sourcing');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      render(await r.json()); loaded = true;
+    } catch (e) {
+      if (e.message === '로그인 필요') return;
+      if (!loaded) $('sc-title').textContent = '소싱 자료를 읽지 못했어요';
+      $('sc-lead').textContent = `${e.message} — 잠시 뒤 다시 읽어요.` + (loaded ? ' 아래는 마지막으로 읽은 내용이에요.' : '');
+    } finally { busy = false; }
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

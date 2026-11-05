@@ -216,7 +216,8 @@ details[open] > summary::before { transform: rotate(90deg); }
 @media (max-width: 1100px) {
   .home-cols { grid-template-columns: minmax(0, 1fr); }
   .home-cols > .stack { display: contents; }
-  #mine-sec { order: 1; } #htask-sec { order: 2; } #office-sec { order: 3; } #sys-sec { order: 4; }
+  /* 2026-11-06 UX 검토: 운영 건강 카드(order 없음 = 0)가 휴대폰에서 내 차례보다 먼저 나오던 것 */
+  #mine-sec { order: 1; } #htask-sec { order: 2; } #health-preview { order: 3; } #office-sec { order: 4; } #sys-sec { order: 5; }
 }
 /* 내 차례 — 줄마다 버튼까지(여기서 바로 승인·고르기·처리) */
 .mine { list-style: none; margin: 0; padding: 0; }
@@ -410,6 +411,12 @@ ul.log li:first-child { border-top: 0; }
 ul.log li.hl { background: var(--blue-bg); border-radius: 10px; }
 ul.log .name { font-weight: 600; }
 .md { max-height: 560px; overflow: auto; font-size: 14px; color: var(--ink2); }
+/* 2026-11-06 UX 검토: 일지·현재 상태가 높이에서 줄 가운데로 잘려(스크롤바 숨김) 더 있는 줄 몰랐음 → 아래를 흐리게 + 더 보기 */
+.clip-fade { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent); }
+.clip-open { max-height: none !important; }
+.clip-more { margin-top: 6px; }
+.bad-why { color: var(--red-ink); } details.raw-why { display: inline-block; margin-left: 6px; } details.raw-why > summary { font-size: 12px; padding: 0; } details.raw-why pre { max-height: 160px; }
+@media (max-width: 560px) { #todo > .card-h .act { margin-left: 0; flex-basis: 100%; } #todo > .card-h .act .btn { flex: 1 1 0; white-space: normal; line-height: 1.25; } }   /* 2026-11-06: 할 일 머리 버튼 두 개가 어긋나게 줄바꿈되던 것 */
 .md h1, .md h2, .md h3 { font-size: 15px; margin: 14px 0 4px; color: var(--ink); } .md h1 { font-size: 17px; }
 .md ul { margin: 4px 0; padding-left: 18px; } .md p { margin: 4px 0; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--fill); color: var(--sub); white-space: nowrap; }
@@ -990,6 +997,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-tasks" aria-label="맡긴 일" hidden></section>
     <section class="page" id="p-asks" aria-label="보낸 문의" hidden></section>
     <section class="page" id="p-vat" aria-label="세금 환급" hidden></section>
+    <section class="page" id="p-pay" aria-label="결제" hidden></section>
     <section class="page" id="p-flow" aria-label="업무 흐름" hidden></section>
     <section class="page" id="p-paths" aria-label="주문 경로" hidden></section>
     <section class="page" id="p-catalog" aria-label="상품" hidden></section>
@@ -1114,21 +1122,45 @@ async function act(body, btn) {
   const lab = btn && body.action === 'login_ok' ? btn.textContent : null; if (lab) btn.textContent = '확인 중…';   // 사이트 확인에 몇 초 걸림
   try {
     const r = await apiFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const j = await r.json(); toast((j.ok ? '' : '실패: ') + j.msg); tick();
+    // 2026-11-06: 503 같은 HTML 오류면 r.json()이 'Unexpected token <'을 띄웠음 → 상태 번호로 쉬운 말, msg 없으면 'undefined' 대신 기본 문구
+    const j = await r.json().catch(() => ({ ok: false, msg: `서버가 응답하지 않아요(${r.status}). 잠시 뒤 다시 눌러 주세요.` }));
+    toast((j.ok ? '' : '실패: ') + (j.msg || (j.ok ? '처리했어요' : '서버가 이유를 주지 않았어요'))); tick();
     return j;
   } catch (e) { toast('실패: ' + e.message); } finally { if (btn) { btn.disabled = false; if (lab) btn.textContent = lab; } }
 }
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act]'); if (b) { act(Object.assign({ action: b.dataset.act }, b.dataset.key ? { key: b.dataset.key } : {}, b.dataset.job ? { job: b.dataset.job } : {}, b.dataset.idx != null ? { idx: +b.dataset.idx } : {}), b); return; }
-  const g = ev.target.closest('[data-goto]'); if (g) { const [tab, focus] = g.dataset.goto.split(':'); showTab(tab); const f = g.dataset.focus || focus; if (f) setTimeout(() => focusEl(f), 60); return; }
+  const g = ev.target.closest('[data-goto]'); if (g) { const [tab, focus] = g.dataset.goto.split(':'); showTab(tab); const f = g.dataset.focus || focus;
+    if (f && !$(f) && tab === 'todo' && todoFilter !== 'all' && lastState) { todoFilter = 'all'; render(lastState); }   // 2026-11-06: 묶음에 가려진 카드로 못 가던 것
+    if (f) setTimeout(() => focusEl(f), 60); return; }
   if (ev.target.closest('[data-open-ask]')) openAsk();
 });
 const $ = (id) => document.getElementById(id);
+const escH = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);   // 2026-11-06: 서버 글을 innerHTML에 넣을 때
+const safeUrl = (u) => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';   // 2026-11-06: javascript: 같은 주소 막기
 // 글은 이모지를 걷어 넣는다(서버·디스코드 카드 제목에 붙어 오는 것 — 2026-10-25 사장님 "이모지 최소화"). 줄바꿈은 그대로.
 const deE = (t) => String(t).replace(/(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{24C2}][\u{FE0F}\u{200D}]?)+[ \u00A0]?/gu, '');
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = deE(text); return e; };
 const hm = (s) => s ? s.replace('T', ' ').slice(5, 16) : '—';
 const clean = (t) => deE(String(t || '').replace(/<@[!&]?\d+>/g, '@')).trim();
+// 실패 이유를 쉬운 말 한 줄로(2026-11-06 UX 검토: 'AttributeError…'·'종료코드 1'·빈칸이 그대로 보였음) — 원문은 접어서 그대로
+function failWhy(raw) {
+  const t = clean(raw || ''); const n = (t.match(/ · (\d+번째)$/) || [])[1];
+  const w = !t ? '이유가 기록되지 않았어요 · 아래 회차 기록을 봐 주세요'
+    : /로그인|권한|401|403/.test(t) ? '로그인이 풀렸거나 권한이 없어요'
+    : /\b50[234]\b|응답하지 않|timed? ?out|시간 초과|Timeout/i.test(t) ? '상대 서버가 잠깐 응답하지 않았어요(보통 저절로 풀려요)'
+    : /HTTP 404/.test(t) ? '사이트 주소를 찾지 못했어요(사이트가 바뀌었을 수 있어요)'
+    : /JSON 아님|JSONDecode/.test(t) ? '사이트가 예상과 다른 화면을 줬어요(로그인 화면일 수 있어요)'
+    : /(?:Attribute|Type|Name|Key|Index|Value|Syntax|Import)Error|Traceback/.test(t) ? '프로그램 오류예요 · 코드를 고쳐야 해요'
+    : /^(?:rc=|종료코드 )[1-9]/.test(t) ? '프로그램이 오류로 끝났어요 · 회차 기록을 봐 주세요'
+    : /Connection|urlopen|네트워크|연결/i.test(t) ? '인터넷·서버 연결이 끊겼어요' : t.split(' · ')[0].slice(0, 80);
+  return { plain: w + (n ? ` · ${n}` : ''), raw: t };
+}
+function failLine(tag, head, raw) {   // 머리 · 쉬운 이유 + [원문] 접기
+  const x = failWhy(raw), li = el(tag); li.append(document.createTextNode(`${head} — ${x.plain}`));
+  if (x.raw && x.raw !== x.plain) { const d = el('details'); d.className = 'raw-why'; d.append(el('summary', null, '원문'), el('pre', null, x.raw)); li.append(d); }
+  return li;
+}
 const KIND_KO = { launchd: '프로그램', agent: '에이전트', 'claude-desktop': '데스크톱 앱', 'agent-pending': '이전 대기', retired: '그만 씀', external: '바른청년 밖' };
 function chip(text, cls) { return el('span', 'badge ' + (cls || ''), text); }
 const relDay = (iso, now) => !iso ? '' : (iso.slice(0, 10) === (now || '').slice(0, 10) ? iso.slice(11, 16) : iso.slice(5, 10).replace('-', '/') + ' ' + iso.slice(11, 16));
@@ -1143,6 +1175,7 @@ const ICON = {
   tasks: P('M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12zM8.5 12h.01M12 12h.01M15.5 12h.01'),
   asks: P('M22 2 11 13M22 2l-7 20-4-9-9-4z'),
   vat: P('M6 2h9l5 5v15H6zM14 2v6h6M9 17l6-6M9.5 11.5h.01M14.5 16.5h.01'),
+  pay: P('M2 6h20v12H2zM2 10h20M6 15h4'),   // 결제(2026-11-06, dashboard/pay.js)
   data: P('M4 4h16v16H4zM4 9.5h16M4 15h16M10 4v16'),
   flow: P('M5 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01M7 6h6a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-2a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h6'),
   catalog: P('M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8'),
@@ -1236,10 +1269,16 @@ window.barunNew = (tab, at) => {
 };
 // 메뉴 숫자(할 일·맡긴 일·보낸 문의) — 모듈도 이걸로 바꿈
 window.barunBadge = (name, n) => document.querySelectorAll(`[data-badge="${name}"]`).forEach((b) => { b.textContent = n > 99 ? '99+' : String(n || ''); b.hidden = !n; });
+// 2026-11-06: 휴대폰 서랍 — 닫혀 화면 밖에 있을 때 Tab이 보이지 않는 메뉴로 들어가던 것(inert), 열린 동안 뒤 화면으로 초점이 새던 것, 닫으면 초점이 사라지던 것
+const MOB = matchMedia('(max-width: 1023px)');
 function drawer(open) {
-  $('side').classList.toggle('open', open); $('scrim').classList.toggle('open', open); $('menu-btn').setAttribute('aria-expanded', String(open));
-  if (open) { const cur = $('side').querySelector('[aria-current="page"]'); (cur || $('side').querySelector('.nav-i')).focus(); }
+  const side = $('side'), was = side.classList.contains('open');
+  side.classList.toggle('open', open); $('scrim').classList.toggle('open', open); $('menu-btn').setAttribute('aria-expanded', String(open));
+  side.inert = MOB.matches && !open; for (const x of [document.querySelector('.shell'), $('tabbar')]) if (x) x.inert = MOB.matches && open;
+  if (open) { const cur = side.querySelector('[aria-current="page"]'); (cur || side.querySelector('.nav-i')).focus(); }
+  else if (was && side.contains(document.activeElement)) $('menu-btn').focus();
 }
+MOB.addEventListener('change', () => drawer(false));
 $('menu-btn').onclick = () => drawer(true);
 $('nav-search').addEventListener('input', e => {
   const q = e.target.value.replace(/\s+/g, '').toLowerCase();
@@ -1265,8 +1304,11 @@ function showTab(name, push = true) {
   const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
   if (push && location.hash.split('?')[0] !== '#' + name) history.replaceState(null, '', '#' + name);   // '#data?…' = 데이터 탭 보기 상태(data.js)
   drawer(false);
+  { const nv = $('nav'), a = nv.querySelector('[aria-current="page"]');   // scrollIntoView는 화면 밖 서랍(휴대폰)에서 문서까지 밀 수 있어 메뉴 안에서만
+    if (a) { const t = a.offsetTop - nv.offsetTop; if (t < nv.scrollTop) nv.scrollTop = t - 8; else if (t + a.offsetHeight > nv.scrollTop + nv.clientHeight) nv.scrollTop = t + a.offsetHeight - nv.clientHeight + 8; } }   // 2026-11-06: 아래쪽 메뉴(실행과 감시·절감 효과)를 열면 왼쪽 메뉴에서 지금 화면이 보이게
   if (name === 'activity') window.dispatchEvent(new Event('resize'));   // 숨어 있던 타임라인을 지금 폭으로 다시 그림
   if (name === 'home' && window.barunOfficeRepaint) window.barunOfficeRepaint();
+  if (name === 'records') { clipBox($('worklog')); clipBox($('status')); }   // 숨어 있을 땐 높이가 0이라 더 보기를 못 정함
   if (name === 'data' && window.barunData) window.barunData();
   if (curTab !== name) window.scrollTo({ top: 0 });
   curTab = name;
@@ -1291,6 +1333,23 @@ $('task-send').onclick = async (ev) => {
 };
 $('task-text').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('task-send').click(); });
 
+const clipOpen = new Set();   // 펼친 상자(5초·20초 갱신에도 그대로)
+function clipBox(box) {
+  const id = box.id; let b = box.nextElementSibling; if (!(b && b.classList.contains('clip-more'))) b = null;
+  const open = clipOpen.has(id); box.classList.toggle('clip-open', open);
+  const over = open || box.scrollHeight > box.clientHeight + 4;
+  box.classList.toggle('clip-fade', over && !open);
+  if (!over) { if (b) b.remove(); return; }
+  if (!b) { b = el('button', 'more-link clip-more'); b.type = 'button'; b.style.marginLeft = '0'; box.after(b); }
+  b.textContent = open ? '접기' : '더 보기 ›'; b.setAttribute('aria-expanded', String(open));
+  b.onclick = () => { if (clipOpen.has(id)) clipOpen.delete(id); else clipOpen.add(id); clipBox(box); };
+}
+// 현재 상태(STATUS.md)의 파일 경로(`data/worklog/….md`·`jobs/run_agent.sh`)는 사장님께 뜻이 없어 걷음(2026-11-06 UX 검토) — 원문은 git에
+const PATH_RE = /`[^`\n]*?(?:[\w.*-]+\/)+[\w.*{}-]+(?:\.(?:md|py|json|jsonl|toml|sh|js|txt|log))?`/g;
+const noPaths = (md) => md.split('\n').map((l) => {
+  if (!PATH_RE.test(l)) return l; PATH_RE.lastIndex = 0;
+  return l.replace(PATH_RE, '').replace(/\(\s*(?:원본|→)?\s*\)/g, '').replace(/\s*[·,]\s*(?=[\s·,.)]|$)/g, '').replace(/[^.]*?(?:경과는|누적은)\s*\./g, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,)])/g, '$1').replace(/:\s*\./g, '.');
+}).join('\n');
 function mdRender(src, root) {
   root.textContent = '';
   let ul = null;
@@ -1344,7 +1403,7 @@ function renderSavings(sv) {
   const H = el('div', 'sv-n h'), A = el('div', 'sv-n a');
   const lh = el('div', 'lab'); lh.innerHTML = `<b></b>${ico('user')} 사람 시간`;
   const la = el('div', 'lab'); la.innerHTML = `<b></b>${ico('bot')} AI 시간`;
-  const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>${hu.checks ? ` (그중 확인만 ${hu.checks}회)` : ''}`;
+  const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>${hu.checks ? ` (그중 확인만 ${+hu.checks || 0}회)` : ''}`;
   const ea = el('div', 'eq'); ea.innerHTML = `아낀 AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
   H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
   big.append(H, el('i'), A); hero.append(big);
@@ -1353,7 +1412,7 @@ function renderSavings(sv) {
   hero.append(pace);
   const mini = el('div', 'sv-mini');
   for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], [sv.week_label || '최근 7일', hu.week, w.secs, w.cost]]) {
-    const d = el('div'); d.innerHTML = `${k} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>$${(cc || 0).toFixed(2)}</b>`; mini.append(d);
+    const d = el('div'); d.innerHTML = `${escH(k)} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>$${(cc || 0).toFixed(2)}</b>`; mini.append(d);
   }
   hero.append(mini); box.append(hero);
   if (!svCounted && !matchMedia('(prefers-reduced-motion: reduce)').matches) {      // 처음 열 때만 0에서 올라가게
@@ -1383,7 +1442,7 @@ function renderSavings(sv) {
         if (days.length <= 7 || v === peak) b.append(el('em', null, `${(v / 3600).toFixed(1)}`));      // 일주일 이하면 다, 길면 가장 큰 날만
         g.append(b);
       }
-      const show = () => { tip.innerHTML = `<b>${d.day.slice(5).replace('-', '/')}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; tip.hidden = false;
+      const show = () => { tip.innerHTML = `<b>${escH(String(d.day).slice(5).replace('-', '/'))}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; tip.hidden = false;
         const r = g.getBoundingClientRect(), pr = ch.getBoundingClientRect(); tip.style.left = `${Math.min(pr.width - 170, Math.max(0, r.left - pr.left + r.width / 2 - 60))}px`; tip.style.top = '4px'; };
       g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('click', show); g.addEventListener('mouseleave', () => { tip.hidden = true; }); g.addEventListener('blur', () => { tip.hidden = true; });
       plot.append(g); xs.append(el('span', null, d.day.slice(5).replace('-', '/')));
@@ -1505,7 +1564,7 @@ function render(s) {
   else if (issues.length) { ht.append('확인할 일 ', el('em', null, `${issues.length}건`)); }
   else ht.textContent = '모두 정상';
   if (lvl === 'ok' && (stale.length || hubBad)) { lvl = 'warn'; htxt = stale.length ? '멈춤 의심' : '허브 확인 지연'; }
-  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt.replace('마지막 실행 실패', '실패'); hp.setAttribute('aria-label', '전체 상태: ' + htxt);
+  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt.replace('마지막 실행 실패', '지금 실패');   // 2026-11-06: 아래 '24시간 동안 실패'와 다른 수인 걸 말로 hp.setAttribute('aria-label', '전체 상태: ' + htxt);
   $('hero-lead').textContent = `${busy}명 일하는 중` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
   if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열(barund) 응답 없음${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
@@ -1513,14 +1572,15 @@ function render(s) {
   else al.hidden = true;
   renderSavings(sv);
   const ST = [
-    ['할 일', issues.length, '건', [urgent ? `긴급 ${urgent}건` : '#할-일', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
-    ['결정·답변 대기', approvals, '건', taskWait ? `맡긴 일 ${taskWait}건 포함` : '버튼 승인', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
+    // 2026-11-06 UX 검토: 이름이 세는 것을 그대로 말하게(위 막대 '지금 실패'와 '24시간 동안 실패'가 달라 보이던 것)
+    ['#할-일 카드', issues.length, '건', [urgent ? `긴급 ${urgent}건` : '#할-일', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
+    ['승인·답 기다림', approvals, '건', taskWait ? `승인 카드 ${s.approvals || 0} · 맡긴 일 ${taskWait}` : '승인 버튼 기다리는 카드', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
-    ['24시간 실패 이력', fails24.length, '건', fails24.length ? `24시간 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
-    ['AI 사용량', us.blocked ? '한도' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 창 · 7일 ${p7 ?? '-'}%`,
+    ['24시간 동안 실패', fails24.length, '번', fails24.length ? `지금 실패 ${failNow}건 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
+    ['AI 한도', us.blocked ? '다 씀' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 ${p5 ?? '-'}% 사용 · 7일 ${p7 ?? '-'}% 사용`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
-    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간 · 사람' : '', svA.secs || svA.cost ? `AI ${Math.round(svA.secs / 360) / 10}시간 · $${(svA.cost || 0).toFixed(2)}` : '-', svH || svA.secs ? 'ok' : '', 'savings'],
+    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간' : '', svH || svA.secs ? `사람 ${Math.round(svH / 360) / 10}시간 아낌 · AI ${Math.round((svA.secs || 0) / 360) / 10}시간 · AI 비용 $${(svA.cost || 0).toFixed(2)} 아낌` : '-', svH || svA.secs ? 'ok' : '', 'savings'],
   ];
   const sg = $('stats'); sg.textContent = '';
   for (const [k, v, u, d, cls, go] of ST) {
@@ -1530,7 +1590,7 @@ function render(s) {
   }
   window.barunBadge('todo', issues.length);
   const fl = $('fails24');
-  if (fl) { $('fails24-box').hidden = !fails24.length; fl.textContent = ''; fails24.slice(0, 8).forEach((f) => fl.append(el('li', null, `${f.at ? relDay(f.at, s.now) : '지금'} · ${f.what}${f.why ? ' — ' + clean(f.why) : ''}`))); }
+  if (fl) { $('fails24-box').hidden = !fails24.length; fl.textContent = ''; fails24.slice(0, 8).forEach((f) => fl.append(failLine('li', `${f.at ? relDay(f.at, s.now) : '지금'} · ${f.what}`, f.why))); }
 
   try { window.barunOffice && window.barunOffice(s); } catch (e) { console.error('사무실', e); }
 
@@ -1580,12 +1640,13 @@ function render(s) {
   const oldOne = (i) => i.last && (Date.parse(s.now) - Date.parse(i.last)) > 72 * 3600e3;
   const FIL = [['all', '전체', () => true], ['tap', '버튼 한 번', oneTap], ['old', '3일 넘음', oldOne], ['snz', '미룸', () => true]];
   const fbar = el('div', 'todo-fil');
+  // 2026-11-06: 고른 묶음의 마지막 카드를 처리하면 칩이 사라지고 목록이 빈 채로 남았음 → 0건이면 전체로(칩을 그리기 전에)
+  { const f = FIL.find((x) => x[0] === todoFilter); if (!f || (todoFilter === 'snz' ? snoozed : issues).filter(f[2]).length === 0) todoFilter = 'all'; }
   for (const [k, lab, fn] of FIL) {
     const n = (k === 'snz' ? snoozed : issues).filter(fn).length; if (k !== 'all' && !n) continue;
     const b = el('button', 'chipbtn' + (todoFilter === k ? ' on' : ''), `${lab} ${n}`); b.type = 'button'; b.setAttribute('aria-pressed', String(todoFilter === k));
     b.onclick = () => { todoFilter = k; render(s); }; fbar.append(b);
   }
-  if (todoFilter === 'snz' && !snoozed.length) todoFilter = 'all';
   const shown = todoFilter === 'snz' ? snoozed : sorted.filter((FIL.find((f) => f[0] === todoFilter) || FIL[0])[2]);
   if (todoFilter === 'old' && shown.length) {
     const bulk = el('button', 'btn sm weak', `${shown.length}건 모두 처리`); bulk.type = 'button';
@@ -1643,7 +1704,7 @@ function render(s) {
       const st = (BO.labels || {})[r.state] || r.state;
       li.append(el('div', 'bm', [hmm(r.updated), st, dom[r.role] || r.role, r.source].filter(Boolean).join(' · ')));
       if (r.body) { const d = el('details'); d.append(el('summary', null, '내용'), el('pre', null, r.body)); li.append(d); }
-      if (r.ref) { const a = el('a', 'small'); a.innerHTML = `디스코드 ${ico('external')}`; a.href = r.ref; a.target = '_blank'; a.rel = 'noopener'; li.append(a); }
+      if (safeUrl(r.ref)) { const a = el('a', 'small'); a.innerHTML = `디스코드 ${ico('external')}`; a.href = safeUrl(r.ref); a.target = '_blank'; a.rel = 'noopener'; li.append(a); }
       ul.append(li);
     }
     if (!rows.length) ul.append(el('li', 'muted', '없음'));
@@ -1685,6 +1746,10 @@ function render(s) {
     else if (j.launchd && j.launchd.last_exit != null) side.append(chip(j.launchd.last_exit === 0 ? '정상' : `종료코드 ${j.launchd.last_exit}`, j.launchd.last_exit === 0 ? 'ok' : 'bad'));
     if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs weak'); b.innerHTML = `${ico('play')} 지금 실행`; b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
     if (j.kind === 'agent' && sc && (!ran.length || sc.at > ran[0].start.replace(' ', 'T'))) main.append(el('div', 'ds', `스크립트가 대신 · 최근 ${relDay(sc.at, s.now)} ${sc.ok ? '정상' : '실패'}${sc.note ? ' · ' + clean(sc.note).slice(0, 80) : ''}`));
+    { const lastRun = ran[0], useSc = j.kind !== 'agent' && sc && !(j.launchd && j.launchd.pid);   // 실패한 업무 = 왜 실패했는지 한 줄(원문은 접어서)
+      const raw = useSc ? (!sc.ok ? (sc.note || '') : null) : lastRun && lastRun.end && lastRun.rc ? (lastRun.summary || `rc=${lastRun.rc}`).split('\n').slice(-3).join('\n')
+        : !ran.length && !useSc && j.launchd && !j.launchd.pid && j.launchd.last_exit ? `종료코드 ${j.launchd.last_exit}` : null;
+      if (raw != null) { const d = failLine('div', '실패 이유', raw); d.className = 'ds bad-why'; main.append(d); } }
     r.append(main, side);
     if ((j.runs || []).length || (j.script || []).length) {
       const more = el('div', 'more'); const d = el('details');
@@ -1750,7 +1815,11 @@ function render(s) {
   if (!(s.invoices || []).length) inv.append(el('li', 'empty', '인보이스 없음'));
   for (const f of (s.invoices || [])) {
     const li = el('li'); const a = el('a', null, f.name); a.href = '#';
-    a.onclick = async (ev) => { ev.preventDefault(); try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank'); } catch (e) { toast('열지 못함: ' + e.message); } };
+    // 2026-11-06: 받아 온 뒤 window.open하면 사파리가 팝업으로 막고, 404·503 응답도 그대로 열렸음 → 창을 먼저 열고 응답을 확인한 뒤 채움
+    a.onclick = async (ev) => { ev.preventDefault(); const w = window.open('', '_blank');
+      try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+        const u = URL.createObjectURL(await r.blob()); if (w) w.location.href = u; else window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000);
+      } catch (e) { if (w) w.close(); toast('열지 못함: ' + e.message); } };
     li.append(a, el('span', 'muted small', ` · ${f.at.replace('T', ' ').slice(5)} · ${f.kb}KB`)); inv.append(li);
   }
 
@@ -1775,7 +1844,8 @@ function render(s) {
   if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 기록 없음'));
   if (s.worklog.length > 40) { const li = el('li'); const b = el('button', 'more-link', moreRec.worklog ? '최근 40줄만 보기' : `오늘 ${s.worklog.length}줄 중 최근 40줄 · 앞 ${s.worklog.length - 40}줄 더 보기`); b.type = 'button'; b.style.marginLeft = '0'; b.onclick = () => { moreRec.worklog = !moreRec.worklog; render(lastState); }; li.append(b); wl.append(li); }
   for (const l of [...(moreRec.worklog ? s.worklog : s.worklog.slice(0, 40))].reverse()) wl.append(el('li', null, l));
-  mdRender(s.status_md || '(없음)', $('status'));
+  mdRender(noPaths(s.status_md || '(없음)'), $('status'));
+  clipBox($('worklog')); clipBox($('status'));
 
   const g = $('git'); g.textContent = '';
   const sync = s.git.ahead === 0 && s.git.behind === 0;
@@ -1839,6 +1909,7 @@ window.addEventListener('hashchange', route); route();
 <script src="catalog.js"></script>
 <script src="asks.js"></script>
 <script src="vat.js"></script>
+<script src="pay.js"></script>
 <script src="agents.js"></script>
 <script src="tasks.js"></script>
 <script src="reports.js"></script>

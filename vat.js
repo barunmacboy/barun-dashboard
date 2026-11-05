@@ -77,7 +77,9 @@
     setInterval(() => { if (!document.hidden && $('p-vat').hidden) load(); }, 300000);
     return true;
   }
-  const start = () => { stop(); timer = setInterval(() => { if (!document.hidden && !$('p-vat').hidden && !document.querySelector('dialog.vt-dlg[open]')) load(); }, 60000); };
+  // 2026-11-06: '확인 필요' 칸에 세율·금액을 적는 중에 60초 새로 읽기가 화면을 다시 그려 적던 값이 날아갔음 → 고치는 중이면 건너뜀
+  const editing = () => !!document.querySelector('#p-vat .vt-fix [data-dirty]') || !!document.activeElement?.closest?.('#p-vat .vt-fix');
+  const start = () => { stop(); timer = setInterval(() => { if (!document.hidden && !$('p-vat').hidden && !document.querySelector('dialog.vt-dlg[open]') && !editing()) load(); }, 60000); };
   const stop = () => { if (timer) clearInterval(timer); timer = 0; };
   const stat = (k, v, d, cls, go) => { const s = E(go ? 'button' : 'div', 'stat ' + (cls || '')); if (go) { s.type = 'button'; s.onclick = () => $(go).scrollIntoView({ behavior: 'smooth', block: 'start' }); } else s.style.cursor = 'default'; s.append(E('div', 'k', k)); const vv = E('div', 'v'); vv.innerHTML = v; s.append(vv, E('div', 'd', d || '')); return s; };
   const btn = (txt, cls, icon, fn, title) => { const b = icon ? IE('button', 'btn ' + cls, icon, txt) : E('button', 'btn ' + cls, txt); b.type = 'button'; if (title) b.title = title; b.onclick = (ev) => fn(b, ev); return b; };
@@ -86,7 +88,8 @@
     if (b) b.disabled = true;
     try {
       const r = await window.barunFetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'vat', ...body }) });
-      const j = await r.json(); if (window.toast) window.toast(j.msg || (j.ok ? '했어요' : '못 했어요'));
+      const j = await r.json().catch(() => ({ ok: false, msg: `응답을 읽지 못했어요(${r.status}) — 다시 누르기 전에 목록에서 확인해 주세요` }));
+      if (window.toast) window.toast((j.ok ? '' : '실패: ') + (j.msg || (j.ok ? '했어요' : '못 했어요')));
       await load(true); return j;
     } catch (e) { if (window.toast) window.toast('보내지 못했어요: ' + e.message); return null; } finally { if (b) b.disabled = false; }
   }
@@ -116,6 +119,11 @@
   // ── 창: 신청했어요 · PDF 올리기 · 환급 받음 ────────────────
   function dialog(build) {
     const d = E('dialog', 'vt-dlg'); const f = E('form'); f.method = 'dialog'; d.append(f); build(f, d);
+    // 2026-11-06: 입력칸에서 Enter를 치면 첫 버튼인 [취소]로 제출돼 창이 아무 말 없이 닫혔음(접수번호·금액이 저장된 줄 앎) → Enter는 주 버튼으로
+    f.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing || e.target.tagName !== 'INPUT') return;
+      e.preventDefault(); const main = f.querySelector('.btn.primary, .btn.danger'); if (main && !main.disabled) main.click();
+    });
     d.addEventListener('close', () => d.remove()); document.body.append(d); d.showModal ? d.showModal() : d.setAttribute('open', ''); return d;
   }
   function applyDlg() {
@@ -170,14 +178,18 @@
       f.append(E('h3', null, `환급 받음 ${items.length}건`), E('p', null, `예상 ${eur(exp)}. 실제로 들어온 금액을 적으면 신청한 달에 남아요(모르면 비워 두세요).`));
       const l = E('label', null, '받은 금액 합계(EUR)'); const a = E('input'); a.type = 'number'; a.step = '0.01'; a.placeholder = exp.toFixed(2); l.append(a);
       const row = E('div', 'row'); const no = E('button', 'btn ghost', '취소'); no.value = 'no'; const ok = E('button', 'btn primary', '환급 받음'); ok.type = 'button';
+      let going = false;
       ok.onclick = async () => {   // 합계를 예상 비율대로 나눠 건마다 남김(한 건이면 그대로)
-        const tot = a.value === '' ? null : Number(a.value); let left = tot, j = null;
-        for (const [n, i] of items.entries()) {
-          const part = tot == null ? null : n === items.length - 1 ? Math.round(left * 100) / 100 : Math.round(tot * ((i.refund || 0) / (exp || 1)) * 100) / 100;
-          if (part != null) left -= part;
-          j = await act({ op: 'refunded', sha: i.sha, amount: part }, ok); if (!j || !j.ok) return;
-        }
-        d.close();
+        if (going) return; going = true;   // 2026-11-06: 건마다 act가 버튼을 다시 켜서 여러 건 도는 사이 또 누르면 같은 건을 두 번 보냈음
+        try {
+          const tot = a.value === '' ? null : Number(a.value); let left = tot, j = null;
+          for (const [n, i] of items.entries()) {
+            const part = tot == null ? null : n === items.length - 1 ? Math.round(left * 100) / 100 : Math.round(tot * ((i.refund || 0) / (exp || 1)) * 100) / 100;
+            if (part != null) left -= part;
+            j = await act({ op: 'refunded', sha: i.sha, amount: part }, ok); if (!j || !j.ok) return;
+          }
+          d.close();
+        } finally { going = false; }
       };
       row.append(no, ok); f.append(l, row); setTimeout(() => a.focus(), 30);
     });
@@ -228,7 +240,8 @@
     const k = E('select'); for (const [v, l] of [['19', '19%만'], ['혼합', '19%+7%'], ['7', '7%만(대상 아님)']]) { const o = E('option', null, l); o.value = v; if (i.kind === v) o.selected = true; k.append(o); }
     if (!['19', '혼합', '7'].includes(i.kind)) { const o = E('option', null, '세율 고르기'); o.value = ''; o.selected = true; k.prepend(o); }
     const g = E('input'); g.type = 'number'; g.step = '0.01'; g.placeholder = '19% 금액 €'; if (i.gross19 != null) g.value = i.gross19; g.title = '19% 상품 구매금(세금 포함). 7%만이면 비워 두세요';
-    const o = E('input', 'wide'); o.placeholder = '공홈 주문번호'; o.value = (i.override || {}).order || (i.rows.length ? '' : i.order || ''); o.title = '시트 주문과 못 맞췄으면 공홈 주문번호를 적어 주세요';
+    for (const x of [k, g]) x.addEventListener('input', () => { x.dataset.dirty = '1'; });
+    const o = E('input', 'wide'); o.addEventListener('input', () => { o.dataset.dirty = '1'; }); o.placeholder = '공홈 주문번호'; o.value = (i.override || {}).order || (i.rows.length ? '' : i.order || ''); o.title = '시트 주문과 못 맞췄으면 공홈 주문번호를 적어 주세요';
     f.append(k, g, o, btn('저장', 'xs primary', 'check', (b) => act({ op: 'fix', sha: i.sha, kind: k.value, gross19: g.value, order: o.value.trim() }, b)),
       btn('제외', 'xs ghost', 'x', () => excludeDlg(i)));
     return f;
@@ -337,8 +350,16 @@
 
   async function load(force) {
     if (busy && !force) return; busy = true;
-    try { const r = await (window.barunFetch || fetch)('/api/vat'); if (r.ok) render(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+    // 2026-11-06: 503이면 '불러오는 중'에 멈춰 있던 것 → 실패를 보이고, 읽은 적 있으면 그 화면은 그대로
+    try {
+      const r = await (window.barunFetch || fetch)('/api/vat');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      render(await r.json());
+    } catch (e) {
+      if (e.message === '로그인 필요') return;
+      if (!D) $('vt-title').textContent = '읽지 못했어요';
+      $('vt-lead').textContent = `세금 환급 자료를 읽지 못했어요(${e.message}) — 잠시 뒤 다시 읽어요.` + (D ? ' 아래는 마지막으로 읽은 내용이에요.' : '');
+    } finally { busy = false; }
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

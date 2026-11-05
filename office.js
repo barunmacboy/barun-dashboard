@@ -349,7 +349,7 @@
     const g = E('div', 'od-grid');
     g.append(col('하는 일', doing(m, last), '쉬는 중'), col('할 일', upcoming(m, last), '없음'), col('했던 일', history(m, last), '없음'));
     box.append(g);
-    if (m.top_card_link) { const a = E('a', 'btn sm', '디스코드에서 열기'); a.href = m.top_card_link; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
+    if (/^https?:\/\//i.test(m.top_card_link || '')) { const a = E('a', 'btn sm', '디스코드에서 열기'); a.href = m.top_card_link; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
   }
 
   function build(root) {
@@ -430,7 +430,9 @@
     extra = others.map((d, i) => ({ d, x: 20 + (i % 8) * 30, y: 122 }));   // 처음 보는 직원은 아래 줄에 임시 자리
     const next = [...known, ...others];
     if (next.join(',') !== order.join(',') || !cv || !root.contains(cv)) { order = next; build(root); }
-    const roster = document.getElementById('office-roster'); roster.textContent = '';
+    const roster = document.getElementById('office-roster');
+    const keepSeat = document.activeElement?.closest?.('#office-roster .row')?.dataset.seat;   // 2026-11-06: 10초마다 목록을 새로 그려 키보드 초점이 사라졌음 → 같은 직원 줄로 되돌림
+    roster.textContent = '';
     const cnt = { busy: 0, todo: 0, blocked: 0, idle: 0, paused: 0 };
     const rank = { blocked: 0, todo: 1, busy: 2, paused: 3, idle: 4 };
     const rows = [];
@@ -471,6 +473,7 @@
       row.append(avatar(d, 'avatar sm k-' + kind), body, right);
       li.append(row); roster.append(li);
     }
+    if (keepSeat) roster.querySelector(`.row[data-seat="${CSS.escape(keepSeat)}"]`)?.focus({ preventScroll: true });
     const c = document.getElementById('office-count');
     if (c) {
       c.textContent = '';

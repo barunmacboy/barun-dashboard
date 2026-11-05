@@ -188,7 +188,9 @@
     try {
       const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: pause ? 'autobuy_pause' : 'autobuy_resume', key: shop }) });
-      const j = await r.json(); if (window.toast) window.toast((j.ok ? '' : '실패: ') + j.msg); loadBuy();
+      // 2026-11-06: 응답이 JSON이 아니면 'Unexpected token'만 떠서 멈췄는지 알 수 없었음 → 다시 읽은 상태로 확인하라고
+      const j = await r.json().catch(() => ({ ok: false, msg: `응답을 읽지 못했어요(${r.status}) — 아래 켜짐·멈춤 표시로 확인해 주세요` }));
+      if (window.toast) window.toast((j.ok ? '' : '실패: ') + (j.msg || '')); loadBuy();
     } catch (e) { if (window.toast) window.toast('실패: ' + e.message); } finally { btn.disabled = false; }
   }
   function planLine(x) {
@@ -206,7 +208,8 @@
       const h = E('h3', null, s.shop);
       h.append(E('span', 'badge ' + (s.paused ? 'warn' : 'ok'), s.paused ? '멈춤' : '켜짐'),
         E('span', 'badge ' + (s.confirmed ? 'ok' : ''), s.confirmed ? '첫 결제 확인됨' : '첫 결제 확인 전'));
-      const b = E('button', 'btn xs ' + (s.paused ? 'weak' : 'danger'), s.paused ? '다시 켜기' : '멈춤'); b.type = 'button';
+      // 2026-11-06: 초록 '켜짐' 옆 빨간 '멈춤' 버튼이 '켜졌는데 멈춤'으로 읽혀서 — 동작 이름(멈추기)·테두리 버튼으로
+      const b = E('button', 'btn xs ' + (s.paused ? 'weak' : 'ghost'), s.paused ? '다시 켜기' : '멈추기'); b.type = 'button';
       b.title = s.paused ? `${s.paused_by || ''} ${hmS(s.paused_at)} 멈춤` : '이 구매처 자동 결제를 멈춰요';
       b.onclick = () => pauseBtn(s.shop, !s.paused, b); h.append(b);
       const pct = L.day ? Math.min(100, s.today_krw / L.day * 100) : 0;
@@ -235,16 +238,29 @@
     }
     $('ab-other').textContent = d.plan_other.length ? '구매처 미정 재고 구매: ' + d.plan_other.map(planLine).join(' · ') : '';
   }
+  // 2026-11-06: 자동 구매 자료를 못 읽으면 '불러오는 중'만 남아 켜짐·멈춤을 알 수 없었음 → 못 읽었다고, 이전 표시가 있으면 '마지막으로 읽은 상태'라고
+  let buyOk = false;
   async function loadBuy() {
-    try { const r = await (window.barunFetch || fetch)('/api/autobuy'); if (r.ok) renderBuy(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ }
+    try {
+      const r = await (window.barunFetch || fetch)('/api/autobuy');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      renderBuy(await r.json()); buyOk = true;
+    } catch (e) {
+      if (e.message === '로그인 필요') return;
+      $('ab-lead').textContent = `자동 구매 상태를 읽지 못했어요(${e.message}).` + (buyOk ? ' 아래는 마지막으로 읽은 상태라 지금과 다를 수 있어요.' : ' 멈추려면 잠시 뒤 다시 열어 주세요.');
+    }
   }
 
   async function load() {
     if (busy) return; busy = true;
     loadBuy();
-    try { const r = await (window.barunFetch || fetch)('/api/automation'); if (r.ok) render(await r.json()); }
-    catch (e) { /* 토큰 창은 barunFetch가 띄움 */ } finally { busy = false; }
+    try {
+      const r = await (window.barunFetch || fetch)('/api/automation');
+      if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+      render(await r.json());
+    } catch (e) {
+      if (e.message !== '로그인 필요' && !data) { $('au-title').textContent = '자동화 현황을 읽지 못했어요'; $('au-lead').textContent = `${e.message} — 잠시 뒤 다시 읽어요.`; }
+    } finally { busy = false; }
   }
 
   if (!install()) document.addEventListener('DOMContentLoaded', install);

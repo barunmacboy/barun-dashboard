@@ -53,7 +53,7 @@
       const row = node('article', 'todo open');
       row.append(node('span', 'badge', r.state === 'running' ? '에이전트 진행' : '실행 대기'), node('h3', 't', r.title),
         node('p', 'what', `${r.reason} · 접수 후 ${duration(r.age_secs)}`));
-      if (r.kind === 'browser' && r.reason.includes('작업판')) row.append(action('앞선 작업 확인', 'tasks', r.id));
+      if (r.kind === 'browser' && String(r.reason || '').includes('작업판')) row.append(action('앞선 작업 확인', 'tasks', r.id));
       progress.append(row);
     }
     if (ex.slowest?.length) {
@@ -68,7 +68,8 @@
     const list = node('ul', 'sys');
     const sources = h.hub?.sources || {};
     for (const v of Object.values(sources)) { const li = node('li'); li.append(node('span', 'dot ' + (v.paused ? 'idle' : v.ok ? 'ok' : 'warn')), node('span', '', v.label), node('span', 'muted small', v.paused ? '운영 시간 밖' : v.running ? `확인 중 ${duration(v.secs)}` : v.ok ? '정상' : v.fails ? `연속 실패 ${v.fails}회` : '확인 지연')); list.append(li); }
-    const q = h.queue || {}; const qa = q.at && Date.now() - Date.parse(q.at) < 120000;
+    // 2026-11-06: q.at은 시간대 없는 한국 시각 — 기기 시계(Date.now)와 비교하면 해외·시계 어긋난 기기에서 늘 '확인 필요'였음 → 서버 now와 비교
+    const q = h.queue || {}; const qBase = Date.parse(s.now || '') || Date.now(); const qa = q.at && qBase - Date.parse(q.at) < 120000;
     const li = node('li'); li.append(node('span', 'dot ' + (qa ? 'ok' : 'warn')), node('span', '', '실행 대기열'), node('span', 'muted small', qa ? '정상' : '확인 필요')); list.append(li);
     service.append(list, action('실행 내역 보기', 'work', 'runs'));
     const issues = section('복구가 필요한 일', '현재 상태와 다음 조치');
@@ -89,6 +90,6 @@
     if (focused?.isConnected) focused.focus({preventScroll: true});
   }
   window.barunHealth = draw;
-  window.addEventListener('barun:page', () => { if (current) draw(current); });
+  document.addEventListener('barun:page', () => { if (current) draw(current); });   // 2026-11-06: 이 이벤트는 document에서만 나서(버블 없음) window 듣기는 한 번도 안 불렸음
   if (window.barunState) draw(window.barunState);
 })();
