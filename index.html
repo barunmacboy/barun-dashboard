@@ -725,6 +725,10 @@ table.dt.sheet .badge { padding: 0 6px; font-size: 11px; }
 .dt-fx[hidden] { display: none; }
 .dt-fx .fx-name { flex: none; font-weight: 700; padding-right: 8px; border-right: 1px solid var(--line); white-space: nowrap; }
 .dt-fx .fx-val { flex: 1; min-width: 0; word-break: break-all; }
+.fx-colors { display: inline-flex; align-items: center; gap: 4px; flex: none; }   /* 고른 줄 색 칠하기·풀기(2026-11-09) */
+.fx-chip { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink2, #666); font-size: 11px; line-height: 1; cursor: pointer; }
+.fx-chip:hover { outline: 2px solid var(--blue); outline-offset: 1px; }
+.fx-chip.on { box-shadow: inset 0 0 0 2px var(--ink); }
 .dt-fx .fx-in { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
 table.dt.sheet td.ed { cursor: text; }   /* 아래 선을 한 줄 더 그리면 고칠 칸만 선이 2px — 열마다 가로선이 어긋나 보임(2026-10-24) */
 table.dt.sheet td.ed:hover { background: var(--blue-bg); }
@@ -1890,10 +1894,23 @@ probe().then((ok) => {
   toast('브라우저가 연결을 막아 서버 주소로 옮겨요. 토큰을 한 번 더 넣어 주세요.');
   setTimeout(() => { location.href = API + '/'; }, 2500);
 });
+// 디스코드 #할-일 카드의 링크('#todo-<카드 key>', notify/discord.card_url) → 할 일 탭에서 그 카드를 펼쳐 보여 줌.
+// 첫 자료가 아직 안 왔으면(로그인 창 포함 — 10분까지) 기다리고, 묶음·미룸에 가려졌으면 전체 → 미룸 순으로 바꿔 가며 찾는다(2026-11-06 '링크가 이상하잖아').
+function openTodoCard(key, tries = 0, waited = 0) {
+  if (!tries && !waited) showTab('todo', false);
+  openTodos.add(key);
+  const id = 'todo-' + key;
+  if (!lastState) { if (waited < 1200) setTimeout(() => openTodoCard(key, 0, waited + 1), 500); return; }
+  if (!$(id)) { todoFilter = (todoFilter === 'all' && tries > 2) ? 'snz' : 'all'; render(lastState); }
+  if ($(id)) { showTab('todo', false); $(id).classList.add('open'); focusEl(id); return; }
+  if (tries < 8) setTimeout(() => openTodoCard(key, tries + 1, waited), 300);
+  else { todoFilter = 'all'; render(lastState); toast('이 카드는 이미 처리돼 할 일 목록에 없어요'); }
+}
 // 첫 화면: 주소의 #화면 → 마지막으로 본 화면 → 한눈에. '#ev-…'(타임라인에서 알림 기록으로 가는 고리)는 일지·알림으로.
 function route() {
   const h = location.hash.slice(1).split('?')[0];
   if (h.startsWith('ev-')) { showTab('records', false); setTimeout(() => focusEl(h), 300); return; }
+  if (h.startsWith('todo-')) { openTodoCard(decodeURIComponent(h.slice(5))); return; }
   let last = ''; try { last = localStorage.getItem('barun.tab') || ''; } catch (e) { /* 무시 */ }
   showTab(TABS.includes(h) ? h : (TABS.includes(last) ? last : 'home'), false);
 }

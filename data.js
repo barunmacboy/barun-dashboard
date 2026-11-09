@@ -30,7 +30,7 @@
     tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내', nation: '국가' };
   const STATES = ['후보', '정밀확인', '탈락', '외부대기', '끝'];
   // 보기 상태 = 표·찾기·할 일 묶음·열 필터·정렬·페이지·숨긴 열·고정 열 — 주소(#data?…)에 남아 새로고침·공유해도 그대로, '보기 저장'은 이 브라우저(localStorage)에
-  const DEF = (t) => ({ table: t, q: '', preset: t === 'sheet_rows' ? '진행 중' : t === 'order_ledger' ? '미정' : '', offset: 0, filters: [], sort: [], hide: [],
+  const DEF = (t) => ({ table: t, q: '', preset: t === 'sheet_rows' ? '진행 중' : t === 'order_ledger' ? '미정' : '', offset: 0, filters: [], sort: [], hide: [], show: [],
     pin: t === 'sheet_rows' ? ['tab', 'row', 'receiver'] : [] });   // 주문 시트는 탭·행·받는 분을 왼쪽에 고정(오른쪽으로 넘겨도 누구 줄인지 보이게, 10/23 사장님 "285mm 뒤 정보를 볼 수 없어")
   // 바꾼 기록에서 되돌릴 수 있는 일(ops/orderedit.undo와 같게)
   const UNDO_OPS = ['칸', '일괄', '붙여넣기', '채우기', '되돌리기', '설정', '메모', '색', '지우기', '줄옮기기', '줄복사'];   // 서버 orderedit.undo가 되돌리는 것
@@ -96,7 +96,7 @@
   function saveHash() {
     const s = { t: cur.table, p: cur.preset };
     if (cur.q) s.q = cur.q; if (cur.offset) s.o = cur.offset; if (cur.filters.length) s.f = cur.filters; if (cur.sort.length) s.s = cur.sort;
-    if (cur.hide.length) s.h = cur.hide; if (cur.pin.join() !== DEF(cur.table).pin.join()) s.pin = cur.pin;
+    if (cur.hide.length) s.h = cur.hide; if (cur.show.length) s.sh = cur.show; if (cur.pin.join() !== DEF(cur.table).pin.join()) s.pin = cur.pin;
     const h = '#data?' + encodeURIComponent(JSON.stringify(s));
     if (location.hash !== h) history.replaceState(history.state, '', h);   // 자세히를 연 표시(뒤로 가기 = 닫기)는 그대로
   }
@@ -106,7 +106,7 @@
     cur = Object.assign(d, { q: typeof s.q === 'string' ? s.q : '', preset: typeof s.p === 'string' ? s.p : d.preset, offset: Math.max(0, +s.o || 0),
       filters: Array.isArray(s.f) ? s.f.filter((f) => f && typeof f.c === 'string' && typeof f.op === 'string' && (f.op !== 'in' || Array.isArray(f.vs))) : [],
       sort: Array.isArray(s.s) ? s.s.filter((x) => typeof x === 'string') : [],
-      hide: Array.isArray(s.h) ? s.h.filter((x) => typeof x === 'string') : [], pin: Array.isArray(s.pin) ? s.pin.filter((x) => typeof x === 'string') : d.pin });
+      hide: Array.isArray(s.h) ? s.h.filter((x) => typeof x === 'string') : [], show: Array.isArray(s.sh) ? s.sh.filter((x) => typeof x === 'string') : [], pin: Array.isArray(s.pin) ? s.pin.filter((x) => typeof x === 'string') : d.pin });
     const qi = document.querySelector('.dt-q'); if (qi) qi.value = cur.q;
     return true;
   }
@@ -125,7 +125,10 @@
   // 화면에 그릴 칸 = 숨긴 칸 빼고, 고정한 칸을 앞으로(시트 열 구조는 그대로 — 보기만)
   // 휴대폰(760px 이하) 기본 고정은 탭·행만 — 받는 분까지 붙이면 넘겨 볼 칸이 화면의 30%뿐(10/24). 직접 고정을 바꿨으면 그대로
   const pinned = (c) => cur.pin.includes(c) && !(NARROW.matches && c === 'receiver' && cur.pin.join() === DEF(cur.table).pin.join());
-  const visCols = () => { const cs = last.cols.filter((c) => !cur.hide.includes(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
+  // 탭마다 기본으로 숨기는 칸(서버 dbview.tab_hide — 2026-11-09 사장님: 일본 탭 주문일시·국가, 국가는 기타유럽만). 열 보이기에서 켜면 cur.show로 보임
+  const tabHide = () => { const t = isSheet() && last && tabPicked(); return (t && (last.tab_hide || {})[t]) || []; };
+  const hidden = (c) => cur.hide.includes(c) || (tabHide().includes(c) && !cur.show.includes(c));
+  const visCols = () => { const cs = last.cols.filter((c) => !hidden(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
   const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동(빈칸)' : '(빈칸)') : CODE_COLS.includes(c) ? ko(v) : String(v));
   function setFilter(c, f) { cur.filters = cur.filters.filter((x) => x.c !== c); if (f) cur.filters.push(f); cur.offset = 0; }
   function toggleVal(c, v) {        // 칩: 같은 칸에서 여러 값 고르기(누르면 넣고, 다시 누르면 뺌)
@@ -223,8 +226,12 @@
     const cb = E('div', 'dt-form'); const cl = E('div', 'dt-cols');
     for (const c of last.cols) {
       const l = E('div', 'dt-col');
-      const vis = E('input'); vis.type = 'checkbox'; vis.checked = !cur.hide.includes(c); vis.setAttribute('aria-label', `${cname(c)} 보이기`);
-      vis.onchange = () => { cur.hide = vis.checked ? cur.hide.filter((x) => x !== c) : cur.hide.concat(c); saveHash(); render(); };
+      const vis = E('input'); vis.type = 'checkbox'; vis.checked = !hidden(c); vis.setAttribute('aria-label', `${cname(c)} 보이기`);
+      vis.onchange = () => {
+        cur.hide = vis.checked ? cur.hide.filter((x) => x !== c) : cur.hide.concat(c);
+        cur.show = vis.checked && tabHide().includes(c) ? cur.show.concat(c) : cur.show.filter((x) => x !== c);
+        saveHash(); render();
+      };
       const pn = E('button', 'chipbtn' + (cur.pin.includes(c) ? ' on' : '')); pn.append(I('pin')); pn.type = 'button'; pn.title = '왼쪽에 고정'; pn.setAttribute('aria-pressed', String(cur.pin.includes(c)));
       pn.setAttribute('aria-label', `${cname(c)} 고정`);
       pn.onclick = () => { cur.pin = cur.pin.includes(c) ? cur.pin.filter((x) => x !== c) : cur.pin.concat(c); saveHash(); render(); panel(); };
@@ -232,8 +239,8 @@
       l.append(lab, pn); cl.append(l);
     }
     const cr = E('div', 'dt-fp-row');
-    cr.append(btn('모두 보이기', 'ghost', () => { cur.hide = []; saveHash(); render(); panel(); }), btn('고정 풀기', 'ghost', () => { cur.pin = []; saveHash(); render(); panel(); }));
-    cb.append(E('div', 'od-t', `열 보이기·고정 (${last.cols.length - cur.hide.filter((x) => last.cols.includes(x)).length}/${last.cols.length}칸 보임)`),
+    cr.append(btn('모두 보이기', 'ghost', () => { cur.hide = []; cur.show = [...new Set([...cur.show, ...tabHide()])]; saveHash(); render(); panel(); }), btn('고정 풀기', 'ghost', () => { cur.pin = []; saveHash(); render(); panel(); }));
+    cb.append(E('div', 'od-t', `열 보이기·고정 (${last.cols.filter((x) => !hidden(x)).length}/${last.cols.length}칸 보임)`),
       E('p', 'muted small', '체크 끄면 숨김 · 핀은 왼쪽 고정'), cl, cr);
     body.append(cb);
     // 저장한 보기
@@ -248,7 +255,7 @@
     const vr2 = E('div', 'dt-fp-row');
     vr2.append(field('이름', nm), btn('지금 보기 저장', 'primary', () => {
       const name = nm.value.trim(); if (!name) { out.textContent = '이름을 적어 주세요'; return; }
-      const v = views(); v[name] = { t: cur.table, p: cur.preset, q: cur.q, f: cur.filters, s: cur.sort, h: cur.hide, pin: cur.pin };
+      const v = views(); v[name] = { t: cur.table, p: cur.preset, q: cur.q, f: cur.filters, s: cur.sort, h: cur.hide, sh: cur.show, pin: cur.pin };
       out.textContent = putViews(v) ? `'${name}' 저장했어요(이 브라우저에만)` : '저장하지 못했어요(브라우저 저장소가 막힘)'; nm.value = ''; panel();
     }), out);
     vb.append(E('div', 'od-t', '보기 저장(이 브라우저에만)'), vr, vr2);
@@ -727,6 +734,30 @@
     flash(ok ? `복사했어요 · ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '복사 실패 · 브라우저가 막음');
   }
   function flash(msg) { const box = document.querySelector('.dt-fx'); if (!box) return; const m = E('span', 'fx-flash', msg); box.append(m); setTimeout(() => m.remove(), 1800); }
+  // 고른 줄 색 칠하기·풀기(2026-11-09 사장님 "일본줄의 수작업 편의를 위해 행에다 특정색을 입혔다 풀었다") — 줄 자세히의 '줄 색'과 같은 저장(sheet_meta ucolor),
+  //   고른 줄이 모두 그 색이면 같은 단추가 풀기 · 여러 줄은 한 묶음(바꾼 기록에서 한 번에 되돌림) · ⌘Z = 방금 칠한·푼 것 되돌리기
+  const ucolorOf = (r) => (r._meta || {}).ucolor || '';
+  const colorItem = (r, oldv, newv) => ({ tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key, ident: ident(r), col: '', mkind: 'ucolor', old: oldv, new: newv });
+  async function colorRows(rows, hex) {
+    const to = hex && rows.length && rows.every((r) => ucolorOf(r) === hex) ? '' : hex;
+    const items = rows.filter((r) => ucolorOf(r) !== to).map((r) => colorItem(r, ucolorOf(r), to));
+    if (!items.length) { flash(rows.length ? '풀 색이 없어요' : '줄을 먼저 골라 주세요'); return; }
+    const j = await doAct({ kind: 'sheet_meta', items }, null, null);
+    if (j && j.ok) { lastColor = items.map((x) => Object.assign({}, x, { old: x.new, new: x.old })); lastSaved = []; }
+  }
+  function colorChips(rowsOf) {
+    const pal = (last && last.colors) || {}, now = rowsOf(), g = E('span', 'fx-colors');
+    if (!Object.keys(pal).length || !now.length) return null;
+    Object.entries(pal).forEach(([name, hex], i) => {     // ⌥1~7 단축키 순서 = 이 순서
+      const on = now.every((r) => ucolorOf(r) === hex);
+      const b = E('button', 'fx-chip' + (on ? ' on' : '')); b.type = 'button'; b.style.background = hex;
+      b.title = (on ? `${name} 풀기` : `${name} 칠하기 · 다시 누르면 풀기`) + ` · ⌥${i + 1}`; b.setAttribute('aria-label', b.title);
+      b.onclick = () => colorRows(rowsOf(), hex); g.append(b);
+    });
+    if (now.some(ucolorOf)) { const x = E('button', 'fx-chip fx-chip-x', '✕'); x.type = 'button'; x.title = '줄 색 모두 풀기 · ⌥0'; x.setAttribute('aria-label', x.title); x.onclick = () => colorRows(rowsOf(), ''); g.append(x); }
+    return g;
+  }
+  const selRows = () => { const g = rangeOf(); return g ? last.rows.slice(g.r0, g.r1 + 1) : []; };
   document.addEventListener('paste', (e) => {      // 칸을 고른 채 ⌘V — 엑셀·시트에서 복사한 여러 칸도 이 칸부터(미리보기)
     if (!cell || !isSheet() || !document.activeElement || !document.activeElement.closest('table.dt') || document.activeElement.closest('input,select')) return;
     const r = last.rows[rowIdx(cell.k)]; if (!r) return;
@@ -777,14 +808,15 @@
     const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
     box.hidden = !isSheet() || viewMode() === 'cards'; box.textContent = '';
     if (box.hidden) return;
-    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '누르면 고치기 · 끌면 여러 칸 · 행 번호는 자세히')); return; }
+    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '누르면 고치기 · 끌면 여러 칸 · 행 번호는 자세히 · ⌥1~7 줄 색(다시 누르면 풀기)')); return; }
     const g = rangeOf();
     if (g && (g.r1 > g.r0 || g.c1 > g.c0)) {      // 범위: 칸 수 · 숫자 합계·평균(엑셀 아래 상태줄처럼 — 수익·배송비 더해 보기)
       const nums = []; let n = 0; for (const [rr, cc] of rangeCells()) { n++; const x = numOf(cellVal(rr, cc)); if (x != null && NUMC.includes(cc)) nums.push(x); }
       const sum = nums.reduce((a, b) => a + b, 0);
       box.append(E('span', 'fx-name', `${g.r1 - g.r0 + 1}줄 × ${g.c1 - g.c0 + 1}칸`),
         E('span', 'fx-val', nums.length ? `합계 ${Math.round(sum).toLocaleString('ko-KR')} · 평균 ${Math.round(sum / nums.length).toLocaleString('ko-KR')} · 숫자 ${nums.length}칸 / ${n}칸` : `${n}칸 (숫자 칸 없음)`));
-      const cp = E('button', 'btn sm ghost', '복사 ⌘C'); cp.type = 'button'; cp.onclick = copySel; box.append(cp); return;
+      const cp = E('button', 'btn sm ghost', '복사 ⌘C'); cp.type = 'button'; cp.onclick = copySel; box.append(cp);
+      const cc = colorChips(selRows); if (cc) box.append(cc); return;
     }
     const c = cell.c, v = cellVal(r, c);
     box.append(E('span', 'fx-name', `${r.tab} ${r.row}행 · ${cname(c)}`));
@@ -800,6 +832,7 @@
     } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸'));
     if (v) { const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C'; cp.onclick = copySel; box.append(cp); }
     if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = E('a', 'btn sm ghost', '배송 조회 ↗'); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
+    const cc = colorChips(selRows); if (cc) box.append(cc);
     const go = IB(E('button', 'btn sm ghost'), 'chevron', '줄 자세히', true); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
   }
   function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky) — 실제 너비(소수 포함)로, offsetWidth(반올림)면 넘길 때 고정 칸이 1px씩 밀림
@@ -909,7 +942,7 @@
     else pending[k] = { tab: r.tab, row: r.row, key: r.key, col: sheetCol(c), old, new: val, ident: ident(r), op: op || '칸', c };
     queueSave();
   }
-  let flying = {}, saving = false, again = false, saveT = 0, retryT = 0, lastSaved = [], editing = null;
+  let flying = {}, saving = false, again = false, saveT = 0, retryT = 0, lastSaved = [], editing = null, lastColor = null;
   const justSaved = new Set();
   let sv = { k: '' };            // 저장 상태: saving · ok(저장됨) · wait(회차 중 — 1분마다 다시) · net(못 보냄) · bad(일부 못 씀)
   const rowOfEdit = (e) => last && last.rows.find((x) => x.tab === e.tab && String(x.row) === String(e.row));
@@ -970,6 +1003,7 @@
       const td = r && !pending[k] && cellTd(r, e.c); if (td) { td.classList.remove('dirty'); td.classList.remove('saved'); void td.offsetWidth; td.classList.add('saved'); }
     }
     lastSaved = ok;           // 되돌리기 = 이번에 저장한 칸만(못 쓴 저장 뒤에 앞 저장을 되돌리지 않게)
+    if (ok.length) lastColor = null;      // ⌘Z는 가장 나중에 한 것(칸 저장 또는 줄 색)만
     const hh = new Date().toTimeString().slice(0, 5);
     sv = (failed.size || failedRows.size || unsure || !j.ok) && !/바뀐 값이 없어요/.test(msg)
       ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장 못 한 칸은 시트 값으로 되돌림` } : { k: 'ok', at: hh };
@@ -997,6 +1031,7 @@
     }, ms == null ? 1200 : ms);
   }
   function undoLast() {        // 방금 저장한 칸들을 전 값으로(그 뒤 또 고친 칸은 건드리지 않음) — 한 번 더 누르면 다시 앞 값으로
+    if (lastColor) { const items = lastColor; lastColor = null; doAct({ kind: 'sheet_meta', items }, null, null); return; }   // 방금 칠한·푼 줄 색
     if (!lastSaved.length) { toast('되돌릴 저장이 없어요'); return; }
     const back = lastSaved; lastSaved = []; let n = 0;
     for (const e of back) { const r = rowOfEdit(e); if (r && cellVal(r, e.c) === e.new) { stage(r, e.c, e.old, '되돌리기'); n++; } }
@@ -1134,6 +1169,7 @@
       fill.onclick = () => fillDown(s.value);
       const clr = E('button', 'btn sm ghost', '고르기 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
       g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr);
+      const cc = colorChips(() => last.rows.filter((x) => picked.has(rid(x)))); if (cc) g.insertBefore(cc, clr);
       if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = IB(E('button', 'btn sm primary'), 'plus', '이 줄로 재고 추가'); cp.type = 'button'; cp.title = '상품 정보로 새 재고 줄'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
       b.append(g);
     }
@@ -2230,6 +2266,14 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     if (e.key !== 'Escape' || typing(e) || !pageOn() || document.querySelector('dialog[open]')) return;
     const fp = $('dt-fpanel'), au = document.querySelector('.dt-audit');
     if (fp && !fp.hidden) { fp.hidden = true; panel(); } else if (au && !au.hidden) { au.hidden = true; au.textContent = ''; } else if (sel) closeDetail();
+  });
+  // ⌥1~7 = 고른 줄 색 칠하기(같은 키 다시 = 풀기) · ⌥0 = 모두 풀기(2026-11-09 사장님 "줄색으로 가는 경로가 너무 길어 … 단축키가 제일 좋을 것 같아").
+  //   칠한 뒤 표를 다시 그려 칸에서 초점이 빠져도 이어서 누르게 문서에서 받음 · e.code(맥 ⌥는 글자가 바뀌어 e.key로는 못 받음)
+  document.addEventListener('keydown', (e) => {
+    if (!e.altKey || e.metaKey || e.ctrlKey || !/^Digit[0-7]$/.test(e.code) || typing(e) || !pageOn() || !isSheet() || !last) return;
+    const rows = cell ? selRows() : last.rows.filter((x) => picked.has(rid(x))), pal = Object.values(last.colors || {}), n = +e.code.slice(5);
+    if (!rows.length || (n && !pal[n - 1])) return;
+    e.preventDefault(); colorRows(rows, n ? pal[n - 1] : '');
   });
   // 닫기·새로고침: 고치던 칸까지 바로 보내고(keepalive), 회차 때문에 못 보낸 칸이나 인터넷 오류로 남은 칸이 있을 때만 붙잡음
   window.addEventListener('beforeunload', (e) => { flushNow(); if (Object.keys(pending).length && ['wait', 'net'].includes(sv.k)) { e.preventDefault(); e.returnValue = ''; } });
