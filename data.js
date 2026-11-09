@@ -1005,9 +1005,12 @@
     lastSaved = ok;           // 되돌리기 = 이번에 저장한 칸만(못 쓴 저장 뒤에 앞 저장을 되돌리지 않게)
     if (ok.length) lastColor = null;      // ⌘Z는 가장 나중에 한 것(칸 저장 또는 줄 색)만
     const hh = new Date().toTimeString().slice(0, 5);
+    // 2026-11-09: 서버가 송장 칸 실수(같은 국내송장 두 받는 분·직배 한 칸만 고침)를 ⚠️ 줄로 돌려주면 저장 뒤 바로 빨간 알림(barun/invoice_check)
+    const warn = msg.split('\n').filter((l) => l.startsWith('⚠️')).map((l) => noE(l).trim()).join(' · ');
     sv = (failed.size || failedRows.size || unsure || !j.ok) && !/바뀐 값이 없어요/.test(msg)
-      ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장 못 한 칸은 시트 값으로 되돌림` } : { k: 'ok', at: hh };
+      ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장 못 한 칸은 시트 값으로 되돌림` } : { k: 'ok', at: hh, ...(warn ? { msg: warn } : {}) };
     saveUI(); bar();
+    if (warn) toast(warn.slice(0, 220), true, 12000);
     if (sv.k === 'bad') reloadWhenIdle(300);
     else if (sel && ok.some((e) => rid(sel) === `${e.tab}:${e.row}`) && !busyTyping()) detail(true);   // 열린 자세히도 새 값으로
     if (again || Object.keys(pending).some((k) => !flying[k])) { again = false; queueSave(0); }
