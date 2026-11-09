@@ -2269,8 +2269,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   });
   // ⌥1~7 = 고른 줄 색 칠하기(같은 키 다시 = 풀기) · ⌥0 = 모두 풀기(2026-11-09 사장님 "줄색으로 가는 경로가 너무 길어 … 단축키가 제일 좋을 것 같아").
   //   칠한 뒤 표를 다시 그려 칸에서 초점이 빠져도 이어서 누르게 문서에서 받음 · e.code(맥 ⌥는 글자가 바뀌어 e.key로는 못 받음)
+  //   표 칸을 한 번 눌러 입력칸이 열려 있어도 받음 — 입력칸을 닫고(다른 칸을 누른 것과 같음) 그 줄을 칠함(2026-11-09 사장님 "안돼": 고칠 수 있는 칸은 누르면 바로 입력칸이라 무시되던 것)
   document.addEventListener('keydown', (e) => {
-    if (!e.altKey || e.metaKey || e.ctrlKey || !/^Digit[0-7]$/.test(e.code) || typing(e) || !pageOn() || !isSheet() || !last) return;
+    const gridIn = !!(e.target && e.target.classList && e.target.classList.contains('cell-in') && e.target.closest('table.dt'));
+    if (!e.altKey || e.metaKey || e.ctrlKey || !/^Digit[0-7]$/.test(e.code) || (typing(e) && !gridIn) || !pageOn() || !isSheet() || !last) return;
+    if (gridIn) { e.preventDefault(); e.target.blur(); }
     const rows = cell ? selRows() : last.rows.filter((x) => picked.has(rid(x))), pal = Object.values(last.colors || {}), n = +e.code.slice(5);
     if (!rows.length || (n && !pal[n - 1])) return;
     e.preventDefault(); colorRows(rows, n ? pal[n - 1] : '');
