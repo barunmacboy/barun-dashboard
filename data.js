@@ -1202,7 +1202,8 @@
   async function doAct(payload, btn, out) {
     if (payload.confirm && !confirm(payload.confirm)) return;
     delete payload.confirm;
-    const wk = payload.kind === 'sheet_row' && ROW_WAIT_OPS.includes(payload.op) ? `${payload.op}#${payload.tab}#${payload.row}` : '';
+    const wk = payload.kind === 'sheet_row' && ROW_WAIT_OPS.includes(payload.op) ? `${payload.op}#${payload.tab}#${payload.row}`
+      : payload.kind === 'sheet_undo' ? `undo#${payload.line || payload.batch || payload.id}` : '';   // 되돌리기·되살리기도 회차가 끝나면 저절로
     if (wk && payload.force) delete rowWait[wk];
     if (wk && payload.retry && !(wk in rowWait)) return;          // '그래도 하기'로 이미 끝낸 대기
     const label = btn && btn.textContent;
@@ -1668,7 +1669,8 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
         sug[t] = { shop, center, name, car };
       }
       if (t !== tab) return;
-      const s = sug[t];
+      const fixed = (((last && last.dropdowns) || {})[t] || {}).shop;   // 구매처가 선택 목록인 탭(일본 2026-11-10)은 그 목록만
+      const s = fixed ? { ...sug[t], shop: fixed } : sug[t];
       const fillDl = (el, vs) => { el.textContent = ''; for (const v of vs) { const o = E('option'); o.value = v; el.append(o); } };
       fillDl(dlName, s.name); fillDl(dlShop, s.shop); fillDl(dlCenter, s.center); fillDl(dlCar, s.car);
       const chipRow = (box, k, vs) => {
