@@ -1002,6 +1002,7 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-asks" aria-label="보낸 문의" hidden></section>
     <section class="page" id="p-vat" aria-label="세금 환급" hidden></section>
     <section class="page" id="p-pay" aria-label="결제" hidden></section>
+    <section class="page" id="p-settings" aria-label="설정" hidden></section>
     <section class="page" id="p-flow" aria-label="업무 흐름" hidden></section>
     <section class="page" id="p-paths" aria-label="주문 경로" hidden></section>
     <section class="page" id="p-catalog" aria-label="상품" hidden></section>
@@ -1068,9 +1069,9 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   </form>
 </dialog>
 
-<script src="config.js?v=90f9fb07da"></script>
-<script src="transport.js?v=90f9fb07da"></script>
-<script src="navigation.js?v=90f9fb07da"></script>
+<script src="config.js?v=676ee063ac"></script>
+<script src="transport.js?v=676ee063ac"></script>
+<script src="navigation.js?v=676ee063ac"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1180,6 +1181,7 @@ const ICON = {
   asks: P('M22 2 11 13M22 2l-7 20-4-9-9-4z'),
   vat: P('M6 2h9l5 5v15H6zM14 2v6h6M9 17l6-6M9.5 11.5h.01M14.5 16.5h.01'),
   pay: P('M2 6h20v12H2zM2 10h20M6 15h4'),   // 결제(2026-11-06, dashboard/pay.js)
+  settings: P('M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4'),   // 설정(2026-11-12, dashboard/settings.js)
   data: P('M4 4h16v16H4zM4 9.5h16M4 15h16M10 4v16'),
   flow: P('M5 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01M7 6h6a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-2a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h6'),
   catalog: P('M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8'),
@@ -1916,20 +1918,21 @@ function route() {
 }
 window.addEventListener('hashchange', route); route();
 </script>
-<script src="office.js?v=90f9fb07da"></script>
-<script src="activity.js?v=90f9fb07da"></script>
-<script src="data.js?v=90f9fb07da"></script>
-<script src="sourcing.js?v=90f9fb07da"></script>
-<script src="automation.js?v=90f9fb07da"></script>
-<script src="paths.js?v=90f9fb07da"></script>
-<script src="flow.js?v=90f9fb07da"></script>
-<script src="catalog.js?v=90f9fb07da"></script>
-<script src="asks.js?v=90f9fb07da"></script>
-<script src="vat.js?v=90f9fb07da"></script>
-<script src="pay.js?v=90f9fb07da"></script>
-<script src="agents.js?v=90f9fb07da"></script>
-<script src="tasks.js?v=90f9fb07da"></script>
-<script src="reports.js?v=90f9fb07da"></script>
-<script src="health.js?v=90f9fb07da"></script>
+<script src="office.js?v=676ee063ac"></script>
+<script src="activity.js?v=676ee063ac"></script>
+<script src="data.js?v=676ee063ac"></script>
+<script src="sourcing.js?v=676ee063ac"></script>
+<script src="automation.js?v=676ee063ac"></script>
+<script src="paths.js?v=676ee063ac"></script>
+<script src="flow.js?v=676ee063ac"></script>
+<script src="catalog.js?v=676ee063ac"></script>
+<script src="asks.js?v=676ee063ac"></script>
+<script src="vat.js?v=676ee063ac"></script>
+<script src="pay.js?v=676ee063ac"></script>
+<script src="settings.js?v=676ee063ac"></script>
+<script src="agents.js?v=676ee063ac"></script>
+<script src="tasks.js?v=676ee063ac"></script>
+<script src="reports.js?v=676ee063ac"></script>
+<script src="health.js?v=676ee063ac"></script>
 </body>
 </html>
