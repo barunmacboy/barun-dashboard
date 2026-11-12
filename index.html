@@ -953,8 +953,8 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     .btn.primary:hover:not(:disabled) { box-shadow: 0 6px 16px color-mix(in srgb, var(--blue) 28%, transparent); }
   }
   /* 커서를 따라가는 옅은 빛 */
-  .lit:is(.stat, .btn:not(.primary), .ac, .st-link, .nav-i, .card) { background-image: radial-gradient(220px circle at var(--mx, -999px) var(--my, -999px), var(--glow), transparent 70%); }
-  .card.lit { background-image: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--blue) 4%, transparent), transparent 70%); }
+  .lit:is(.stat, .btn:not(.primary), .ac, .st-link, .nav-i, .card) { background-image: radial-gradient(220px circle at var(--mx, -999px) var(--my, -999px), var(--glow), transparent 70%) !important; }   /* 화면마다 :hover 배경이 덮어도 빛은 보이게 */
+  .card.lit { background-image: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--blue) 4%, transparent), transparent 70%) !important; }
   /* 화면 들어올 때 — 카드가 차례로 떠오름(9번째부터는 같이) */
   .page.enter > * { animation: rise .42s var(--ease-out) both; }
   .page.enter > *:nth-child(2) { animation-delay: .035s; } .page.enter > *:nth-child(3) { animation-delay: .07s; }
@@ -1487,11 +1487,13 @@ function plainText(t, opt) {
     .replace(/https?:\/\/(?:www\.)?([^\s/]+)\S*/g, '$1')
     .replace(/(?:\b[A-Z0-9][\w-]*\s+)?proof data required/gi, '쿠팡이 증빙 자료를 요구함').replace(/NullPointerException/g, '쿠팡 등록 오류')
     .replace(/\s+[—–]\s+/g, ' · ').replace(/\s+-\s+(?=\S)/g, ' · ')
-    .replace(/(\d+)초(가|는|를)?/g, (m, n, j) => (+n >= 60 ? `${Math.round(n / 60)}분${j ? { 가: '이', 는: '은', 를: '을' }[j] : ''}` : m));   // 358초 → 6분
+    .replace(/(\d+)초(가|는|를)?/g, (m, n, j) => (+n >= 60 ? `${Math.round(n / 60)}분${j ? { 가: '이', 는: '은', 를: '을' }[j] : ''}` : m))   // 358초 → 6분
+    .replace(/\b(done|OK|ok|failed|skip(?:ped)?)\b/g, (m) => ({ done: '끝', OK: '정상', ok: '정상', failed: '실패', skip: '건너뜀', skipped: '건너뜀' })[m]);   // 문장 속 영어 상태 낱말
   if (opt && opt.strict) {
     s = s.replace(/\b(?:pricing|barun|auto|ops|dashboard|notify|core|jobs|config|tools|autoimprove|docs|clients)\/[\w./-]*\w/g, '')   // 코드 위치
       .replace(/\b[a-z_]+\.[A-Z_]{3,}\b/g, '')                                              // orderedit.EDITABLE
       .replace(/(?:커밋\s*)?\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,12}\b/g, '')        // 커밋·사안 번호(16진수)
+      .replace(/\b[\w-]+(?:\.[\w-]+)*\.(?:tar\.gz\.enc|tar\.gz|enc|gz|zip|db|log|js|txt)\b/g, '파일')            // hourly_00.tar.gz.enc·motion.js
       .replace(/\bauto-[a-z]+\b/g, '자동').replace(/\b(?:[\w-]+\/)*[\w-]+\.(?:py|json|jsonl|toml|sh|md)\b\s*/g, '')
       .replace(/\b[a-z]+(?:_[a-z]+)+(?:으로|로|를|을|이|가|에서|의)?/g, '').replace(/\bnew 상태/g, '새 상태');
   } else {
@@ -2019,7 +2021,8 @@ function render(s) {
   for (const l of [...(moreRec.worklog ? s.worklog : s.worklog.slice(0, 40))].reverse()) {
     const m = /^-?\s*(\d{1,2}:\d{2})\s*[·|]\s*([^·|]+?)\s*[·|]\s*(.*)$/s.exec(l);
     const li = el('li', 'wl');
-    if (m) li.append(el('b', 'wt', m[1]), el('span', 'wa', m[2]), el('span', null, m[3])); else li.append(l);
+    if (m) { const body = el('span', null, plainText(m[3], { strict: true })); body.title = m[3]; li.append(el('b', 'wt', m[1]), el('span', 'wa', m[2]), body); }
+    else li.append(plainText(l, { strict: true }));
     wl.append(li);
   }
   mdRender(noPaths(s.status_md || '(없음)'), $('status'));
