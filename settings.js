@@ -70,8 +70,9 @@
       .ac-f .hint { grid-column: 2; font-size: 12px; color: var(--muted); margin-top: -4px; }
       .ac-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
       .ac-places div { display: flex; gap: 6px; align-items: center; } .ac-places span { width: 58px; color: var(--sub); flex: none; }
-      .ac-add { margin-top: 12px; font-size: 13px; color: var(--sub); line-height: 1.6; } .ac-add summary { cursor: pointer; color: var(--ink); font-weight: 600; }
-      .ac-add ol { margin: 6px 0 0; padding-left: 20px; } .ac-add code { font-size: 12.5px; background: var(--fill2); padding: 2px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+      .ac-new { margin-top: 12px; border-style: dashed; } .ac-new .ac-f { max-width: 620px; } .ac-new .st-msg { text-align: left; }
+      .ac-steps { margin: 8px 0 2px; padding-left: 20px; font-size: 13px; color: var(--sub); line-height: 1.6; } .ac-steps a { color: inherit; text-decoration: underline; font-weight: 600; }
+      .ac-key { display: flex; gap: 6px; align-items: center; } .ac-key input { flex: 1 1 auto; }
       @media (max-width: 720px) { .ac-f { grid-template-columns: 1fr; } .ac-f .hint { grid-column: 1; } .ac-h .sp { margin-left: 0; } .st-row { grid-template-columns: 1fr; gap: 8px; } .st-v { justify-content: flex-start; } .st-msg { text-align: left; } .st-job .sum { margin-left: 22px; flex-basis: 100%; } }`;
     document.head.append(css);
     sec.innerHTML = `
@@ -244,7 +245,7 @@
     const gs = $('st-groups'); gs.innerHTML = '';
     for (const g of ['', ...D.groups]) {
       const c = E('button', 'st-chip', g || '전체'); c.type = 'button'; c.setAttribute('aria-pressed', String(grp === g && !onlyChanged));
-      const xs = D.items.filter((it) => !g || it.group === g);   // 예약 업무는 칸 수가 아니라 업무 수
+      const xs = D.items.filter((it) => (!g || it.group === g) && it.key !== ACCT_KEY);   // 예약 업무는 칸 수가 아니라 업무 수, 새 상품 계정은 '쿠팡 계정' 카드라 안 셈
       c.append(E('span', 'n', String(g === '예약 업무' ? new Set(xs.map((x) => x.job && x.job.job)).size : xs.length)));
       c.onclick = () => { grp = g; onlyChanged = false; chips(); body(); }; gs.append(c);
     }
@@ -255,30 +256,67 @@
 
 
   // ── 쿠팡 계정 카드 ───────────────────────────────────────────────
-  const ADD_CMD = '/Users/Shared/git/barun_runtime/venv/bin/python /Users/Shared/git/barun_project/clients/account.py 추가 coupang <이름>';
+  let addOpen = false, rekey = '';   // [계정 추가] 펼침 · 키를 바꾸는 중인 계정
 
   function acctCard() {
     const card = E('div', 'card'), h = E('div', 'card-h');
     const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
     h.append(E('h2', '', '쿠팡 계정 — 새 상품을 어디에 올릴까'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
-    card.append(h, E('div', 'st-gdesc', '소싱 자동 등록과 등록 명령이 새 쿠팡 상품을 고른 계정에 올려요. 주문 수집·가격·발송 같은 운영은 늘 바른청년이고, 이미 올린 상품은 그대로예요. 다른 계정은 판매자 번호·Wing 아이디·출고지·반품지·연락처를 그 계정 것으로 바꿔 보내고, 바른청년 정보가 남으면 보내지 않아요.'));
+    card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품이 올라가요. 판매자 번호·Wing 아이디·출고지·반품지·연락처는 그 계정 것으로 바꿔 보내고, 바른청년 정보가 남으면 보내지 않아요.'));
     const list = E('div', 'ac-list');
     for (const a of D.accounts) list.append(acctTile(a));
     card.append(list);
-    const add = E('details', 'ac-add'); add.open = D.accounts.length === 1;
-    add.append(E('summary', '', '다른 쿠팡 계정 더하기'));
-    const ol = E('ol');
-    const li1 = E('li', '', 'Wing > 판매자정보 > 추가판매정보 > OPEN API 키 발급에서 그 계정의 업체코드·Access Key·Secret Key를 확인해요. 허용 IP를 물으면 바른청년 키에 넣은 것과 같은 이 맥미니의 IP를 넣어요.');
-    const li2 = E('li', '', '맥미니 터미널에서 아래 명령을 실행하고, 묻는 대로 붙여 넣어요(키는 화면에 안 보이고 이 컴퓨터 비밀 폴더에만 저장돼요). <이름>은 영문으로 짧게(예: food2).');
-    const cmd = E('div'); cmd.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px';
-    const code = E('code', '', ADD_CMD); const cp = E('button', 'btn sm ghost', '명령 복사'); cp.type = 'button';
-    cp.onclick = async () => { try { await navigator.clipboard.writeText(ADD_CMD); cp.textContent = '복사했어요'; } catch (e) { cp.textContent = '직접 복사해 주세요'; } };
-    cmd.append(code, cp); li2.append(cmd);
-    ol.append(li1, li2, E('li', '', '이 화면을 새로 고치면 계정이 나와요 → [연결 확인]을 누르면 그 계정의 출고지·반품지를 읽어 비어 있는 칸을 채워요.'),
-      E('li', '', 'Wing 로그인 아이디·고객센터 번호(·공통 상세 사진)를 적고 저장 → [여기에 올리기].'),
-      E('li', '', '상품마다 따로 고르려면 등록 명령에 --계정 <이름>(바른청년은 --계정 바른청년).'));
-    add.append(ol); card.append(add);
+    if (addOpen) card.append(keyForm(''));
+    else {
+      const b = E('button', 'btn', '+ 쿠팡 계정 추가'); b.type = 'button'; b.style.marginTop = '12px';
+      b.onclick = () => { addOpen = true; body(); setTimeout(() => { const f = document.getElementById('ak-label'); if (f && f.focus) f.focus(); }, 0); };
+      card.append(b);
+    }
     return card;
+  }
+
+  // 키 넣기 — 새 계정(name '') 또는 그 계정 키 바꾸기. 서버가 먼저 쿠팡을 읽어 보고 되면 저장(안 되면 아무것도 안 남음). 키는 다시 보여 주지 않음.
+  function keyForm(name) {
+    const box = E('div', 'ac ac-new'), msg = E('div', 'st-msg'), f = E('div', 'ac-f');
+    box.append(E('b', '', name ? `${name} 키 바꾸기` : '쿠팡 계정 추가'));
+    const ol = E('ol', 'ac-steps');
+    const s1 = E('li'); s1.append('그 계정으로 ', Object.assign(E('a', '', 'Wing'), { href: 'https://wing.coupang.com', target: '_blank', rel: 'noopener' }), '에 로그인');
+    ol.append(s1, E('li', '', '오른쪽 위 판매자명 → 판매자정보 → 추가판매정보 → OPEN API 키 발급'),
+      E('li', '', '업체코드·Access Key·Secret Key를 복사해 아래에 붙여 넣기(허용 IP를 물으면 바른청년 키에 등록한 IP와 같게)'));
+    box.append(ol);
+    const inp = (id, label, ph, type, hint) => {
+      const i = E('input'); i.id = id; i.placeholder = ph; i.type = type || 'text'; i.autocomplete = 'off'; i.spellcheck = false; i.setAttribute('aria-label', label);
+      const l = E('label', '', label); l.htmlFor = id;
+      let field = i;
+      if (type === 'password') {                      // 칸 옆 [보기] — 붙여 넣은 키를 눈으로 확인
+        field = E('div', 'ac-key'); const eye = E('button', 'btn sm ghost', '보기'); eye.type = 'button'; eye.setAttribute('aria-label', `${label} 보기`);
+        eye.onclick = () => { i.type = i.type === 'password' ? 'text' : 'password'; eye.textContent = i.type === 'password' ? '보기' : '가리기'; };
+        field.append(i, eye);
+      }
+      f.append(l, field); if (hint) f.append(E('div', 'hint', hint)); return i;
+    };
+    const label = name ? null : inp('ak-label', '보이는 이름', '예: 푸드투 상사', 'text', '목록에 보일 이름(아무거나)');
+    const vendor = inp('ak-vendor', '업체코드', 'A00123456', 'text', '영문 1자 + 숫자');
+    const access = inp('ak-access', 'Access Key', '붙여 넣기', 'password', '저장한 뒤엔 끝 4자리만 보여요');
+    const secret = inp('ak-secret', 'Secret Key', '붙여 넣기', 'password', '이 맥미니 비밀 폴더에만 저장 — 화면·기록에 다시 나오지 않아요');
+    const row = E('div', 'st-bar'); row.style.marginTop = '12px';
+    const go = E('button', 'btn primary', name ? '연결 확인하고 키 바꾸기' : '연결 확인하고 저장'); go.type = 'button';
+    const cancel = E('button', 'btn ghost', '취소'); cancel.type = 'button';
+    cancel.onclick = () => { addOpen = false; rekey = ''; body(); };
+    go.onclick = async () => {
+      const t = go.textContent; go.textContent = '쿠팡에 연결해 보는 중…'; msg.className = 'st-msg'; msg.textContent = '';
+      const fields = { name, label: label ? label.value : '', vendor_id: vendor.value, access_key: access.value, secret_key: secret.value, replace: !!name };
+      const r = await post({ op: 'acct_add', fields }, go, msg);
+      go.textContent = t;
+      if (r && r.ok) {
+        const nm = name || String(vendor.value).trim().toLowerCase();
+        acctMsg.set(nm, { text: r.msg, ok: true }); openAcct.add(nm);    // 이어서 Wing 아이디·번호를 바로 넣게 펼침
+        access.value = secret.value = ''; addOpen = false; rekey = '';
+      }
+    };
+    row.append(go, cancel);
+    box.append(f, row, msg);
+    return box;
   }
 
   function acctTile(a) {
@@ -360,6 +398,19 @@
     const b = E('button', 'btn sm', '계정 정보 저장'); b.type = 'button';
     b.onclick = () => post({ op: 'acct_save', name: a.name, fields: Object.fromEntries(Object.entries(val).map(([k, fn]) => [k, fn()])) }, b, msg).then(keep);
     f.append(E('span'), b);
+    const kr = E('div', 'st-bar');                   // 키 — 끝 4자리만, 바꾸기·빼기
+    kr.append(E('span', 'muted small', `Access Key ${a.key_hint || ''} · 업체코드 ${(a.checked || {}).vendor_id || '연결 확인 전'}`));
+    const rk = E('button', 'btn sm ghost', '키 바꾸기'); rk.type = 'button';
+    rk.onclick = () => { rekey = a.name; body(); };
+    const rm = E('button', 'btn sm ghost', '계정 빼기'); rm.type = 'button';
+    let armed = 0;
+    rm.onclick = () => {
+      if (Date.now() - armed > 4000) { armed = Date.now(); rm.textContent = '한 번 더 눌러 빼기'; msg.className = 'st-msg bad'; msg.textContent = '이 계정을 목록에서 빼요(키 파일은 보관 폴더로 옮겨 되살릴 수 있어요) — 맞으면 4초 안에 한 번 더'; setTimeout(() => { rm.textContent = '계정 빼기'; }, 4000); return; }
+      openAcct.delete(a.name); post({ op: 'acct_remove', name: a.name }, rm, msg).then(keep);
+    };
+    kr.append(rk, rm);
+    f.append(E('label', '', '키'), kr);
+    if (rekey === a.name) { const kf = keyForm(a.name); kf.style.gridColumn = '1 / -1'; f.append(kf); }
     return f;
   }
 
