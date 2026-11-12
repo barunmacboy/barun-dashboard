@@ -3,6 +3,8 @@
 // 바꾸기: POST /api/action {action:'settings', op:'set'|'reset'|'pause'|'resume', key, value}.
 // 목록 원본은 config/settings.toml(설명 help · 바꾸면 effect · 바깥에 쓰는 스위치 risk · 묶음 설명 group_help) + 예약 업무(jobs/jobs.toml).
 // 화면은 칸 종류(kind)만 보고 그린다. 비밀번호·카드번호는 받지 않는다. 바깥에 쓰는 스위치(risk)는 두 번 눌러야 저장.
+// 쿠팡 계정 카드(2026-11-12 사장님 '다른 쿠팡 계정에도 상품을 올릴 수 있게'): 계정마다 준비 상태·[여기에 올리기](설정 account.coupang_register)·
+// [연결 확인](op acct_check — 그 계정 키로 쿠팡 GET만)·계정 정보(op acct_save — 반품지·출고지는 연결 확인이 읽은 목록에서만). 키는 화면에서 받지 않는다(터미널 명령 안내).
 // 자리: index.html에 미리 있는 화면(#p-settings)을 채운다(보임·숨김은 'barun:page' 이벤트).
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -12,7 +14,9 @@
     infra: '인프라·감시', sourcing: '소싱·등록' };
   const when = (at) => String(at || '').slice(5, 16).replace('T', ' ');
   let D = null, busy = false, q = '', grp = '', onlyChanged = false;
-  const openJobs = new Set();
+  const openJobs = new Set(), openAcct = new Set(), acctMsg = new Map();   // 계정마다 마지막 결과 글(다시 그려도 남게)
+  const ACCT_GROUP = '판매 수수료·계정', ACCT_KEY = 'account.coupang_register';
+  const COUNTRY = { DE: '독일', US: '미국', AU: '호주', FR: '프랑스', NZ: '뉴질랜드', JP: '일본', IT: '이탈리아', ES: '스페인', GB: '영국', CA: '캐나다', KR: '한국' };
 
   function install() {
     const sec = $('p-settings'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
@@ -52,7 +56,23 @@
       .st-links { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: stretch; }
       .st-link { display: flex; flex-direction: column; justify-content: flex-start; gap: 3px; text-align: left; font: inherit; padding: 10px 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--fill2); color: var(--ink); cursor: pointer; }
       .st-link span { font-size: 12.5px; color: var(--sub); }
-      @media (max-width: 720px) { .st-row { grid-template-columns: 1fr; gap: 8px; } .st-v { justify-content: flex-start; } .st-msg { text-align: left; } .st-job .sum { margin-left: 22px; flex-basis: 100%; } }`;
+      .ac-list { display: grid; gap: 10px; }
+      .ac { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; background: var(--card); }
+      .ac.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink) inset; }
+      .ac-h { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .ac-h b { font-size: 15px; } .ac-h .sp { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+      .ac-ok { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--fill2); color: var(--st-good, #15803d); }
+      .ac-no { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--fill2); color: var(--st-serious, #c2410c); }
+      .ac .st-msg { text-align: left; }   /* 결과 글은 계정 정보 바로 아래 왼쪽에 */
+      .ac-m { font-size: 13px; color: var(--sub); margin-top: 6px; line-height: 1.55; }
+      .ac-todo { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--st-serious, #c2410c); } .ac-todo li { margin: 2px 0; }
+      .ac-f { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 12px; margin-top: 10px; align-items: center; font-size: 13px; }
+      .ac-f label { color: var(--sub); } .ac-f input, .ac-f select { font: inherit; font-size: 13.5px; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; width: 100%; }
+      .ac-f .hint { grid-column: 2; font-size: 12px; color: var(--muted); margin-top: -4px; }
+      .ac-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+      .ac-places div { display: flex; gap: 6px; align-items: center; } .ac-places span { width: 58px; color: var(--sub); flex: none; }
+      .ac-add { margin-top: 12px; font-size: 13px; color: var(--sub); line-height: 1.6; } .ac-add summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+      .ac-add ol { margin: 6px 0 0; padding-left: 20px; } .ac-add code { font-size: 12.5px; background: var(--fill2); padding: 2px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+      @media (max-width: 720px) { .ac-f { grid-template-columns: 1fr; } .ac-f .hint { grid-column: 1; } .ac-h .sp { margin-left: 0; } .st-row { grid-template-columns: 1fr; gap: 8px; } .st-v { justify-content: flex-start; } .st-msg { text-align: left; } .st-job .sum { margin-left: 22px; flex-basis: 100%; } }`;
     document.head.append(css);
     sec.innerHTML = `
       <div class="card hero"><h2 id="st-title">불러오는 중</h2><p class="lead">코드를 고치지 않고 바꾸는 값이에요. 저장하면 늦어도 10초 뒤 모든 업무가 새 값을 써요.</p>
@@ -98,7 +118,9 @@
     let armed = 0;
     const save = (v, el) => {
       if (it.risk && Date.now() - armed > 4000) {          // 바깥에 쓰는 스위치 — 4초 안에 한 번 더
-        armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = '바깥에 실제로 쓰는 설정이에요 — 맞으면 4초 안에 한 번 더 눌러 주세요'; return null;
+        armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = '바깥에 실제로 쓰는 설정이에요 — 맞으면 4초 안에 한 번 더 눌러 주세요';
+        if (el && el.tagName === 'BUTTON') { const t = el.textContent; el.textContent = '한 번 더 눌러 확정'; setTimeout(() => { el.textContent = t; }, 4000); }
+        return null;
       }
       armed = 0; return post({ op: 'set', key: it.key, value: v }, el, msg);
     };
@@ -201,8 +223,10 @@
     let n = 0;
     for (const g of D.groups) {
       if (grp && g !== grp) continue;
-      const items = D.items.filter((it) => it.group === g && hit(it));
-      if (!items.length) continue;
+      const items = D.items.filter((it) => it.group === g && hit(it) && it.key !== ACCT_KEY);   // 새 상품 계정은 아래 '쿠팡 계정' 카드에서
+      const acctHere = g === ACCT_GROUP && !onlyChanged && (!q || '쿠팡 계정 올리기 등록 판매자 출고지 반품지 wing'.includes(q) || D.accounts.some((a) => (a.label + a.name).toLowerCase().includes(q)));
+      if (acctHere) { n += 1; }
+      if (!items.length) { if (acctHere) out.append(acctCard()); continue; }
       n += items.length;
       if (g === '예약 업무') { out.append(jobCard(items)); continue; }
       const card = E('div', 'card'), h = E('div', 'card-h'), ch = items.filter((x) => x.changed).length;
@@ -211,6 +235,7 @@
       if (D.group_help[g]) card.append(E('div', 'st-gdesc', D.group_help[g]));
       for (const it of items) card.append(row(it));
       out.append(card);
+      if (acctHere) out.append(acctCard());
     }
     if (!n) out.append(Object.assign(E('div', 'card'), { textContent: onlyChanged ? '바꾼 설정이 없어요 — 모두 기본값이에요' : '맞는 설정이 없어요 — 다른 말로 찾아 보세요' }));
   }
@@ -228,8 +253,118 @@
     c.onclick = () => { onlyChanged = !onlyChanged; grp = ''; chips(); body(); }; gs.append(c);
   }
 
+
+  // ── 쿠팡 계정 카드 ───────────────────────────────────────────────
+  const ADD_CMD = '/Users/Shared/git/barun_runtime/venv/bin/python /Users/Shared/git/barun_project/clients/account.py 추가 coupang <이름>';
+
+  function acctCard() {
+    const card = E('div', 'card'), h = E('div', 'card-h');
+    const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
+    h.append(E('h2', '', '쿠팡 계정 — 새 상품을 어디에 올릴까'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
+    card.append(h, E('div', 'st-gdesc', '소싱 자동 등록과 등록 명령이 새 쿠팡 상품을 고른 계정에 올려요. 주문 수집·가격·발송 같은 운영은 늘 바른청년이고, 이미 올린 상품은 그대로예요. 다른 계정은 판매자 번호·Wing 아이디·출고지·반품지·연락처를 그 계정 것으로 바꿔 보내고, 바른청년 정보가 남으면 보내지 않아요.'));
+    const list = E('div', 'ac-list');
+    for (const a of D.accounts) list.append(acctTile(a));
+    card.append(list);
+    const add = E('details', 'ac-add'); add.open = D.accounts.length === 1;
+    add.append(E('summary', '', '다른 쿠팡 계정 더하기'));
+    const ol = E('ol');
+    const li1 = E('li', '', 'Wing > 판매자정보 > 추가판매정보 > OPEN API 키 발급에서 그 계정의 업체코드·Access Key·Secret Key를 확인해요. 허용 IP를 물으면 바른청년 키에 넣은 것과 같은 이 맥미니의 IP를 넣어요.');
+    const li2 = E('li', '', '맥미니 터미널에서 아래 명령을 실행하고, 묻는 대로 붙여 넣어요(키는 화면에 안 보이고 이 컴퓨터 비밀 폴더에만 저장돼요). <이름>은 영문으로 짧게(예: food2).');
+    const cmd = E('div'); cmd.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px';
+    const code = E('code', '', ADD_CMD); const cp = E('button', 'btn sm ghost', '명령 복사'); cp.type = 'button';
+    cp.onclick = async () => { try { await navigator.clipboard.writeText(ADD_CMD); cp.textContent = '복사했어요'; } catch (e) { cp.textContent = '직접 복사해 주세요'; } };
+    cmd.append(code, cp); li2.append(cmd);
+    ol.append(li1, li2, E('li', '', '이 화면을 새로 고치면 계정이 나와요 → [연결 확인]을 누르면 그 계정의 출고지·반품지를 읽어 비어 있는 칸을 채워요.'),
+      E('li', '', 'Wing 로그인 아이디·고객센터 번호(·공통 상세 사진)를 적고 저장 → [여기에 올리기].'),
+      E('li', '', '상품마다 따로 고르려면 등록 명령에 --계정 <이름>(바른청년은 --계정 바른청년).'));
+    add.append(ol); card.append(add);
+    return card;
+  }
+
+  function acctTile(a) {
+    const on = a.name === D.register_account, ready = !a.problems.length;
+    const box = E('div', 'ac' + (on ? ' on' : '')), h = E('div', 'ac-h'), msg = E('div', 'st-msg');
+    const last = acctMsg.get(a.name); if (last) { msg.textContent = last.text; msg.className = 'st-msg' + (last.ok ? '' : ' bad'); }
+    const keep = (r) => { if (r) acctMsg.set(a.name, { text: r.msg || '', ok: !!r.ok }); };
+    h.append(E('b', '', a.label || a.name));
+    if (a.name && a.label && a.label !== a.name) h.append(E('span', 'muted small', a.name));
+    if (a.main) h.append(E('span', 'badge', '운영 계정'));
+    if (on) h.append(E('span', 'badge', '새 상품은 여기로'));
+    h.append(E('span', ready ? 'ac-ok' : 'ac-no', ready ? '올릴 수 있어요' : `준비 덜 됨 ${a.problems.length}`));
+    const sp = E('span', 'sp');
+    if (!on) {
+      const go = E('button', 'btn sm', '여기에 올리기'); go.type = 'button'; go.disabled = !ready;
+      if (!ready) go.title = '아래 채울 것을 먼저 채워 주세요';
+      let armed = 0;
+      go.onclick = () => {
+        if (Date.now() - armed > 4000) {
+          armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = `새 쿠팡 상품을 '${a.label || a.name}'에 올리게 바꿔요 — 맞으면 4초 안에 한 번 더 눌러 주세요`;
+          go.textContent = '한 번 더 눌러 확정'; setTimeout(() => { go.textContent = '여기에 올리기'; }, 4000); return;
+        }
+        post({ op: 'set', key: ACCT_KEY, value: a.name }, go, msg).then(keep);
+      };
+      sp.append(go);
+    }
+    const ck = E('button', 'btn sm ghost', '연결 확인'); ck.type = 'button'; ck.title = '그 계정 키로 쿠팡을 읽기만 해요(판매자 번호·출고지·반품지)';
+    ck.onclick = () => { msg.className = 'st-msg'; msg.textContent = '쿠팡에 묻는 중…'; post({ op: 'acct_check', name: a.name }, ck, msg).then(keep); };
+    sp.append(ck);
+    if (!a.main) {
+      const ed = E('button', 'btn sm ghost', openAcct.has(a.name) ? '접기' : '정보 고치기'); ed.type = 'button';
+      ed.onclick = () => { if (openAcct.has(a.name)) openAcct.delete(a.name); else openAcct.add(a.name); body(); };
+      sp.append(ed);
+    }
+    h.append(sp); box.append(h);
+    const ch = a.checked || {};
+    const places = Object.entries(a.places || {}).map(([c, code]) => `${COUNTRY[c] || c} ${code}`).join(' · ');
+    const rc = (ch.return_centers || []).find((x) => x.code === a.return_center);
+    const info = a.main
+      ? ['본보기 상품의 출고지·반품지·연락처를 그대로 써요', ch.vendor_id ? `판매자 ${ch.vendor_id}` : '', ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' — 실패'}` : '']
+      : [ch.vendor_id ? `판매자 ${ch.vendor_id}` : '판매자 번호 — 연결 확인 전', a.vendor_user_id ? `Wing ${a.vendor_user_id}` : '', places ? `출고지 ${places}` : '',
+        rc ? `반품지 ${rc.name}` : '', a.contact ? `고객센터 ${a.contact}` : '', a.detail_image ? '공통 상세 사진 있음' : '공통 상세 사진 없음(설계 상세를 씀)',
+        ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' — 실패'}` : ''];
+    const meta = E('div', 'ac-m'); info.filter(Boolean).forEach((x, i) => { if (i) meta.append(' · '); const sp = E('span', '', x); if (x.length <= 22) sp.style.whiteSpace = 'nowrap'; meta.append(sp); });   // 번호·코드가 줄 끝에서 안 쪼개지게
+    box.append(meta);
+    if (a.problems.length) { const ul = E('ul', 'ac-todo'); for (const p of a.problems) ul.append(E('li', '', p)); box.append(ul); }
+    if (!a.main && openAcct.has(a.name)) box.append(acctForm(a, msg, keep));
+    box.append(msg);
+    return box;
+  }
+
+  function acctForm(a, msg, keep) {
+    const ch = a.checked || {}, f = E('div', 'ac-f'), val = {};
+    const lab = (label, el) => { const id = `ac-${a.name}-${Object.keys(val).length}`; el.id = id; el.setAttribute('aria-label', label); const l = E('label', '', label); l.htmlFor = id; f.append(l, el); };
+    const text = (key, label, ph, hint) => {
+      const i = E('input'); i.value = a[key] || ''; i.placeholder = ph || ''; i.title = ph || ''; lab(label, i); val[key] = () => i.value;
+      if (hint) f.append(E('div', 'hint', hint));
+    };
+    text('label', '보이는 이름', '예: 푸드투 상사');
+    text('vendor_user_id', 'Wing 로그인 아이디', '그 계정 Wing에 로그인하는 아이디', '쿠팡 상품 등록에 꼭 들어가요(vendorUserId)');
+    text('contact', '고객센터 번호', '02-1234-5678', '상품의 판매자 연락처·A/S 번호로 들어가요');
+    text('as_info', 'A/S 안내', '비우면 "해외구매대행 상품입니다. 문의는 고객센터 …"');
+    text('detail_image', '공통 상세 사진 주소', 'https://…', '다른 사업자 계정 상세는 공통 안내 사진 한 장(비우면 설계 상세를 쓰고 바른청년 안내 띠만 뺌)');
+    const rs = E('select'); rs.append(new Option('(고르기)', ''));
+    for (const x of (ch.return_centers || []).filter((x) => x.usable)) rs.append(new Option(`${x.name} — ${x.addr} ${x.detail}`.trim(), x.code));
+    rs.value = a.return_center || ''; lab('반품지', rs); val.return_center = () => rs.value;
+    if (!(ch.return_centers || []).length) f.append(E('div', 'hint', '[연결 확인]을 먼저 누르면 그 계정 반품지가 나와요'));
+    const usable = (ch.places || []).filter((x) => x.usable);
+    const countries = [...new Set(usable.filter((x) => x.country && x.country !== 'KR').map((x) => x.country))];
+    const pl = E('div', 'ac-places'), sel = {};
+    for (const c of countries) {
+      const s = E('select'); s.append(new Option('(안 씀)', ''));
+      for (const x of usable.filter((x) => x.country === c)) s.append(new Option(`${x.name} ${x.code}`, x.code));
+      s.value = (a.places || {})[c] || ''; s.setAttribute('aria-label', `${COUNTRY[c] || c} 출고지`); sel[c] = s;
+      const d = E('div'); d.append(E('span', '', COUNTRY[c] || c), s); pl.append(d);
+    }
+    val.places = () => Object.fromEntries(Object.entries(sel).map(([c, s]) => [c, s.value]).filter(([, v]) => v));
+    f.append(E('label', '', '나라별 출고지'), countries.length ? pl : E('div', 'muted small', '[연결 확인]을 먼저 누르면 그 계정 출고지가 나라별로 나와요'));
+    const b = E('button', 'btn sm', '계정 정보 저장'); b.type = 'button';
+    b.onclick = () => post({ op: 'acct_save', name: a.name, fields: Object.fromEntries(Object.entries(val).map(([k, fn]) => [k, fn()])) }, b, msg).then(keep);
+    f.append(E('span'), b);
+    return f;
+  }
+
   function render(d) {
-    D = { group_help: {}, links: [], paused: [], history: [], ...d };
+    D = { group_help: {}, links: [], paused: [], history: [], accounts: [], register_account: '', ...d };
     const changed = D.items.filter((x) => x.changed);
     $('st-title').textContent = changed.length ? `설정 ${D.items.length}개 · 바꾼 것 ${changed.length}개` : `설정 ${D.items.length}개 · 모두 기본값`;
     const st = $('st-stats'); st.innerHTML = '';
