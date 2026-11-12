@@ -6,8 +6,20 @@
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   // 2026-11-06: 503 '{}'도 자료로 받아 render가 data.tabs에서 깨지고 '불러오는 중'도 없이 멈췄음 → 응답 코드부터 확인
   const fetchJ = async (p, opts) => { const r = await (window.barunFetch || fetch)(p, opts); if (!r.ok) throw new Error(`서버 응답 ${r.status}`); return r.json(); };
-  const DESC = { 전체현황: '진행 중 주문 요약', 매출분석: '이번 달 매출·순이익', 판매점검: '쿠팡 판매 점검(⑦)',
-    메일정리: '네이버 메일 정리(⑤)', 설정: '환율·탭 기본값 · 노란 칸 수정은 다음 갱신부터 반영' };
+  const DESC = { 전체현황: '진행 중 주문 요약', 매출분석: '이번 달 매출·순이익', 판매점검: '쿠팡 판매 점검',
+    메일정리: '네이버 메일 정리', 설정: '환율·탭 기본값 · 노란 칸을 고치면 다음 갱신부터 반영돼요' };
+  const LABEL = { 전체현황: '전체 현황', 매출분석: '매출 분석', 판매점검: '판매 점검', 메일정리: '메일 정리' };
+  const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t ?? ''));
+  // 2026-11-12 리뉴얼: 격자 글(서버가 씀)을 화면에 낼 때 — 이모지·파일 이름·업무 번호 덧말은 빼고, ' — '는 '·'로, 습니다체 안내는 해요체로(뜻은 그대로)
+  const FIX = [
+    [/자동으로 다시 써지는 탭\s*\(수정 금지\)/g, '회차마다 새로 써지는 탭이라 여기서는 고치지 않아요'],
+    [/^설정\s*[—–-]\s*노란 칸만 고치세요\.\s*직접환율을 적으면 자동환율 대신 씁니다\.?$/, '노란 칸만 고쳐 주세요. 직접환율을 적으면 자동환율 대신 그 값을 써요.'],
+    [/\s*\((?:장부\s+)?[\w./-]+\.(?:jsonl|json|py|db|csv)\)/g, ''],
+    [/\s*\([⓪①②③④⑤⑥⑦⑧⑨⑩]\)/g, ''],
+    [/\s*\(수정 금지\)/g, ''],
+    [/\s+[—–]\s+/g, ' · '],
+  ];
+  const tidy = (t) => FIX.reduce((x, [re, to]) => x.replace(re, to), noE(t)).trim();
   let cur = '전체현황', data = null, pending = {}, note = '';
   const card = () => document.getElementById('rep-card');
 
@@ -33,23 +45,42 @@
     const h = String(head || ''), t = s.trim();
     if (!h || KEEP.test(h) || !/^-?\d+(\.\d+)?$/.test(t)) return s;
     if (RATE.test(h)) return t.includes('.') || +t === 0 ? `${(+t * 100).toFixed(1)}%` : s;
+    if (/환율/.test(h)) { const n = +t, d = Math.abs(n) < 100 ? 4 : 2; return n.toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d }); }   // 엔(JPY)처럼 작은 값은 소수 4자리
     if (MONEY.test(h) && /^-?\d{4,}$/.test(t)) return (+t).toLocaleString('ko-KR');
     return s;
   }
   window.barunReportCell = shown;     // 시험용(dashboard/tests/test_reports_js.py)
 
+  // 한 줄짜리 '없음' 표는 머리글 없이 한 문장으로
+  const isEmptyTable = (rows) => rows.length === 1 && rows[0].row.filter((c) => String(c).trim()).every((c) => /^(없음|-|—)$/.test(String(c).trim()));
+  // 머리글 + 숫자 한두 줄(매출분석 첫 덩어리)은 숫자 칸으로 — 화면 첫머리 요약
+  const isKpi = (rows, head) => head && rows.length >= 1 && rows.length <= 2 && head.row.filter((c) => String(c).trim()).length <= 5
+    && rows[0].row.filter((c) => String(c).trim()).every((c) => /\d/.test(String(c)) && String(c).length <= 24);
+  function kpis(rows, head) {
+    const box = E('div', 'stats rep-kpi');
+    head.row.forEach((k, j) => {
+      if (!String(k).trim()) return;
+      // '212만원 (포인트 48만원)'처럼 괄호 덧말은 큰 숫자 아래 줄로
+      const val = tidy(shown(rows[0].row[j], k)), m = val.match(/^(.+?)\s*\((.+)\)$/);
+      const st = E('div', 'stat'); st.title = val;
+      st.append(E('div', 'k', tidy(k)), E('div', 'v', m ? m[1] : val), E('div', 'd', [m && m[2], rows[1] ? tidy(rows[1].row[j] || '') : ''].filter(Boolean).join(' · ')));
+      box.append(st);
+    });
+    return box;
+  }
   function table(rows, head) {
+    if (isEmptyTable(rows)) return E('p', 'rep-empty', '지금은 해당하는 줄이 없어요.');
     const used = new Set();
     for (const { row } of [head, ...rows].filter(Boolean)) row.forEach((c, j) => { if (String(c).trim()) used.add(j); });
     rows.forEach(({ i, row }) => row.forEach((c, j) => { if (editable(i, j + 1)) used.add(j); }));
     const cols = [...used].sort((a, b) => a - b);
     const wrap = E('div', 'rep-wrap'); const t = E('table', 'rep');
-    if (head) { const tr = E('tr'); for (const j of cols) tr.append(E('th', null, head.row[j] || '')); const th = E('thead'); th.append(tr); t.append(th); }
+    if (head) { const tr = E('tr'); for (const j of cols) tr.append(E('th', null, tidy(head.row[j] || ''))); const th = E('thead'); th.append(tr); t.append(th); }
     const tb = E('tbody');
     for (const { i, row } of rows) {
       const tr = E('tr');
       for (const j of cols) {
-        const raw = row[j] || '', v = editable(i, j + 1) ? raw : shown(raw, head ? head.row[j] : '');
+        const raw = row[j] || '', v = editable(i, j + 1) ? raw : tidy(shown(raw, head ? head.row[j] : ''));
         const hd = head ? String(head.row[j] || '') : '';
         const td = E('td', /^[-+]?[\d,.]+(원|%|건|개|만원)?$/.test(v.trim()) && !KEEP.test(hd) ? 'num' : v.length > 40 ? 'long' : KEEP.test(hd) ? 'id' : null);
         if (hd) td.dataset.h = hd;   // 폰 카드 보기의 칸 이름
@@ -66,10 +97,10 @@
     }
     t.append(tb); wrap.append(t);
     // 2026-11-06: PC에서 오른쪽 칸(공홈주문번호 등)이 잘려도 옆으로 밀 수 있다는 표시가 없었음 → 넘치면 오른쪽 흐림 + 안내 한 줄
-    const hint = E('div', 'rep-hint', '옆으로 밀면 칸이 더 있어요 →'); hint.hidden = true;
+    const hint = E('div', 'rep-hint', '오른쪽으로 밀면 칸이 더 있어요'); hint.hidden = true;
     const edge = () => { const over = wrap.scrollWidth > wrap.clientWidth + 2; hint.hidden = !over; wrap.classList.toggle('more-r', over && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2); };
     wrap.addEventListener('scroll', edge, { passive: true }); wrap._edge = edge; requestAnimationFrame(edge);
-    const box = E('div'); box.append(wrap, hint); return box;
+    const box = E('div'); box.append(hint, wrap); return box;
   }
 
   // ── 매출분석 그래프(보고서 'report' 동작의 그래프 정의 + 격자의 숫자) — 색: 네이버 3번(청록)·쿠팡 2번(주황)·합계 1번(파랑), 검사기 통과 ──
@@ -91,6 +122,8 @@
     const top = Math.ceil(max / step) * step;
     const x = (i) => L + (W - L - R) * (body.length < 2 ? 0.5 : i / (body.length - 1)), y = (v) => T + (H - T - B) * (1 - v / top);
     const svg = S('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ch-svg', role: 'img', 'aria-label': `${c.title || '일별 매출'} 선 그래프` });
+    // 그림이 늘어나도 축 글자는 화면에서 12px(viewBox 배율만큼 줄여 줌)
+    if (window.ResizeObserver) new ResizeObserver(() => { const w = svg.getBoundingClientRect().width; if (w) svg.style.setProperty('--ax', `${(12 * W / w).toFixed(2)}px`); }).observe(svg);
     for (let v = 0; v <= top + 1e-9; v += step) { svg.append(S('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'ch-grid' }), S('text', { x: L - 6, y: y(v) + 4, class: 'ch-ax', 'text-anchor': 'end' }, man(v))); }
     body.forEach((r, i) => { if (i % 5 === 0 || i === body.length - 1) svg.append(S('text', { x: x(i), y: H - 6, class: 'ch-ax', 'text-anchor': 'middle' }, r[0])); });
     names.forEach((n, k) => {
@@ -146,30 +179,49 @@
     return g;
   }
 
+  // 맨 위 안내 줄: 제목은 굵게, '갱신'이 든 줄은 앞의 숫자(진행 중 22건)만 요약으로 크게 · 나머지는 작고 옅게
+  function lead(t, first) {
+    if (/갱신/.test(t)) {
+      const parts = t.split(' · '), k = parts.findIndex((x) => /갱신/.test(x));
+      const sum = parts.slice(0, Math.max(0, k)).filter((x) => /\d/.test(x)), rest = parts.filter((x) => !sum.includes(x));
+      return [sum.length && E('div', 'rep-sum', sum.join(' · ')), E('div', 'rep-meta', rest.join(' · '))].filter(Boolean);
+    }
+    return [E('div', first && t.length <= 30 ? 'rep-title' : first ? 'rep-note' : 'rep-meta', t)];
+  }
   function render() {
     const box = card(); if (!box || !data) return;
-    const body = box.querySelector('.rep-body'); body.textContent = '';
+    const body = box.querySelector('.rep-body'); body.textContent = ''; body.classList.remove('rep-wait'); requestAnimationFrame(() => { body.style.minHeight = ''; });
     const chips = box.querySelector('.rep-tabs'); chips.textContent = '';
     for (const t of data.tabs) {
-      const b = E('button', 'chipbtn' + (t === cur ? ' on' : ''), t); b.type = 'button'; b.setAttribute('aria-pressed', String(t === cur));
-      b.onclick = () => { if (Object.keys(pending).length && !confirm('저장 안 한 칸을 버릴까요?')) return; pending = {}; note = ''; cur = t; load(); };
+      const b = E('button', 'chipbtn' + (t === cur ? ' on' : ''), LABEL[t] || t); b.type = 'button'; b.setAttribute('aria-pressed', String(t === cur));
+      b.onclick = () => {
+        if (t === cur) return;
+        if (Object.keys(pending).length && !confirm('저장하지 않은 칸이 있어요. 버리고 넘어갈까요?')) return;
+        pending = {}; note = ''; cur = t;
+        // 탭을 바꾸는 동안 높이를 잡아 둬 화면이 출렁이지 않게
+        body.style.minHeight = `${body.offsetHeight}px`; body.classList.add('rep-wait');
+        chips.querySelectorAll('.chipbtn').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+        load();
+      };
       chips.append(b);
     }
     box.querySelector('.rep-desc').textContent = `${DESC[cur] || ''}${data.updated ? ` · ${data.updated.slice(5, 16).replace('T', ' ')} 기준` : ''}`;
-    if (!data.grid.length) { body.append(E('p', 'muted', '내용 없음')); return; }
-    const ch = charts(); if (ch) body.append(ch);
+    if (!data.grid.length) { body.append(E('p', 'rep-empty', '아직 내용이 없어요. 회차가 돌면 채워져요.')); bar(); return; }
+    const ch = charts();
     for (const b of blocks(data.grid)) {
       const sec = E('section', 'rep-sec');
       let rows = b;
-      if (solo(rows[0].row)) { sec.append(E(rows[0].i <= 2 ? 'div' : 'h3', rows[0].i <= 2 ? 'rep-lead' : 'rep-h', rows[0].row[0])); rows = rows.slice(1); }
-      while (rows.length && solo(rows[0].row) && rows[0].i <= 3) { sec.append(E('div', 'rep-lead', rows[0].row[0])); rows = rows.slice(1); }
+      if (solo(rows[0].row)) { const t = tidy(rows[0].row[0]); if (rows[0].i <= 2) sec.append(...lead(t, true)); else sec.append(E('h3', 'rep-h', t)); rows = rows.slice(1); }
+      while (rows.length && solo(rows[0].row) && rows[0].i <= 3) { sec.append(...lead(tidy(rows[0].row[0]), false)); rows = rows.slice(1); }
       if (rows.length) {
         const multi = rows.filter((r) => r.row.filter((c) => String(c).trim()).length > 1).length;
         const head = rows.length > 1 && multi ? rows[0] : null;
-        sec.append(table(head ? rows.slice(1) : rows, head));
+        sec.append(head && isKpi(rows.slice(1), head) ? kpis(rows.slice(1), head) : table(head ? rows.slice(1) : rows, head));
       }
       body.append(sec);
     }
+    // 그래프는 맨 위 숫자 칸(요약) 바로 아래에, 숫자 칸이 없으면 맨 위에
+    if (ch) { const k = body.querySelector('.rep-kpi'); const after = k && k.closest('.rep-sec'); if (after) after.after(ch); else body.prepend(ch); }
     bar();
   }
 
@@ -179,19 +231,19 @@
     b.hidden = !n && !note; b.textContent = ''; if (b.hidden) return;
     if (n) {
       const undo = E('button', 'btn sm ghost', '되돌리기'); undo.type = 'button'; undo.onclick = () => { pending = {}; note = ''; render(); };
-      const save = E('button', 'btn sm primary', `저장 (${n}칸)`); save.type = 'button';
+      const save = E('button', 'btn sm primary', '저장'); save.type = 'button';
       save.onclick = async () => {
         save.disabled = true; save.textContent = '저장 중…';
         try {
           const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'db', kind: 'settings_set', edits: Object.values(pending) }) });
-          const j = await r.json();
+          const j = await r.json().catch(() => ({ ok: false, msg: `서버가 응답하지 않아요(${r.status}). 잠시 뒤 다시 저장해 주세요.` }));
           if (j.ok) pending = {};
-          note = (j.ok ? '' : '실패: ') + j.msg;
-        } catch (e) { note = '실패: ' + e.message; }
+          note = j.ok ? (j.msg || '저장했어요. 다음 갱신부터 반영돼요.') : `저장하지 못했어요. ${j.msg || '서버가 이유를 주지 않았어요.'}`;
+        } catch (e) { note = `저장하지 못했어요. ${e.message}`; }
         await load();
       };
-      b.append(E('b', null, `${n}칸 바뀜`), undo, save);
+      b.append(E('b', null, `고친 칸 ${n}개`), undo, save);
     }
     if (note) { const o = E('span', 'rep-out', note); o.setAttribute('role', 'status'); b.append(o); }
   }
@@ -201,25 +253,40 @@
   async function load() {
     const box = card(); if (!box) return;
     const my = ++seq; let j;
-    try { j = await fetchJ('/api/db/grid?tab=' + encodeURIComponent(cur)); } catch (e) { if (my !== seq) return; box.querySelector('.rep-body').textContent = '보고서를 읽지 못했어요: ' + e.message; bar(); return; }
+    const fail = (t) => { const b = box.querySelector('.rep-body'); b.classList.remove('rep-wait'); b.style.minHeight = ''; b.replaceChildren(E('p', 'rep-empty', t)); bar(); };
+    try { j = await fetchJ('/api/db/grid?tab=' + encodeURIComponent(cur)); } catch (e) { if (my !== seq || e.message === '로그인 필요') return; fail(`보고서를 읽지 못했어요(${e.message}). 잠시 뒤 다시 열어 주세요.`); return; }
     if (my !== seq) return;
-    if (j.error || !Array.isArray(j.grid)) { box.querySelector('.rep-body').textContent = j.error || '보고서 자료 모양이 달라요'; bar(); return; }
+    if (j.error || !Array.isArray(j.grid)) { fail(j.error || '보고서 자료를 알아보지 못했어요. 잠시 뒤 다시 열어 주세요.'); return; }
     data = j; render();
   }
 
   function build() {
     const panel = document.getElementById('p-reports'); if (!panel || card()) return;
     const css = E('style'); css.textContent = `
-      .rep-wrap.more-r { box-shadow: inset 0 0 0 1px var(--line), inset -18px 0 14px -12px rgba(0, 0, 0, .18); }
-      .rep-hint { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
-      table.rep td.id { white-space: normal; word-break: break-all; min-width: 110px; max-width: 200px; }
+      .rep-wrap.more-r { box-shadow: inset 0 0 0 1px var(--line), inset -24px 0 16px -12px color-mix(in srgb, var(--ink) 16%, transparent); }
+      .rep-hint { font-size: 12.5px; color: var(--muted); text-align: right; margin: 0 0 4px; }
+      #rep-card .rep-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+      #rep-card .rep-title { font-size: 15px; font-weight: 700; color: var(--ink); }
+      #rep-card .rep-sum { font-size: 15px; font-weight: 600; color: var(--ink2); }
+      #rep-card .rep-note { font-size: 13.5px; color: var(--sub); }
+      #rep-card .rep-meta { font-size: 12.5px; color: var(--muted); margin-top: -4px; }
+      #rep-card .rep-h { font-size: 15px; font-weight: 700; margin: 0; }
+      .rep-empty { margin: 0; padding: 12px 16px; border-radius: var(--r-sm); background: var(--fill2); font-size: 13.5px; color: var(--muted); }
+      #rep-card .rep-kpi .stat { cursor: default; }
+      @media (hover: hover) { #rep-card .rep-kpi .stat:hover { transform: none; background: var(--fill2); box-shadow: inset 0 0 0 1px var(--line); } }
+      @media (hover: hover) and (prefers-color-scheme: dark) { #rep-card .rep-kpi .stat:hover { box-shadow: none; } }
+      #rep-card .rep-kpi .stat .d { white-space: normal; }
+      #rep-card .ch-grid { align-items: stretch; }
+      #rep-card .ch-svg .ch-ax { font-size: var(--ax, 12px); }
+      .rep-body { transition: opacity .2s var(--ease, ease); } .rep-body.rep-wait { opacity: .45; }
+      table.rep td.id { white-space: nowrap; font-variant-numeric: tabular-nums; }
       /* 2026-11-06 폰: 표가 4칸만 보이고 나머지는 잘려서 — 줄마다 카드(칸 이름: 값) */
       @media (max-width: 640px) {
         .rep-wrap { box-shadow: none; overflow: visible; } .rep-hint { display: none; }
         table.rep, table.rep tbody, table.rep tr, table.rep td { display: block; width: 100%; box-sizing: border-box; }
-        table.rep thead { display: none; } table.rep tr { border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; }
-        table.rep td { border-top: 0; padding: 3px 0; max-width: none; white-space: normal; word-break: break-all; text-align: left !important; min-width: 0 !important; }
-        table.rep td[data-h]::before { content: attr(data-h) ' '; color: var(--muted); font-size: 12px; margin-right: 6px; }
+        table.rep thead { display: none; } table.rep tr { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; margin-bottom: 8px; }
+        table.rep td { border-top: 0; padding: 4px 0; max-width: none; white-space: normal; overflow-wrap: anywhere; text-align: left !important; min-width: 0 !important; }
+        table.rep td[data-h]::before { content: attr(data-h) ' '; color: var(--muted); font-size: 12px; margin-right: 8px; }
         table.rep td:empty { display: none; }
       }`;
     document.head.append(css);

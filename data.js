@@ -17,18 +17,31 @@
   // 2026-11-06: 503 같은 HTML 오류 페이지면 .json()이 'Unexpected token <'을 그대로 보여 줬음 → 상태 번호로(오류로 던져 저장은 '저장 안 됨'·다시 저장 길로)
   const readJ = async (r) => { try { return await r.json(); } catch (e) { throw new Error(`서버가 응답하지 않아요(${r.status})`); } };
   const fetchJ = async (p, opts) => readJ(await (window.barunFetch || fetch)(p, opts));
+  // 오류 한 줄(2026-11-12 화면 글): 연결이 끊긴 것은 할 일까지, 서버가 준 한국어는 그대로, 영어 원문(Failed to fetch 등)은 쉬운 말로
+  const errText = (e) => { const m = noE(String((e && e.message) || e || '')).trim(); return /failed to fetch|networkerror|load failed|network|aborted?/i.test(m) ? '인터넷 연결을 확인하고 다시 해 주세요.' : /[가-힣]/.test(m) ? m : '서버에서 오류가 났어요. 잠시 뒤 다시 해 주세요.'; };
   const won = (v) => (+v).toLocaleString('ko-KR') + '원';
-  const COLNAME = { lead_id: '줄', title: '상품', quantity: '수량', state: '상태', profit: '이익', cost_krw: '도착원가', market_krw: '시장가', plan: '계획가',
-    marks: '표시', reason: '판정 이유', waiting: '대기', updated: '고친 시각', source_key: '원천', country: '나라', site: '판매처', currency: '통화', unit_price: '단가', fx_krw: '환율',
-    checked_at: '확인', status: '상태', notes: '메모', platform: '플랫폼', listing_id: 'id', name: '상품명', qty: '수량', price: '가격', seller_code: '판매자 코드',
-    group_no: '그룹·상품', at: '시각', action: '동작', applied: '실행', ok: '성공', summary: '요약', approved_by: '승인', tab: '탭', row: '행', receiver: '받는 분',
-    option: '옵션', progress: '진행상태', intl_tracking: '해외송장', kr_invoice: '국내송장', fwd_request: '배대지 신청번호', memo: '메모', problem: '문제', key: 'key',
-    ordered_at: '주문일', claim_status: '클레임', paid: '결제', courier: '택배사', invoice: '송장', src: '출처', field: '칸', old: '전', new: '후',
+  const COLNAME = { lead_id: '번호', title: '상품', quantity: '수량', state: '상태', profit: '수익', cost_krw: '도착원가', market_krw: '시장가', plan: '계획가',
+    marks: '표시', reason: '판정 이유', waiting: '대기', updated: '고친 시각', source_key: '원천 번호', country: '나라', site: '사이트', currency: '통화', unit_price: '단가', fx_krw: '환율',
+    checked_at: '확인 시각', status: '상태', notes: '메모', platform: '플랫폼', listing_id: '상품 번호', name: '상품명', qty: '수량', price: '가격', seller_code: '판매자 코드',
+    group_no: '그룹 번호', at: '시각', action: '한 일', applied: '적용', ok: '성공', summary: '요약', approved_by: '승인한 사람', tab: '탭', row: '행', receiver: '받는 분',
+    option: '옵션', progress: '진행상태', intl_tracking: '해외송장', kr_invoice: '국내송장', fwd_request: '배대지 신청번호', memo: '메모', problem: '문제', key: '주문 키',
+    ordered_at: '주문일', claim_status: '클레임', paid: '결제액', courier: '택배사', invoice: '송장', src: '출처', field: '칸', old: '전 값', new: '새 값',
     ordered: '주문일시', shop: '구매처', shop_price: '공홈가', shop_order: '공홈주문번호', ship_mode: '배송방식', intl_carrier: '해외운송사', fwd_center: '배대지센터',
     ship_cost: '배송비', margin: '수익률', send_qty: '보낼수량', order_no: '주문번호', due: '발송기한', settle: '입금액', cost: '원가', stock_note: '재고안내', point: '포인트',
-    tax_rate: '세율', handling: '처리 방식', ref: '근거', claim: '클레임', claim_at: '클레임 시각', order_id: '주문번호', line_id: '줄 id', product_id: '상품 id',
-    tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내', nation: '국가' };
+    tax_rate: '세율', handling: '처리 방식', ref: '근거', claim: '클레임', claim_at: '클레임 시각', order_id: '주문번호', line_id: '줄 번호', product_id: '상품 번호',
+    tel: '연락처', zip: '우편번호', addr: '주소', ship_memo: '배송메모', pccc: '통관부호', stock_note: '재고안내', nation: '국가',
+    // 2026-11-12: 정렬·필터 칸 고르기에 'id'·'measured_krw' 같은 영어 칸 이름이 그대로 보이던 것
+    id: '고유 번호', seq: '순서', profit_naver: '네이버 수익', profit_coupang: '쿠팡 수익', registered: '등록됨', item_key: '상품 키', vat_factor: '부가세 배수',
+    local_shipping: '현지 배송비', freight_krw: '운송비', in_stock: '재고 있음', evidence: '증거', user_price: '직접 넣은 가격', user_currency: '직접 넣은 통화',
+    user_at: '직접 넣은 시각', user_ref: '직접 넣은 근거', measured_krw: '실측 원가', measured_freight_krw: '실측 운송비', measured_at: '실측 시각', measured_ref: '실측 근거',
+    measured_opt_qty: '실측 옵션 수량', measured_freight_qty: '실측 운송 수량', cost_origin: '원가 출처', cost_at: '원가 시각', product_no: '상품번호', origin_no: '원상품 번호',
+    link_origin: '원상품 연결', link_at: '연결 시각', barcode: '바코드', ids: '등록 번호', dir: '기록 폴더', kind: '종류', source: '출처', role: '맡은 곳', body: '내용',
+    priority: '우선순위', created: '만든 시각', parent: '상위 항목', data: '자료' };
   const STATES = ['후보', '정밀확인', '탈락', '외부대기', '끝'];
+  // 표 이름은 화면에서만 쉬운 말로(2026-11-12 리뉴얼: '일 표'·'원천 상품'·'주문 변경 이력'이 내부 이름 그대로 보이던 것). 서버 이름표는 그대로
+  const TABLE_KO = { sheet_rows: '주문 시트', orders: '쿠팡·네이버 주문', order_ledger: '주문 처리 방식', order_events: '주문 바뀐 기록', sourcing_leads: '소싱 후보',
+    sources: '구매처 상품', listings: '판매 상품', registrations: '상품 등록 기록', items: '일 목록' };
+  const tableName = (name, label) => TABLE_KO[name] || label || name;
   // 보기 상태 = 표·찾기·할 일 묶음·열 필터·정렬·페이지·숨긴 열·고정 열 — 주소(#data?…)에 남아 새로고침·공유해도 그대로, '보기 저장'은 이 브라우저(localStorage)에
   const DEF = (t) => ({ table: t, q: '', preset: t === 'sheet_rows' ? '진행 중' : t === 'order_ledger' ? '미정' : '', offset: 0, filters: [], sort: [], hide: [], show: [],
     pin: t === 'sheet_rows' ? ['tab', 'row', 'receiver'] : [] });   // 주문 시트는 탭·행·받는 분을 왼쪽에 고정(오른쪽으로 넘겨도 누구 줄인지 보이게, 10/23 사장님 "285mm 뒤 정보를 볼 수 없어")
@@ -46,11 +59,19 @@
     if (v == null || v === '') return '';
     if (['profit', 'cost_krw', 'market_krw', 'price', 'paid', 'settle'].includes(k) && !isNaN(+v) && String(v).trim() !== '') return won(v);
     if (typeof v === 'string' && (v.startsWith('[') || v.startsWith('{'))) { try { const j = JSON.parse(v); return Array.isArray(j) ? j.join(', ') : Object.entries(j).map(([a, b]) => `${a === 'naver' ? '네이버' : a === 'coupang' ? '쿠팡' : a} ${typeof b === 'number' ? b.toLocaleString('ko-KR') : (typeof b === 'object' ? JSON.stringify(b) : b)}`).join(' · '); } catch (e) { /* 그대로 */ } }
-    if (/^\d{4}-\d\d-\d\dT/.test(String(v))) return String(v).slice(5, 16).replace('T', ' ');
+    { const d = String(v).trim().match(/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d:\d\d)(:\d\d(\.\d+)?)?(Z|[+-]\d\d:?\d\d)?$/); if (d) return `${+d[1] !== new Date().getFullYear() ? d[1] + '/' : ''}${d[2]}/${d[3]} ${d[4]}`; }   // 날짜·시각은 MM/DD HH:mm(올해가 아니면 연도까지)
+    if (k === 'shop' && /^https?:\/\//i.test(String(v).trim())) { try { return new URL(String(v).trim()).hostname.replace(/^www\./, ''); } catch (e) { /* 그대로 */ } }   // 구매처 칸에 주소 전체가 든 줄은 사이트 이름만
+    if (k === 'field') return COLNAME[v] || String(v);          // 주문 바뀐 기록의 칸 이름(progress·invoice…)도 화면 말로
     if (CODE_COLS.includes(k)) return ko(v);     // 플랫폼 상태 코드·플랫폼 이름은 사람 말로(값·필터는 원래 코드 그대로)
     return /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(String(v)) ? noE(v) : String(v);   // 보이는 값의 이모지만 걷음(값은 그대로)
   };
-  const badgeCls = (v) => /탈락|반려|실패|SUSPENSION|PROHIBITION|CANCEL|취소|반품|미정/.test(v) ? 'bad' : /정밀확인|등록준비|대기|심사|OUTOFSTOCK|요청중|필요/.test(v) ? 'warn' : /등록|승인완료|SALE|ok|끝|발송완료|배송완료|구매확정|해외구매|재고발송/.test(v) ? 'ok' : '';
+  const badgeCls = (v) => /탈락|반려|실패|SUSPENSION|PROHIBITION|판매중지|판매금지|CANCEL|취소|반품|미정/.test(v) ? 'bad' : /정밀확인|등록준비|대기|심사|OUTOFSTOCK|품절|요청중|필요/.test(v) ? 'warn' : /등록|승인완료|SALE|판매 ?중|ok|끝|발송완료|배송완료|구매확정|해외구매|재고발송/.test(v) ? 'ok' : '';
+  // 상태 표시: '해외발송(신청대기)'처럼 괄호 덧말이 붙은 시트 값은 큰 말 + 작은 덧말(2026-11-12 휴대폰 점검)
+  const badge = (v, cls) => {
+    const s = String(v ?? ''), m = s.match(/^(.+?)\s*\((.+)\)\s*$/), b = E('span', cls == null ? 'badge ' + badgeCls(s) : cls);
+    if (m) { b.append(m[1]); b.append(E('small', 'bsub', m[2])); b.title = s; } else b.textContent = s;
+    return b;
+  };
 
   // 2026-10-24 사장님 "사용성을 극한으로, 모바일까지": 위 머리글을 줄이고(표가 화면 위쪽부터) 찾기 옆 한 줄에 필터·보기·재고 줄·바꾼 기록,
   //   걸린 필터는 늘 보이게, 휴대폰은 줄마다 카드(누가·무엇·지금 단계·기한) — 표가 필요하면 [표로 보기]
@@ -82,11 +103,14 @@
     };
     const tb = (txt, cls, fn) => { const b = E('button', 'btn sm ghost dt-tb ' + cls, txt); b.type = 'button'; b.onclick = fn; return b; };
     const bs = E('div', 'dt-tbtns');
+    const vw = E('div', 'segctl dt-view'); vw.setAttribute('role', 'group'); vw.setAttribute('aria-label', '보기 방식');   // 2026-11-12: '표로 보기'·'카드로 보기' 한 버튼이 화면마다 글이 달라 헷갈리던 것 → 늘 '카드 | 표'
+    for (const [v, t] of [['cards', '카드'], ['grid', '표']]) { const b = E('button', null, t); b.type = 'button'; b.dataset.v = v; b.onclick = () => { if (viewMode() !== v) setView(v); }; vw.append(b); }
     bs.append(tb('필터·정렬', 'dt-fbtn', () => { fp.hidden = !fp.hidden; panel(); if (!fp.hidden) fp.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }),
-      tb('', 'dt-vbtn', () => setView(viewMode() === 'cards' ? 'grid' : 'cards')),
+      vw,
       IB(tb('', 'dt-sbtn', () => stockDialog()), 'plus', '재고 넣기'),
       tb('바꾼 기록', 'dt-abtn', () => auditPanel()));
-    bs.querySelector('.dt-abtn').title = '바꾼 기록 · 되돌리기';
+    bs.querySelector('.dt-abtn').title = '바꾼 기록 보기·되돌리기';
+    edgeFade(bs); edgeFade(card.querySelector('.dt-tables'));
     const sv = E('span', 'dt-save'); sv.hidden = true; sv.setAttribute('role', 'status'); sv.setAttribute('aria-live', 'polite');   // 바로 저장 상태(저장 중·저장됨·되돌리기)
     tools.append(q, bs, sv);
   }
@@ -133,7 +157,7 @@
   const tabHide = () => { const t = isSheet() && last && tabPicked(); return (t && (last.tab_hide || {})[t]) || []; };
   const hidden = (c) => cur.hide.includes(c) || (tabHide().includes(c) && !cur.show.includes(c));
   const visCols = () => { const cs = last.cols.filter((c) => !hidden(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
-  const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동(빈칸)' : '(빈칸)') : CODE_COLS.includes(c) ? ko(v) : String(v));
+  const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동' : '빈칸') : CODE_COLS.includes(c) ? ko(v) : String(v));
   function setFilter(c, f) { cur.filters = cur.filters.filter((x) => x.c !== c); if (f) cur.filters.push(f); cur.offset = 0; }
   function toggleVal(c, v) {        // 칩: 같은 칸에서 여러 값 고르기(누르면 넣고, 다시 누르면 뺌)
     const f = cur.filters.find((x) => x.c === c && x.op === 'in');
@@ -148,11 +172,11 @@
   }
   function fdesc(f) {
     const n = cname(f.c);
-    if (f.op === 'has') return `${n}에 '${f.v || ''}' 들어감`;
+    if (f.op === 'has') return `${n}에 '${f.v || ''}' 포함`;
     if (f.op === 'eq') return `${n} = '${f.v || '빈칸'}'`;
     if (f.op === 'in') return `${n}: ${f.vs.slice(0, 3).map((v) => blankName(f.c, v)).join(', ')}${f.vs.length > 3 ? ` 외 ${f.vs.length - 3}개` : ''}`;
-    if (f.op === 'blank') return `${n} 빈칸`;
-    if (f.op === 'notblank') return `${n} 빈칸 아님`;
+    if (f.op === 'blank') return `${n} 빈칸만`;
+    if (f.op === 'notblank') return `${n} 빈칸 빼고`;
     if (f.op === 'range') return `${n} ${f.lo || '처음'} ~ ${f.hi || '끝'}`;
     return n;
   }
@@ -200,7 +224,7 @@
     active();
     p.textContent = ''; if (p.hidden) return;
     const body = E('div', 'dt-fp');
-    const hd = E('div', 'dt-fp-h'); hd.append(E('b', null, '필터·정렬·열·저장한 보기'), btn('닫기', 'ghost', () => { p.hidden = true; panel(); }));
+    const hd = E('div', 'dt-fp-h'); hd.append(E('b', null, '필터·정렬'), btn('닫기', 'ghost', () => { p.hidden = true; panel(); }));
     body.append(hd);
     // 열 필터 만들기
     const cols = last.allcols || last.cols;
@@ -208,15 +232,15 @@
     const cs = select([], null); for (const c of cols) { const o = E('option', null, cname(c)); o.value = c; if (c === fcol) o.selected = true; cs.append(o); }
     cs.setAttribute('aria-label', '필터할 칸');
     const ex = cur.filters.find((x) => x.c === fcol) || {};
-    const ops = [['in', '여러 값 고르기'], ['has', '글자 들어감'], ['eq', '똑같음'], ...((isNum(fcol) || isDate(fcol)) ? [['range', isNum(fcol) ? '숫자 범위' : '날짜 범위']] : []), ['blank', '빈칸만'], ['notblank', '빈칸 빼고']];
-    const os = E('select'); os.setAttribute('aria-label', '어떻게');
+    const ops = [['in', '여러 값 고르기'], ['has', '글자 포함'], ['eq', '값이 같음'], ...((isNum(fcol) || isDate(fcol)) ? [['range', isNum(fcol) ? '숫자 범위' : '날짜 범위']] : []), ['blank', '빈칸만'], ['notblank', '빈칸 빼고']];
+    const os = E('select'); os.setAttribute('aria-label', '조건');
     for (const [v, l] of ops) { const o = E('option', null, l); o.value = v; if (v === (ex.op || 'in')) o.selected = true; os.append(o); }
     const area = E('div', 'dt-fp-area');
     cs.onchange = () => { fcol = cs.value; panel(); };
     const draw = () => editor(area, fcol, os.value, ex);
     os.onchange = draw;
-    const row = E('div', 'dt-fp-row'); row.append(field('칸', cs), field('어떻게', os));
-    const box = E('div', 'dt-form'); box.append(E('div', 'od-t', '열 필터'), row, area); body.append(box);
+    const row = E('div', 'dt-fp-row'); row.append(field('칸', cs), field('조건', os));
+    const box = E('div', 'dt-form'); box.append(E('div', 'od-t', '필터 걸기'), row, area); body.append(box);
     draw();
     // 정렬(휴대폰은 Shift+클릭이 없어서 여기서 여러 열)
     const ss = select([], null); for (const c of cols) { const o = E('option', null, cname(c)); o.value = c; ss.append(o); }
@@ -224,7 +248,7 @@
     const add = (d) => () => { cur.sort = cur.sort.filter((x) => x.split(':')[0] !== ss.value).concat(`${ss.value}:${d}`); cur.offset = 0; load(); };
     const sb = E('div', 'dt-form'); const sr = E('div', 'dt-fp-row');
     sr.append(field('칸', ss), IB(btn('', 'weak', add('asc')), 'up', '작은 순'), IB(btn('', 'weak', add('desc')), 'down', '큰 순'));
-    sb.append(E('div', 'od-t', '정렬 더하기'), E('p', 'muted small', '머리 누르기: 작은 순 → 큰 순 → 해제 · Shift는 여러 칸'), sr);
+    sb.append(E('div', 'od-t', '정렬 추가'), E('p', 'muted small', '표 머리글을 누를 때마다 작은 순, 큰 순, 해제로 바뀌어요. Shift를 누른 채 누르면 여러 칸으로 정렬해요.'), sr);
     body.append(sb);
     // 열 보이기·고정(보기만 바뀜 — 시트 열 구조는 그대로, 보기 저장에 함께 남음)
     const cb = E('div', 'dt-form'); const cl = E('div', 'dt-cols');
@@ -244,14 +268,14 @@
     }
     const cr = E('div', 'dt-fp-row');
     cr.append(btn('모두 보이기', 'ghost', () => { cur.hide = []; cur.show = [...new Set([...cur.show, ...tabHide()])]; saveHash(); render(); panel(); }), btn('고정 풀기', 'ghost', () => { cur.pin = []; saveHash(); render(); panel(); }));
-    cb.append(E('div', 'od-t', `열 보이기·고정 (${last.cols.filter((x) => !hidden(x)).length}/${last.cols.length}칸 보임)`),
-      E('p', 'muted small', '체크 끄면 숨김 · 핀은 왼쪽 고정'), cl, cr);
+    cb.append(E('div', 'od-t', `열 보이기·고정 · ${last.cols.filter((x) => !hidden(x)).length}/${last.cols.length}칸`),
+      E('p', 'muted small', '체크를 끄면 숨기고, 핀을 누르면 왼쪽에 고정해요.'), cl, cr);
     body.append(cb);
     // 저장한 보기
     const vb = E('div', 'dt-form'); const vr = E('div', 'dt-fp-row');
     const vv = views(), names = Object.keys(vv);
-    const vs = select(names.length ? names : ['(저장한 보기 없음)'], null); vs.setAttribute('aria-label', '저장한 보기');
-    const nm = inp('새 보기 이름(예: 독일 매입대기)'); nm.setAttribute('aria-label', '보기 이름');
+    const vs = select(names.length ? names : ['저장한 보기 없음'], null); vs.setAttribute('aria-label', '저장한 보기');
+    const nm = inp('예: 독일 매입대기'); nm.setAttribute('aria-label', '보기 이름');
     const out = E('span', 'muted small');
     vr.append(field('저장한 보기', vs),
       btn('불러오기', 'weak', () => { const s = views()[vs.value]; if (s && fromState(s)) { loadTables(); load(); } }),
@@ -260,9 +284,9 @@
     vr2.append(field('이름', nm), btn('지금 보기 저장', 'primary', () => {
       const name = nm.value.trim(); if (!name) { out.textContent = '이름을 적어 주세요'; return; }
       const v = views(); v[name] = { t: cur.table, p: cur.preset, q: cur.q, f: cur.filters, s: cur.sort, h: cur.hide, sh: cur.show, pin: cur.pin };
-      out.textContent = putViews(v) ? `'${name}' 저장했어요(이 브라우저에만)` : '저장하지 못했어요(브라우저 저장소가 막힘)'; nm.value = ''; panel();
+      out.textContent = putViews(v) ? `'${name}' 보기를 저장했어요` : '브라우저가 저장을 막아서 저장하지 못했어요'; nm.value = ''; panel();
     }), out);
-    vb.append(E('div', 'od-t', '보기 저장(이 브라우저에만)'), vr, vr2);
+    vb.append(E('div', 'od-t', '보기 저장'), E('p', 'muted small', '찾기·필터·정렬·열 설정을 이름 붙여 남겨요. 이 브라우저에만 저장돼요.'), vr, vr2);
     body.append(vb);
     p.append(body);
   }
@@ -272,14 +296,14 @@
     const same = ex.op === op;
     const apply = (f) => { setFilter(c, f); load(); };
     if (op === 'has' || op === 'eq') {
-      const i = inp(op === 'has' ? '들어간 글자' : '같은 값(비우면 빈칸)', same ? ex.v : ''); i.setAttribute('aria-label', '값');
+      const i = inp(op === 'has' ? '포함할 글자' : '같은 값 · 비우면 빈칸만', same ? ex.v : ''); i.setAttribute('aria-label', '값');
       i.onkeydown = (e) => { if (e.key === 'Enter') apply({ c, op, v: i.value.trim() }); };
-      area.append(field('값', i), btn('걸기', 'primary', () => apply({ c, op, v: i.value.trim() })));
+      area.append(field('값', i), btn('적용', 'primary', () => apply({ c, op, v: i.value.trim() })));
     } else if (op === 'range') {
-      const lo = inp(isNum(c) ? '부터(숫자)' : '부터 예: 2026-10-01', same ? ex.lo : ''), hi = inp(isNum(c) ? '까지(숫자)' : '까지 예: 2026-10-23', same ? ex.hi : '');
+      const lo = inp(isNum(c) ? '최솟값' : '예: 2026-10-01', same ? ex.lo : ''), hi = inp(isNum(c) ? '최댓값' : '예: 2026-10-23', same ? ex.hi : '');
       if (isNum(c)) { lo.inputMode = 'decimal'; hi.inputMode = 'decimal'; } else { lo.type = 'date'; hi.type = 'date'; }
       const r = E('div', 'dt-fp-row'); r.append(field('부터', lo), field('까지', hi));
-      area.append(r, btn('걸기', 'primary', () => apply(lo.value.trim() || hi.value.trim() ? { c, op, lo: lo.value.trim(), hi: hi.value.trim() } : null)));
+      area.append(r, btn('적용', 'primary', () => apply(lo.value.trim() || hi.value.trim() ? { c, op, lo: lo.value.trim(), hi: hi.value.trim() } : null)));
     } else if (op === 'blank' || op === 'notblank') {
       area.append(btn(op === 'blank' ? '빈칸만 보기' : '빈칸 빼고 보기', 'primary', () => apply({ c, op })));
     } else {                     // 여러 값 고르기 — 다른 필터가 걸린 채 이 칸 값 목록(찾기 가능, 개수 제한 없이 찾아서)
@@ -290,7 +314,7 @@
       const fill = async () => {
         const ps = params(); ps.set('col', c); ps.set('find', find.value.trim()); ps.set('limit', '300');
         const my = ++fseq;      // 2026-11-06: 빨리 치면 늦게 온 옛 답이 새 목록을 덮던 것 — 마지막 요청만 그림
-        let j; try { j = await fetchJ('/api/db/values?' + ps.toString()); } catch (e) { if (my === fseq) note.textContent = '값 목록을 못 불러왔어요: ' + e.message; return; }
+        let j; try { j = await fetchJ('/api/db/values?' + ps.toString()); } catch (e) { if (my === fseq) note.textContent = '값 목록을 불러오지 못했어요. ' + errText(e); return; }
         if (my !== fseq) return;
         if (j.error) { note.textContent = j.error; return; }
         list.textContent = '';
@@ -299,10 +323,10 @@
           cb.onchange = () => { cb.checked ? chosen.add(v) : chosen.delete(v); cnt2(); };
           l.append(cb, E('span', null, blankName(c, v)), E('span', 'dt-n', String(cnt))); list.append(l);
         }
-        note.textContent = j.distinct > j.values.length ? `값 ${j.distinct.toLocaleString('ko-KR')}개 중 줄 많은 ${j.values.length}개 — 찾기로 좁혀 주세요` : `값 ${j.distinct.toLocaleString('ko-KR')}개`;
+        note.textContent = j.distinct > j.values.length ? `값 ${j.distinct.toLocaleString('ko-KR')}개 중 많이 쓰인 ${j.values.length}개만 보여요. 찾기로 좁혀 주세요.` : `값 ${j.distinct.toLocaleString('ko-KR')}개`;
       };
-      const go = btn('고른 값으로 걸기', 'primary', () => apply(chosen.size ? { c, op: 'in', vs: [...chosen] } : null));
-      const cnt2 = () => { go.textContent = chosen.size ? `고른 ${chosen.size}개로 걸기` : '필터 풀기'; };
+      const go = btn('고른 값 적용', 'primary', () => apply(chosen.size ? { c, op: 'in', vs: [...chosen] } : null));
+      const cnt2 = () => { go.textContent = chosen.size ? `고른 ${chosen.size}개 적용` : '필터 풀기'; };
       find.oninput = () => { clearTimeout(tm); tm = setTimeout(fill, 250); };
       area.append(field('찾기', find), note, list, go); cnt2(); fill();
     }
@@ -317,7 +341,7 @@
       for (const t of ts) {
         const b = E('button', 'tab', null); b.type = 'button';
         b.setAttribute('aria-selected', String(t.name === cur.table));
-        b.append(document.createTextNode(t.label), E('span', 'dt-n', t.count.toLocaleString('ko-KR')));
+        b.append(document.createTextNode(tableName(t.name, t.label)), E('span', 'dt-n', t.count.toLocaleString('ko-KR')));
         b.onclick = () => {
           const stuck = Object.keys(pending).length && ['wait', 'net'].includes(sv.k);      // 고친 칸은 바로 저장 — 못 보낸 칸이 남았을 때만 물음
           if (stuck && !confirm('저장하지 못한 칸이 있어요. 버리고 다른 표로 갈까요?')) return;
@@ -328,7 +352,8 @@
         };
         box.append(b);
       }
-    } catch (e) { box.textContent = '표 목록을 불러오지 못했어요: ' + e.message; }
+      edgeFade(box);
+    } catch (e) { box.textContent = '표 목록을 불러오지 못했어요. ' + errText(e); }
   }
 
   function chips(box, label, items, isOn, onPick, allOn, onAll, col) {
@@ -336,10 +361,10 @@
     const all = E('button', 'chipbtn' + (allOn ? ' on' : ''), '전체'); all.type = 'button'; all.setAttribute('aria-pressed', String(allOn)); all.onclick = onAll; g.append(all);
     for (const [v, n] of items) {
       const b = E('button', 'chipbtn' + (isOn(v) ? ' on' : '') + (!col && n && /문제|취소|반품/.test(v) ? ' hot' : '') + (!col && !n ? ' zero' : ''), `${col ? blankName(col, v) : v} ${n.toLocaleString('ko-KR')}`); b.type = 'button';
-      b.setAttribute('aria-pressed', String(isOn(v))); b.onclick = (e) => onPick(v, e); if (col) b.title = '이것만 · ⌘클릭은 여러 개'; g.append(b);
+      b.setAttribute('aria-pressed', String(isOn(v))); b.onclick = (e) => onPick(v, e); if (col) b.title = '누르면 이것만 · ⌘를 누른 채 누르면 여러 개'; g.append(b);
     }
-    if (col && items.length >= 15) { const m = E('button', 'chipbtn', '더 보기…'); m.type = 'button'; m.onclick = () => openFilter(col); g.append(m); }
-    box.append(g);
+    if (col && items.length >= 15) { const m = E('button', 'chipbtn', '더 보기'); m.type = 'button'; m.onclick = () => openFilter(col); g.append(m); }
+    box.append(g); edgeFade(g);
   }
 
   let seq = 0, jump = null, lastSig = '';      // jump = 다 불러온 뒤 열 줄 {tab, row}(같은 주문의 다른 줄로 갈 때) · lastSig = 지난 요청(같으면 보던 자리 그대로)
@@ -358,14 +383,14 @@
     let j; try { j = await fetchJ('/api/db/rows?' + ps.toString()); } catch (e) {
       if (my !== seq) return;
       wrap.classList.remove('loading'); wrap.removeAttribute('aria-busy'); wrap.textContent = '';
-      wrap.append(stateBox('불러오지 못했어요', noE(e.message), [['다시 불러오기', () => load()]], true)); return;
+      wrap.append(stateBox('표를 불러오지 못했어요', errText(e), [['다시 불러오기', () => load()]], true)); return;
     }
     if (my !== seq) return;
     wrap.classList.remove('loading'); wrap.removeAttribute('aria-busy');
     saveHash();
     if (j.error) {
       wrap.textContent = '';
-      wrap.append(stateBox(noE(j.error), '필터·정렬을 확인해 주세요.', [['필터·정렬 모두 풀기', () => { cur.filters = []; cur.sort = []; cur.offset = 0; load(); }]])); return;
+      wrap.append(stateBox(noE(j.error), '걸어 둔 필터·정렬을 풀고 다시 열어 보세요.', [['필터·정렬 풀기', () => { cur.filters = []; cur.sort = []; cur.offset = 0; load(); }]])); return;
     }
     // 2026-10-27 사장님 "정보가 적혀있는 하단부터": 시트 탭을 새로 열면(기본 순서·첫 묶음일 때만) 내용이 적힌 마지막 줄 + 빈 줄 2~3줄이 화면 아래에 오게 — 그 줄이 든 500줄 묶음부터
     const tabSig = isSheet() ? JSON.stringify((cur.filters.find((x) => x.c === 'tab') || {}).vs || []) : '';
@@ -393,8 +418,19 @@
     for (const [f, vals] of Object.entries(last.facets || {})) {
       const fin = cur.filters.find((x) => x.c === f && x.op === 'in');
       const has = cur.filters.some((x) => x.c === f);
-      chips(fb, cname(f), vals, (v) => !!fin && fin.vs.includes(v == null ? '' : v), (v, e) => { pickVal(f, v == null ? '' : v, e && (e.metaKey || e.ctrlKey || e.shiftKey)); load(); }, !has, () => { setFilter(f, null); load(); }, f);
+      // 화면 이름이 같은 값(쿠팡 FINAL_DELIVERY·네이버 DELIVERED → 둘 다 '배송완료')은 칩 하나로 — 누르면 둘 다 고름(2026-11-12)
+      const grp = new Map();
+      for (const [v, n] of vals) { const k = blankName(f, v); const g = grp.get(k) || { vs: [], n: 0 }; g.vs.push(v == null ? '' : v); g.n += n; grp.set(k, g); }
+      const items = [...grp.values()].map((g) => [g.vs[0], g.n, g.vs]);
+      const on = (v) => { const g = items.find((x) => x[0] === v); return !!fin && !!g && g[2].some((x) => fin.vs.includes(x)); };
+      chips(fb, f === 'tab' ? '시트 탭' : cname(f), items, on, (v, e) => {
+        const g = items.find((x) => x[0] === v), vs = g ? g[2] : [v == null ? '' : v], multi = e && (e.metaKey || e.ctrlKey || e.shiftKey);
+        if (multi || vs.length === 1) vs.forEach((x, i) => (i ? toggleVal(f, x) : pickVal(f, x, multi)));
+        else setFilter(f, on(v) && fin.vs.length === vs.length ? null : { c: f, op: 'in', vs: [...vs] });
+        load();
+      }, !has, () => { setFilter(f, null); load(); }, f);
     }
+    facetSeps(fb);
     panel();
     if (sel && isSheet()) { const n = last.rows.find((x) => rid(x) === rid(sel)); if (n && n !== sel) { const st = ($('dt-detail') || {}).scrollTop; sel = n; detail(true); if (st) $('dt-detail').scrollTop = st; } }
     const sig = ps.toString(); if (sig !== lastSig) autoW = {};   // 칸 너비는 같은 줄 묶음 동안 그대로(고칠 때마다 표가 옆으로 움직이지 않게)
@@ -402,16 +438,24 @@
     if (sig !== lastSig) { wrap.scrollTop = 0; wrap.scrollLeft = 0; hSync(); } lastSig = sig;   // 다른 줄 묶음일 때만 맨 위로
     if (tail != null) toTail(wrap, tail - cur.offset);
     const more = document.querySelector('.dt-more'); more.textContent = '';
-    more.append(E('span', 'muted small', `${last.total.toLocaleString('ko-KR')}줄 중 ${last.total ? cur.offset + 1 : 0}–${cur.offset + last.rows.length}` + (isSheet() && last.source ? ` · ${last.source}` : '')));
+    const all = cur.offset === 0 && last.rows.length >= last.total;     // 2026-11-12: '23줄 중 1–23 · 격자(원본, 지금 값)' → '전체 23줄'(지금 값이면 출처는 숨김, 사본일 때만)
+    more.append(E('span', 'muted small', (all ? `전체 ${last.total.toLocaleString('ko-KR')}줄` : `${last.total.toLocaleString('ko-KR')}줄 중 ${cur.offset + 1}–${cur.offset + last.rows.length}`)
+      + (isSheet() && last.source && !/격자/.test(last.source) ? ` · ${last.source}` : '')));
     const step = isSheet() ? 500 : 50;
-    if (isSheet() && viewMode() === 'cards') { const b = IB(E('button', 'btn sm weak'), 'plus', '재고 넣기'); b.type = 'button'; b.title = '이 탭 맨 아래에 재고 줄'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
-    if (cur.offset > 0) { const b = IB(E('button', 'btn sm ghost'), 'left', '앞'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
+    if (isSheet() && viewMode() === 'cards') { const b = IB(E('button', 'btn sm weak'), 'plus', '재고 넣기'); b.type = 'button'; b.title = '이 탭 맨 아래에 재고 줄을 넣어요'; b.onclick = () => stockDialog(tabPicked()); more.append(b); }
+    if (cur.offset > 0) { const b = IB(E('button', 'btn sm ghost'), 'left', '이전'); b.type = 'button'; b.onclick = () => { cur.offset = Math.max(0, cur.offset - step); load(); }; more.append(b); }
     if (cur.offset + last.rows.length < last.total) { const b = IB(E('button', 'btn sm ghost'), 'chevron', '다음', true); b.type = 'button'; b.onclick = () => { cur.offset += step; load(); }; more.append(b); }
     bar();
-    if (jump) { const r = last.rows.find((x) => x.tab === jump.tab && +x.row === +jump.row); jump = null; if (r) openRow(r); else toast('그 줄이 없어요. 지워졌거나 옮겨졌어요'); }
+    if (jump) { const r = last.rows.find((x) => x.tab === jump.tab && +x.row === +jump.row); jump = null; if (r) openRow(r); else toast('그 줄이 목록에 없어요. 지웠거나 옮긴 줄인지 확인해 주세요'); }
     showFlash();
   }
   // 빈 화면·오류 = 무엇이 문제인지 + 바로 누를 버튼
+  // 필터 묶음 사이 구분선 — 같은 줄에 나란히 있을 때만(줄이 바뀐 묶음 앞에는 선 없음)
+  function facetSeps(box) {
+    if (!box) return;
+    const gs = [...box.children]; gs.forEach((g, i) => g.classList.toggle('sep', i > 0 && Math.abs(g.offsetTop - gs[i - 1].offsetTop) < 4));
+    if (!box.dataset.fs && window.ResizeObserver) { box.dataset.fs = '1'; new ResizeObserver(() => facetSeps(box)).observe(box); }
+  }
   function stateBox(title, sub, acts, bad) {
     const b = E('div', 'dt-state'); const h = E('b', null); if (bad) h.append(I('alert', 'bad'), ' '); h.append(title); b.append(h); if (sub) b.append(E('p', 'muted small', sub));
     if (acts && acts.length) { const r = E('div', 'btns'); for (const [t, fn] of acts) r.append(btn(t, 'weak', fn)); b.append(r); }
@@ -420,9 +464,10 @@
   function emptyBox() {
     const acts = [];
     if (cur.q) acts.push([`'${cur.q}' 찾기 지우기`, () => { cur.q = ''; document.querySelector('.dt-q').value = ''; cur.offset = 0; load(); }]);
-    if (cur.preset) acts.push([`할 일 '${cur.preset}' 풀기(전체)`, () => { cur.preset = ''; cur.offset = 0; load(); }]);
+    if (cur.preset) acts.push([`'${cur.preset}' 풀고 전체 보기`, () => { cur.preset = ''; cur.offset = 0; load(); }]);
     if (cur.filters.length) acts.push(['필터 풀기', () => { cur.filters = []; cur.offset = 0; load(); }]);
-    return stateBox('맞는 줄이 없어요', acts.length ? '찾기·필터를 풀어 보세요.' : (isSheet() ? '' : '빈 표예요.'), acts);
+    return acts.length ? stateBox('조건에 맞는 줄이 없어요', '찾기나 필터를 풀면 다시 보여요.', acts)
+      : stateBox('아직 줄이 없어요', isSheet() ? '재고 넣기로 줄을 더할 수 있어요.' : '기록이 쌓이면 여기에 보여요.', acts);
   }
   // 짧은 알림(복사됨·저장됨) — 화면 아래 가운데, 휴대폰은 탭 막대 위
   function toast(msg, bad, ms) {
@@ -441,7 +486,15 @@
   }
   async function copyText(v, what) {
     if (await clip(v)) { toast(`${what || '복사'}했어요 · ${v.length > 36 ? v.slice(0, 36).replace(/\n/g, ' ') + '…' : v.replace(/\n/g, ' ')}`); return true; }
-    toast('복사 실패 · 브라우저가 막음', true); return false;
+    toast('브라우저가 막아서 복사하지 못했어요', true); return false;
+  }
+
+  // 옆으로 넘기는 줄(표 고르기 알약·도구 버튼·칩 줄)에 더 있으면 그쪽 끝을 흐리게(2026-11-12 휴대폰 점검: 잘린 칩 뒤에 더 있는 줄 몰랐음)
+  function edgeFade(el) {
+    if (!el) return;
+    const upd = () => { const max = el.scrollWidth - el.clientWidth; el.classList.toggle('ef-l', max > 2 && el.scrollLeft > 2); el.classList.toggle('ef-r', max > 2 && el.scrollLeft < max - 2); };
+    if (!el.dataset.ef) { el.dataset.ef = '1'; el.addEventListener('scroll', upd, { passive: true }); if (window.ResizeObserver) new ResizeObserver(upd).observe(el); }
+    requestAnimationFrame(upd);
   }
 
   // ── 표 그리기(주문 시트는 칸 고치기·줄 고르기) ──
@@ -466,7 +519,7 @@
     const cardsOn = viewMode() === 'cards';
     wrap.classList.toggle('cards', cardsOn);
     requestAnimationFrame(() => { fitH(); hSync(); });
-    const vb = document.querySelector('.dt-vbtn'); if (vb) { vb.textContent = cardsOn ? '표로 보기' : '카드로 보기'; vb.title = ''; }
+    document.querySelectorAll('.dt-view button').forEach((b) => { const on = (b.dataset.v === 'cards') === cardsOn; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
     if (cardsOn) return renderCards(wrap);
     const ed = isSheet() ? (last.edit || {}) : null;
     const cols = visCols();
@@ -483,7 +536,9 @@
       const so = sortOf(c);
       th.setAttribute('aria-sort', so ? (so.d === 'asc' ? 'ascending' : 'descending') : 'none');
       const sb = E('button', 'th-sort', cname(c)); sb.type = 'button';
-      sb.title = '정렬 · Shift는 여러 칸';
+      const edAll = ed && (ed.editable || []).includes(c), edStock = ed && !edAll && canEdit(c, null);   // 2026-11-12: 파란 머리글·회색 머리글이 뜻 없이 섞여 보이던 것 → 한 색 + 고칠 칸은 연필
+      if (edAll) sb.prepend(I('edit', 'th-ed'));
+      sb.title = (edAll ? '눌러서 바로 고치는 칸 · ' : edStock ? '재고 줄에서만 고치는 칸 · ' : '') + '머리글을 누르면 정렬 · Shift는 여러 칸';
       if (so) { const ar = E('span', 'th-ar'); ar.append(I(so.d === 'asc' ? 'up' : 'down')); if (cur.sort.length > 1) ar.append(String(so.i + 1)); sb.append(ar); }
       sb.onclick = (e) => clickSort(c, e.shiftKey);
       const fb = E('button', 'th-filt' + (cur.filters.some((x) => x.c === c) ? ' on' : '')); fb.append(I('filter')); fb.type = 'button';
@@ -492,7 +547,7 @@
       th.append(sb, fb);
       if (ed) {         // 칸 너비 끌어서 바꾸기(이 브라우저에 기억) · 두 번 누르면 원래대로
         if (colW[c]) th.style.width = th.style.minWidth = th.style.maxWidth = colW[c] + 'px';
-        const rz = E('span', 'rz'); rz.title = '끌어서 너비 · 두 번 누르면 원래대로';
+        const rz = E('span', 'rz'); rz.title = '끌어서 너비 바꾸기 · 두 번 누르면 원래대로';
         rz.onmousedown = (e) => resizeStart(e, c, th); rz.ondblclick = (e) => { e.stopPropagation(); delete colW[c]; delete autoW[c]; saveW(); render(); };
         th.append(rz);
       }
@@ -520,24 +575,28 @@
         if (ed && colW[c]) td.style.maxWidth = td.style.minWidth = colW[c] + 'px';
         const pk = ed && pending[`${rid(r)}:${c}`], qk = ed && !pk && queued[`${rid(r)}:${c}`];
         const v = pk ? pk.new : qk ? String(qk.new ?? '') : fmt(c, c === 'due' && ed ? dueOf(r) : r[c]);
-        if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(E('span', 'badge ' + badgeCls(v), v));
+        if (['state', 'status', 'handling', 'progress'].includes(c) && v) td.append(badge(v));
         else if (c === 'name' && r._url && v && !pk) td.append(prodLink(r, v.length > 60 ? v.slice(0, 59) + '…' : v));
         else td.textContent = v.length > 60 ? v.slice(0, 59) + '…' : v;
         if (ed && c === 'due' && v && !pk) { const ds = dueState(r); if (ds) { td.classList.add('due-' + ds.k); td.title = '발송기한 ' + ds.t; } if (dueMoved(r)) td.title = (td.title ? td.title + ' · ' : '') + `시트 처음 기한 ${r.due}에서 늘어남`; }
         if (ed && NUMC.includes(c)) { td.classList.add('num'); if (/^\s*(약\s*)?-\d/.test(v)) td.classList.add('neg'); }
         const nt = ed && noteOf(r, c);
         if (nt) {           // 칸 메모(시트의 메모 대신) — 오른쪽 위 세모, 마우스를 올리면 내용
-          td.classList.add('has-note'); td.title = `메모: ${nt.text}${nt.by ? ` — ${nt.by}` : ''}`;
+          td.classList.add('has-note'); td.title = `메모: ${nt.text}${nt.by ? ` · ${nt.by}` : ''}`;
           td.append(E('span', 'note-dot', '◥'));
         }
         if (ed && canEdit(c, r)) {
-          td.classList.add('ed'); if (!nt) td.title = '눌러서 고치기 · 바로 저장';
-          if (pk) td.classList.add('dirty'); else if (qk) { td.classList.add('queued'); td.title = `회차가 끝나면 저장돼요 — ${qk.by || ''} ${String(qk.at || '').slice(11, 16)}에 고침`.trim(); }
+          td.classList.add('ed'); if (!nt) td.title = '눌러서 고치기 · 바로 저장돼요';
+          if (pk) td.classList.add('dirty');
+          else if (qk) {       // 고친 시각: 서버 대기(2026-11-12T14:30…)와 내가 막 넣은 것(T14:30) 모두 — 앞은 slice(11, 16)이라 내 것은 시각이 비었음
+            td.classList.add('queued'); const who = `${(String(qk.at || '').match(/\d\d:\d\d/) || [''])[0]} ${qk.by || ''}`.trim();
+            td.title = '회차가 끝나면 저장돼요' + (who ? ` · ${who} 고침` : '');
+          }
           else if (justSaved.has(`${rid(r)}:${c}`)) td.classList.add('saved');
           td.ondblclick = (e) => { e.stopPropagation(); cellEdit(td, r, c); };
         }
         if (ed) {    // 시트처럼: 누르면 그 칸을 고르고 위 줄에 전체 내용 — 고칠 수 있는 칸은 뗄 때 바로 고치기(press). '행' 칸은 줄 자세히·조치
-          if (c === 'row') { td.classList.add('rowh'); td.title = '줄 자세히'; }
+          if (c === 'row') { td.classList.add('rowh'); td.title = '눌러서 줄 자세히 보기'; }
           td.onmousedown = (e) => {
             if (e.button || e.target.closest('input,select,a')) return;
             e.preventDefault(); pickCell(r, c, e.shiftKey, true); drag = lastPtr !== 'touch';   // 손가락은 끌어 고르기 없음(밀면 넘김)
@@ -552,7 +611,7 @@
       }
       if (ed) {          // 줄 끝 🗑 — 재고 줄은 한 번에(되살리기 버튼), 고객 주문 줄은 확인 한 번(나눈 줄일 수 있어서)
         const td = E('td', 'del'), b = E('button', 'row-del'); b.append(I('trash')); b.type = 'button';
-        b.title = isStock(r) || !r.key ? '재고 줄 지우기 · 되살리기 가능' : '주문 줄 지우기 · 백업됨'; b.setAttribute('aria-label', `${r.tab} ${r.row}행 지우기`);
+        b.title = isStock(r) || !r.key ? '재고 줄 지우기 · 지워도 되살릴 수 있어요' : '주문 줄 지우기 · 지운 줄은 백업돼요'; b.setAttribute('aria-label', `${r.tab} ${r.row}행 지우기`);
         b.onmousedown = (e) => e.stopPropagation();
         b.onclick = (e) => { e.stopPropagation(); rowDel(r, b); };
         td.append(b); row.append(td);
@@ -565,12 +624,12 @@
     if (ed && last.rows.length) {      // '45행 밑에 재고줄 플러스'(사장님) — 고른 줄(없으면 맨 아래 줄)의 상품명·옵션·구매처·배송방식만 복사
       const tf = E('tfoot'), ftr = E('tr'), ftd = E('td'); ftd.colSpan = cols.length + 2;
       const box = E('div', 'dt-add');
-      const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄의 상품 정보로 새 재고 줄';
+      const a = E('button', 'btn sm add'); a.type = 'button'; a.title = '고른 줄의 상품 정보로 맨 아래에 새 재고 줄을 넣어요';
       a.onclick = (e) => { e.stopPropagation(); stockCopy(addRef(), a); };
       // '다 적어서 넣기'(2026-10-30 사장님) = 고른 줄 모든 칸 복사 → 맨 아래 새 줄, 공홈가·공홈주문번호·해외송장·훗타운 신청번호·국내송장은 빈칸(orderedit.COPY_CLEAR)
-      const more = E('button', 'btn sm ghost', '다 적어서 넣기'); more.type = 'button'; more.title = '고른 줄의 모든 칸을 복사해 맨 아래 새 줄로';
+      const more = E('button', 'btn sm ghost', '다 적어서 넣기'); more.type = 'button'; more.title = '고른 줄의 모든 칸을 복사해 맨 아래에 새 줄로 넣어요';
       more.onclick = (e) => { e.stopPropagation(); rowCopy(addRef(), more); };
-      box.append(a, E('span', 'muted', '상품명·옵션·구매처·배송방식만 복사'), more, E('span', 'muted', '모든 칸 복사(공홈가·공홈주문번호·해외송장·신청번호 빈칸)'));
+      box.append(a, E('span', 'muted', '상품명·옵션·구매처·배송방식만 복사해요'), more, E('span', 'muted', '모든 칸을 복사하고 공홈가·공홈주문번호·해외송장·신청번호는 비워요'));
       ftd.append(box); ftr.append(ftd); tf.append(ftr); tbl.append(tf);
     }
     wrap.append(tbl);
@@ -598,8 +657,9 @@
   }
   // 2026-10-25 사장님 "상품명을 클릭하면 해당 판매처의 상품페이지로": 플랫폼 주문 줄의 상품명 = 쿠팡·네이버 구매자 화면 링크(새 창). 재고 줄은 글자 그대로(고치기)
   function prodLink(r, text) {
-    const a = E('a', 'prod-link', text); if (/^https?:\/\//i.test(String(r._url || ''))) a.href = r._url;   // 2026-11-06: javascript: 같은 주소는 링크로 안 씀 a.target = '_blank'; a.rel = 'noopener noreferrer';
-    a.title = `${ko(r.platform || '') || '판매처'} 상품페이지 열기`;
+    const a = E('a', 'prod-link', text);
+    if (/^https?:\/\//i.test(String(r._url || ''))) { a.href = r._url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }   // 2026-11-06: javascript: 같은 주소는 링크로 안 씀 · 2026-11-12: 새 창 열기가 주석 뒤에 묻혀 현황판을 떠나던 것
+    a.title = `${ko(r.platform || '') || '판매처'} 상품페이지 새 창으로 열기`;
     a.onclick = (e) => e.stopPropagation(); a.onmousedown = (e) => e.stopPropagation();
     return a;
   }
@@ -607,8 +667,8 @@
     const stock = isStock(r), pg = String(r.progress || ''), sg = stageOf(r);
     const c = E('div', 'oc' + (r.problem ? ' prob' : '') + (heldStock(r) ? ' stock' : '') + (sg.stop ? ' stop' : ''));
     const top = E('div', 'oc-top');
-    top.append(E('b', 'oc-who', stock ? (r.name || '재고') : (r.receiver || '(받는 분 없음)')));
-    if (pg) top.append(E('span', 'badge ' + badgeCls(pg), pg));
+    top.append(E('b', 'oc-who', stock ? (r.name || '재고') : (r.receiver || '받는 분 없음')));
+    if (pg) top.append(badge(pg));
     c.append(top);
     const what = stock ? [r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · ');
     if (what) c.append(E('div', 'oc-what', what));   // 카드 안 상품명은 글자만 — 링크면 카드 가운데를 누를 때 자세히 대신 쿠팡이 열림(2026-10-26 휴대폰 감사). 상품페이지는 자세히 머리에
@@ -617,10 +677,10 @@
     for (const b of bits.filter(Boolean)) meta.append(E('span', null, b));
     const ds = !stock && dueState(r); if (ds) meta.append(E('span', 'oc-due ' + ds.k, '기한 ' + ds.t));
     if (sg.ost) meta.append(E('span', 'oc-ost ' + (sg.delivered ? 'ok' : ''), ko(r.platform || '') + ' ' + ko(sg.ost)));
-    if (sg.mismatch) { const w = E('span', 'badge warn', '상태 다름'); w.title = `시트는 '${pg}', ${ko(r.platform || '') || '플랫폼'}은 '${ko(sg.ost)}' — 시트 진행상태를 확인해 주세요`; meta.append(w); }
+    if (sg.mismatch) { const w = E('span', 'badge warn', '상태 다름'); w.title = `시트 진행상태 '${pg}' · ${ko(r.platform || '') || '플랫폼'} 상태 '${ko(sg.ost)}'. 시트를 확인해 주세요.`; meta.append(w); }
     c.append(meta);
     if (!stock && !sg.stop) {              // 7단계 가는 막대 + 지금 단계 이름
-      const bar = E('div', 'oc-steps'); bar.setAttribute('aria-label', `진행 ${sg.done}/7 단계`);
+      const bar = E('div', 'oc-steps'); bar.setAttribute('aria-label', `7단계 중 ${sg.done}단계 끝`);
       sg.steps.forEach(([, ok], j) => bar.append(E('i', ok ? 'done' : j === sg.cur ? 'now' : '')));
       bar.append(E('span', null, sg.cur < 0 ? '배송완료' : sg.next));
       c.append(bar);
@@ -633,7 +693,7 @@
     const title = r.title || r.name || r.summary || r.receiver || r.key || r.lead_id || r.source_key || r.listing_id || '줄';
     const st = ['state', 'status', 'handling', 'progress'].map((k) => r[k]).find((v) => v != null && v !== '');
     const top = E('div', 'oc-top'); top.append(E('b', 'oc-who', fmt('', title)));
-    if (st) { const v = ko(st); top.append(E('span', 'badge ' + badgeCls(v), v)); }
+    if (st) top.append(badge(ko(st)));
     c.append(top);
     const skip = new Set(['title', 'name', 'summary', 'state', 'status', 'handling', 'progress', '_meta', '_ost']);
     const kv = last.cols.filter((k) => !skip.has(k) && r[k] != null && r[k] !== '' && fmt(k, r[k]) !== String(title)).slice(0, 5);
@@ -735,7 +795,7 @@
   const rangeText = () => { const g = rangeOf(); if (!g) return ''; const out = []; for (let i = g.r0; i <= g.r1; i++) { const l = []; for (let j = g.c0; j <= g.c1; j++) l.push(cellVal(last.rows[i], g.vc[j]).replace(/[\t\n]/g, ' ')); out.push(l.join('\t')); } return out.join('\n'); };
   async function copySel() {
     const t = rangeText(); const ok = await clip(t);
-    flash(ok ? `복사했어요 · ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '복사 실패 · 브라우저가 막음');
+    flash(ok ? `복사했어요 · ${t.length > 40 ? t.slice(0, 40) + '…' : t}` : '브라우저가 막아서 복사하지 못했어요');
   }
   function flash(msg) { const box = document.querySelector('.dt-fx'); if (!box) return; const m = E('span', 'fx-flash', msg); box.append(m); setTimeout(() => m.remove(), 1800); }
   // 고른 줄 색 칠하기·풀기(2026-11-09 사장님 "일본줄의 수작업 편의를 위해 행에다 특정색을 입혔다 풀었다") — 줄 자세히의 '줄 색'과 같은 저장(sheet_meta ucolor),
@@ -745,7 +805,7 @@
   async function colorRows(rows, hex) {
     const to = hex && rows.length && rows.every((r) => ucolorOf(r) === hex) ? '' : hex;
     const items = rows.filter((r) => ucolorOf(r) !== to).map((r) => colorItem(r, ucolorOf(r), to));
-    if (!items.length) { flash(rows.length ? '풀 색이 없어요' : '줄을 먼저 골라 주세요'); return; }
+    if (!items.length) { flash(rows.length ? '칠한 색이 없어요' : '줄을 먼저 골라 주세요'); return; }
     const j = await doAct({ kind: 'sheet_meta', items }, null, null);
     if (j && j.ok) { lastColor = items.map((x) => Object.assign({}, x, { old: x.new, new: x.old })); lastSaved = []; }
   }
@@ -758,7 +818,7 @@
       b.title = (on ? `${name} 풀기` : `${name} 칠하기 · 다시 누르면 풀기`) + ` · ⌥${i + 1}`; b.setAttribute('aria-label', b.title);
       b.onclick = () => colorRows(rowsOf(), hex); g.append(b);
     });
-    if (now.some(ucolorOf)) { const x = E('button', 'fx-chip fx-chip-x', '✕'); x.type = 'button'; x.title = '줄 색 모두 풀기 · ⌥0'; x.setAttribute('aria-label', x.title); x.onclick = () => colorRows(rowsOf(), ''); g.append(x); }
+    if (now.some(ucolorOf)) { const x = E('button', 'fx-chip fx-chip-x'); x.append(I('x')); x.type = 'button'; x.title = '줄 색 모두 풀기 · ⌥0'; x.setAttribute('aria-label', x.title); x.onclick = () => colorRows(rowsOf(), ''); g.append(x); }
     return g;
   }
   const selRows = () => { const g = rangeOf(); return g ? last.rows.slice(g.r0, g.r1 + 1) : []; };
@@ -767,7 +827,7 @@
     const r = last.rows[rowIdx(cell.k)]; if (!r) return;
     const t = (e.clipboardData || window.clipboardData).getData('text'); e.preventDefault();
     if (/[\t\n]/.test(t.replace(/\n+$/, ''))) return pasteGrid(r, cell.c, t);
-    if (!canEdit(cell.c, r)) return flash('고칠 수 없는 칸이에요(자동 계산·플랫폼 값)');
+    if (!canEdit(cell.c, r)) return flash('자동으로 채우는 칸이라 고칠 수 없어요');
     stage(r, cell.c, t.trim()); render(); bar();
   });
   function gridKey(e) {          // 화살표 옮기기(Shift = 범위) · Enter/F2 고치기 · 글자 치면 바로 고치기 · Delete 비우기 · ⌘C 복사 · Esc 풀기(시트처럼)
@@ -784,12 +844,12 @@
       pickCell(r2, c2, ext);
     } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); copySel(); }
     else if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); cell = { k: rid(last.rows[0]), c: vc[0] }; cell2 = { k: rid(last.rows[last.rows.length - 1]), c: vc[vc.length - 1] }; paintSel(); fx(); }
-    else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); if (canEdit(cell.c, r0)) { const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c); } else flash('고칠 수 없는 칸이에요'); }
+    else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); if (canEdit(cell.c, r0)) { const td = cellTd(r0, cell.c); if (td) cellEdit(td, r0, cell.c); } else flash('자동으로 채우는 칸이라 고칠 수 없어요'); }
     else if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) { e.preventDefault(); undoLast(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault(); const plan = [];
       for (const [r, c] of rangeCells()) if (canEdit(c, r) && cellVal(r, c) !== '') plan.push({ r, c, v: '' });
-      if (!plan.length) flash('비울 칸이 없어요(고칠 수 없는 칸이거나 이미 빈칸)');
+      if (!plan.length) flash('비울 칸이 없어요. 이미 비었거나 자동으로 채우는 칸이에요');
       else if (plan.length === 1) { stage(plan[0].r, plan[0].c, '', '일괄'); render(); bar(); }
       else preview('칸 비우기', plan, [], '일괄');      // 여러 칸은 바로 저장되니 한 번 보여 주고
     } else if (e.key === 'Escape') { cell = cell2 = null; paintSel(); fx(); }
@@ -812,33 +872,45 @@
     const r = cell && isSheet() && last && last.rows.find((x) => rid(x) === cell.k);
     box.hidden = !isSheet() || viewMode() === 'cards'; box.textContent = '';
     if (box.hidden) return;
-    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '누르면 고치기 · 끌면 여러 칸 · 행 번호는 자세히 · ⌥1~7 줄 색(다시 누르면 풀기)')); return; }
+    if (!r) { box.append(E('span', 'fx-name muted', '칸 내용'), E('span', 'fx-val muted', '칸을 고르면 전체 값이 여기에 보여요. 연필 표시 칸은 눌러서 바로 고쳐요.'), fxHelp()); return; }
     const g = rangeOf();
     if (g && (g.r1 > g.r0 || g.c1 > g.c0)) {      // 범위: 칸 수 · 숫자 합계·평균(엑셀 아래 상태줄처럼 — 수익·배송비 더해 보기)
       const nums = []; let n = 0; for (const [rr, cc] of rangeCells()) { n++; const x = numOf(cellVal(rr, cc)); if (x != null && NUMC.includes(cc)) nums.push(x); }
       const sum = nums.reduce((a, b) => a + b, 0);
       box.append(E('span', 'fx-name', `${g.r1 - g.r0 + 1}줄 × ${g.c1 - g.c0 + 1}칸`),
-        E('span', 'fx-val', nums.length ? `합계 ${Math.round(sum).toLocaleString('ko-KR')} · 평균 ${Math.round(sum / nums.length).toLocaleString('ko-KR')} · 숫자 ${nums.length}칸 / ${n}칸` : `${n}칸 (숫자 칸 없음)`));
-      const cp = E('button', 'btn sm ghost', '복사 ⌘C'); cp.type = 'button'; cp.onclick = copySel; box.append(cp);
-      const cc = colorChips(selRows); if (cc) box.append(cc); return;
+        E('span', 'fx-val', nums.length ? `합계 ${Math.round(sum).toLocaleString('ko-KR')} · 평균 ${Math.round(sum / nums.length).toLocaleString('ko-KR')} · 숫자 ${nums.length}칸 / ${n}칸` : `${n}칸 · 숫자 칸 없음`));
+      const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C'; cp.onclick = copySel; box.append(cp);
+      const cc = colorChips(selRows); if (cc) box.append(cc); box.append(fxHelp()); return;
     }
     const c = cell.c, v = cellVal(r, c);
     box.append(E('span', 'fx-name', `${r.tab} ${r.row}행 · ${cname(c)}`));
     if (canEdit(c, r)) {
       const opts = dropOpts(r, c); let el;
-      if (opts) { el = E('select'); for (const o of ['', ...opts, ...(v && !opts.includes(v) ? [v] : [])]) { const x = E('option', null, o || '(비움)'); x.value = o; if (o === v) x.selected = true; el.append(x); } el.onchange = () => { stage(r, c, el.value.trim()); render(); bar(); }; }
+      if (opts) { el = E('select'); for (const o of ['', ...opts, ...(v && !opts.includes(v) ? [v] : [])]) { const x = E('option', null, o || '빈칸'); x.value = o; if (o === v) x.selected = true; el.append(x); } el.onchange = () => { stage(r, c, el.value.trim()); render(); bar(); }; }
       else {
         el = E('input'); el.value = v;
         el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); stage(r, c, el.value.trim()); render(); bar(); } else if (e.key === 'Escape') { el.value = v; el.blur(); } };
         el.onblur = () => { if (el.value.trim() !== v) { stage(r, c, el.value.trim()); render(); bar(); } };
       }
       el.className = 'fx-val fx-in'; el.setAttribute('aria-label', `${cname(c)} 값`); box.append(el);
-    } else box.append(E('span', 'fx-val', (r[c] == null || r[c] === '' ? '(빈칸)' : fmt(c, r[c])) + ' '), E('span', 'muted small', '· 자동 칸'));
+    } else box.append(E('span', 'fx-val', r[c] == null || r[c] === '' ? '빈칸' : fmt(c, r[c])), E('span', 'muted small fx-auto', '자동으로 채우는 칸'));
     if (v) { const cp = E('button', 'btn sm ghost', '복사'); cp.type = 'button'; cp.title = '⌘C'; cp.onclick = copySel; box.append(cp); }
-    if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = E('a', 'btn sm ghost', '배송 조회 ↗'); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
+    if (v && ['intl_tracking', 'kr_invoice'].includes(c)) { const a = IB(E('a', 'btn sm ghost'), 'external', '배송 조회', true); a.href = trackUrl(v.split(/[,\s]+/)[0]); a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
     const cc = colorChips(selRows); if (cc) box.append(cc);
-    const go = IB(E('button', 'btn sm ghost'), 'chevron', '줄 자세히', true); go.type = 'button'; go.onclick = () => openRow(r); box.append(go);
+    const go = IB(E('button', 'btn sm ghost'), 'chevron', '줄 자세히', true); go.type = 'button'; go.onclick = () => openRow(r); box.append(go, fxHelp());
   }
+  // 표 쓰는 법(2026-11-12: 칸 내용 줄의 '누르면 고치기 · 끌면 여러 칸 · ⌥1~7 줄 색(다시 누르면 풀기)'가 암호 같던 것 → '?'를 누르면 짧은 표)
+  const FX_HELP = [['칸 누르기', '바로 고쳐요. Enter를 누르거나 다른 곳을 누르면 저장돼요.'], ['끌기 · Shift+누르기', '여러 칸을 골라 합계를 봐요.'], ['행 번호 누르기', '줄 자세히를 열어요.'],
+    ['⌘C · ⌘V', '복사하고 붙여 넣어요. 엑셀에서 복사한 여러 칸도 돼요.'], ['⌘Z', '방금 저장한 칸을 되돌려요.'], ['⌥1~7', '고른 줄에 색을 칠해요. 같은 키를 한 번 더 누르면 풀려요.'], ['⌥0', '고른 줄의 색을 모두 풀어요.']];
+  function fxHelp() {
+    const d = E('details', 'fx-help'), s = E('summary', null, '?'); s.setAttribute('aria-label', '표 쓰는 법'); s.title = '표 쓰는 법';
+    const p = E('div', 'fx-pop'), dl = E('dl'); p.append(E('b', null, '표 쓰는 법'));
+    for (const [k, v] of FX_HELP) dl.append(E('dt', null, k), E('dd', null, v));
+    p.append(dl); d.append(s, p);
+    d.onkeydown = (e) => { if (e.key === 'Escape' && d.open) { e.stopPropagation(); d.open = false; s.focus(); } };
+    return d;
+  }
+  document.addEventListener('pointerdown', (e) => { document.querySelectorAll('.fx-help[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; }); }, true);   // 바깥을 누르면 닫힘(칸 누르기는 퍼지지 않아서 잡는 단계에서)
   function pinLeft(tbl) {        // 고정 칸: 앞 칸 너비만큼 왼쪽에 붙임(sticky) — 실제 너비(소수 포함)로, offsetWidth(반올림)면 넘길 때 고정 칸이 1px씩 밀림
     const hs = [...tbl.querySelectorAll('thead th')]; let left = 0; const at = {};
     hs.forEach((th, i) => { if (th.classList.contains('pick') || th.classList.contains('pin')) { at[i] = left; left += th.getBoundingClientRect().width; } });
@@ -968,7 +1040,7 @@
     try { j = await post({ kind: 'sheet_edit', edits: sent.map(([, { op, c, ...e }]) => e), op: ops.size === 1 ? [...ops][0] : '일괄', force: !!force, ...(retry ? { retry: true } : {}) }, true); }
     catch (err) {
       saving = false; for (const [k] of sent) delete flying[k];
-      sv = { k: 'net', msg: `저장 실패: ${err.message}. 주황 칸은 [다시 저장]으로` };
+      sv = { k: 'net', msg: `저장하지 못했어요. ${errText(err)} 주황 칸은 [다시 저장]을 눌러 주세요.` };
       saveUI(); bar(); return;
     }
     saving = false; for (const [k] of sent) delete flying[k];
@@ -989,7 +1061,7 @@
       return;
     }
     if (/회차가 시트를 쓰는 중/.test(msg)) {        // 시트를 쓰는 회차가 끝나면 — 1분마다 다시(그동안 칸은 주황색 그대로)
-      sv = { k: 'wait', msg: `${noE(msg).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 자동 저장` };
+      sv = { k: 'wait', msg: `${noE(msg).replace(/ — 끝난 뒤에.*$/, '')}. 끝나면 저절로 저장해요.` };
       saveUI(); bar(); retryT = setTimeout(() => autoSave(false, false, true), 60000); return;   // retry = 자동 재시도(오류 장부는 첫 번만 셈)
     }
     const failed = new Set((msg.match(/• \S+ \d+행 [^:]+:/g) || []).map((s) => s.slice(2, -1)));
@@ -1012,7 +1084,7 @@
     // 2026-11-09: 서버가 송장 칸 실수(같은 국내송장 두 받는 분·직배 한 칸만 고침)를 ⚠️ 줄로 돌려주면 저장 뒤 바로 빨간 알림(barun/invoice_check)
     const warn = msg.split('\n').filter((l) => l.startsWith('⚠️')).map((l) => noE(l).trim()).join(' · ');
     sv = (failed.size || failedRows.size || unsure || !j.ok) && !/바뀐 값이 없어요/.test(msg)
-      ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장 못 한 칸은 시트 값으로 되돌림` } : { k: 'ok', at: hh, ...(warn ? { msg: warn } : {}) };
+      ? { k: 'bad', at: hh, msg: `${noE(msg)}\n저장하지 못한 칸은 시트 값으로 되돌렸어요.` } : { k: 'ok', at: hh, ...(warn ? { msg: warn } : {}) };
     saveUI(); bar();
     if (warn) toast(warn.slice(0, 220), true, 12000);
     if (sv.k === 'bad') reloadWhenIdle(300);
@@ -1039,7 +1111,7 @@
   }
   function undoLast() {        // 방금 저장한 칸들을 전 값으로(그 뒤 또 고친 칸은 건드리지 않음) — 한 번 더 누르면 다시 앞 값으로
     if (lastColor) { const items = lastColor; lastColor = null; doAct({ kind: 'sheet_meta', items }, null, null); return; }   // 방금 칠한·푼 줄 색
-    if (!lastSaved.length) { toast('되돌릴 저장이 없어요'); return; }
+    if (!lastSaved.length) { toast('되돌릴 게 없어요'); return; }
     const back = lastSaved; lastSaved = []; let n = 0;
     for (const e of back) { const r = rowOfEdit(e); if (r && cellVal(r, e.c) === e.new) { stage(r, e.c, e.old, '되돌리기'); n++; } }
     render(); bar(); saveUI();
@@ -1049,15 +1121,16 @@
     const s = document.querySelector('.dt-save'); if (!s) return;
     const n = Object.keys(pending).length;
     s.hidden = !isSheet(); s.className = 'dt-save ' + sv.k; s.textContent = ''; if (s.hidden) return;   // 늘 같은 자리·같은 폭 — 저장될 때마다 찾기 칸이 줄었다 늘던 것(2026-10-26 감사)
-    if (!sv.k) s.append(I('check'), ' 바로 저장');
-    else if (sv.k === 'saving') s.append(`저장 중… ${Math.max(n, 1)}칸`);
+    // 2026-11-12: 할 일 없는 '바로 저장'이 꺼진 버튼처럼 흐렸던 것 → 초록 점 + '자동 저장'(누르는 것이 아니라 상태 표시)
+    if (!sv.k) { s.append(E('i', 'dt-save-dot'), '자동 저장'); }
+    else if (sv.k === 'saving') s.append(`${Math.max(n, 1)}칸 저장 중…`);
     else if (sv.k === 'ok' || sv.k === 'bad') {
-      s.append(I(sv.k === 'ok' ? 'check' : 'alert'), sv.k === 'ok' ? ` 저장됨 ${sv.at}` : ` 일부 저장 못 함 ${sv.at}`);
+      s.append(I(sv.k === 'ok' ? 'check' : 'alert'), sv.k === 'ok' ? ` ${sv.at} 저장됨` : ` ${sv.at} 일부 저장 못 함`);
       if (lastSaved.length) { const u = E('button', 'dt-undo', '되돌리기'); u.type = 'button'; u.title = `방금 ${lastSaved.length}칸 되돌리기 · ⌘Z`; u.onclick = undoLast; s.append(u); }
-    } else if (sv.k === 'wait') s.append(I('clock'), ` 회차 끝나면 저장 · ${n}칸`);
-    else if (sv.k === 'queued') s.append(I('clock'), ` 회차 끝나면 서버가 저장 · ${Object.keys(queued).length}칸`);
-    else if (sv.k === 'net') s.append(I('alert'), ` 저장 안 됨 · ${n}칸`);
-    s.title = sv.msg || '고친 칸은 바로 저장';
+    } else if (sv.k === 'wait') s.append(I('clock'), ` ${n}칸 · 회차 끝나면 저장`);
+    else if (sv.k === 'queued') s.append(I('clock'), ` ${Object.keys(queued).length}칸 대기 · 회차 끝나면 저장`);
+    else if (sv.k === 'net') s.append(I('alert'), ` ${n}칸 저장 안 됨`);
+    s.title = sv.msg || '고친 칸은 따로 누르지 않아도 바로 저장돼요';
   }
   // 창을 닫거나 다른 앱으로 갈 때: 고치던 칸을 넣고 바로 보냄(keepalive — 창이 닫혀도 끝까지 감)
   function flushNow() { if (editing) editing.el.blur(); if (Object.keys(pending).some((k) => !flying[k]) && sv.k !== 'wait') autoSave(false, true); }
@@ -1069,13 +1142,13 @@
     const plan = [], skip = [];
     lines.forEach((vals, i) => {
       const r = last.rows[ri + i];
-      if (!r) { skip.push(`${i + 1}번째 줄: 이 화면에 줄이 없어요(다음 쪽이거나 끝)`); return; }
+      if (!r) { skip.push(`${i + 1}번째 줄: 붙일 줄이 이 화면에 없어요`); return; }
       vals.forEach((v, j) => {
         const c = cols[ci + j];
         if (!c) { skip.push(`${r.tab} ${r.row}행 ${j + 1}번째 값: 오른쪽에 칸이 없어요`); return; }
-        if (!canEdit(c, r)) { if (v.trim() !== cellVal(r, c)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 고칠 수 없는 칸(자동 계산·플랫폼 값)`); return; }
+        if (!canEdit(c, r)) { if (v.trim() !== cellVal(r, c)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 자동으로 채우는 칸`); return; }
         const opts = dropOpts(r, c);
-        if (opts && v.trim() && !opts.includes(v.trim())) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: '${v.trim()}' 목록 밖 값`);
+        if (opts && v.trim() && !opts.includes(v.trim())) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 목록에 없는 값 '${v.trim()}'`);
         if (v.trim() !== cellVal(r, c)) plan.push({ r, c, v: v.trim() });
       });
     });
@@ -1086,7 +1159,7 @@
     if (rows.length < 2) { alertBar('두 줄 이상 골라 주세요'); return; }
     const src = rows[0], v = cellVal(src, c);
     const plan = [], skip = [];
-    for (const r of rows.slice(1)) { if (!canEdit(c, r)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 고칠 수 없는 칸`); else if (cellVal(r, c) !== v) plan.push({ r, c, v }); }
+    for (const r of rows.slice(1)) { if (!canEdit(c, r)) skip.push(`${r.tab} ${r.row}행 ${cname(c)}: 자동으로 채우는 칸`); else if (cellVal(r, c) !== v) plan.push({ r, c, v }); }
     preview(`아래로 채우기 · ${src.tab} ${src.row}행 ${cname(c)} '${v || '빈칸'}'`, plan, skip, '채우기');
   }
   function preview(title, plan, skip, op) {
@@ -1100,10 +1173,11 @@
     if (!plan.length) ul.append(E('li', 'muted', '바뀌는 칸이 없어요'));
     box.append(ul);
     if (skip.length) { const s = E('ul', 'dt-ev warn'); for (const x of skip.slice(0, 50)) { const li = E('li'); li.append(I('alert'), ' ', x); s.append(li); } box.append(E('p', 'small', `확인할 것 ${skip.length}개`), s); }
-    box.append(E('p', 'muted small', '확인하면 바로 저장 · 되돌리기 ⌘Z'));
+    box.append(E('p', 'muted small', '넣으면 바로 저장돼요. ⌘Z로 되돌릴 수 있어요.'));
     const bs = E('div', 'btns');
     const verb = plan.length && plan.every((p) => p.v === '') ? '비우기' : '넣기';
-    bs.append(btn('취소', 'ghost', () => dlg.close()), btn(`${plan.length}칸 ${verb}`, 'primary', () => { for (const p of plan) stage(p.r, p.c, p.v, op); dlg.close(); render(); bar(); }));
+    const ok = btn(`${plan.length}칸 ${verb}`, 'primary', () => { for (const p of plan) stage(p.r, p.c, p.v, op); dlg.close(); render(); bar(); }); ok.disabled = !plan.length;   // 바뀌는 칸이 없으면 '0칸 넣기'를 누를 수 없게
+    bs.append(btn('닫기', 'ghost', () => dlg.close()), ok);
     box.append(bs); dlg.append(box); document.body.append(dlg);
     dlg.addEventListener('close', () => dlg.remove());
     dlg.showModal();
@@ -1115,7 +1189,7 @@
     const k = `${rid(r)}:${c}`, now = pending[k] ? pending[k].new : (r[c] == null ? '' : String(r[c]));
     let el;
     const opts = dropOpts(r, c);          // 선택 목록 칸(시트 드롭다운 — grid_meta). 목록 밖 지금 값도 그대로 고를 수 있게(시트도 경고만)
-    if (opts) { el = E('select'); for (const o of ['', ...opts, ...(now && !opts.includes(now) ? [now] : [])]) { const x = E('option', null, o || '(비움)'); x.value = o; if (o === now) x.selected = true; el.append(x); } }
+    if (opts) { el = E('select'); for (const o of ['', ...opts, ...(now && !opts.includes(now) ? [now] : [])]) { const x = E('option', null, o || '빈칸'); x.value = o; if (o === now) x.selected = true; el.append(x); } }
     else {
       el = E('input'); el.value = now; if (NUMC.includes(c)) el.inputMode = 'decimal';   // 휴대폰 표 보기: 숫자 칸은 숫자 자판
       el.onpaste = (e) => {     // 엑셀·시트에서 복사한 여러 칸(탭·줄바꿈) → 이 칸부터 미리보기
@@ -1165,19 +1239,19 @@
       const g = E('div', 'dt-bar-g');
       const s = E('select'); s.setAttribute('aria-label', '넣을 칸');
       for (const c of (last.edit.editable || [])) { const o = E('option', null, COLNAME[c] || c); o.value = c; s.append(o); }
-      const v = E('input'); v.placeholder = '같은 값'; v.setAttribute('aria-label', '넣을 값');
-      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button'; go.title = '미리 보고 저장';
+      const v = E('input'); v.placeholder = '넣을 값'; v.setAttribute('aria-label', '넣을 값');
+      const go = E('button', 'btn sm', `고른 ${m}줄에 넣기`); go.type = 'button'; go.title = '넣기 전에 바뀌는 칸을 먼저 보여 드려요';
       go.onclick = () => {
         const plan = [], skip = [], val = v.value.trim();
-        for (const r of last.rows.filter((x) => picked.has(rid(x)))) { if (!canEdit(s.value, r)) skip.push(`${r.tab} ${r.row}행 ${cname(s.value)}: 고칠 수 없는 칸`); else if (cellVal(r, s.value) !== val) plan.push({ r, c: s.value, v: val }); }
+        for (const r of last.rows.filter((x) => picked.has(rid(x)))) { if (!canEdit(s.value, r)) skip.push(`${r.tab} ${r.row}행 ${cname(s.value)}: 자동으로 채우는 칸`); else if (cellVal(r, s.value) !== val) plan.push({ r, c: s.value, v: val }); }
         preview(`고른 ${m}줄에 넣기 · ${cname(s.value)} '${val || '빈칸'}'`, plan, skip, '일괄');
       };
-      const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '맨 위 줄 값을 아래로';
+      const fill = E('button', 'btn sm', '맨 위 줄 값으로 아래 채우기'); fill.type = 'button'; fill.title = '맨 위 줄 값을 고른 나머지 줄에 넣어요';
       fill.onclick = () => fillDown(s.value);
-      const clr = E('button', 'btn sm ghost', '고르기 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
+      const clr = E('button', 'btn sm ghost', '선택 풀기'); clr.type = 'button'; clr.onclick = () => { picked.clear(); render(); bar(); };
       g.append(E('b', null, `${m}줄 고름`), s, v, go, fill, clr);
       const cc = colorChips(() => last.rows.filter((x) => picked.has(rid(x)))); if (cc) g.insertBefore(cc, clr);
-      if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = IB(E('button', 'btn sm primary'), 'plus', '이 줄로 재고 추가'); cp.type = 'button'; cp.title = '상품 정보로 새 재고 줄'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
+      if (m === 1) { const one = last.rows.find((x) => picked.has(rid(x))); const cp = IB(E('button', 'btn sm primary'), 'plus', '이 줄로 재고 추가'); cp.type = 'button'; cp.title = '이 줄 상품 정보로 새 재고 줄을 넣어요'; cp.onclick = () => stockCopy(one, cp); g.insertBefore(cp, clr); }
       b.append(g);
     }
     if (stuck) {
@@ -1185,7 +1259,7 @@
       g.append(E('span', 'dt-bar-t', sv.msg || ''));
       if (sv.k === 'wait') g.append(btn('그래도 저장', 'weak', () => autoSave(true)));
       if (sv.k === 'net') g.append(btn('다시 저장', 'primary', () => autoSave(false)));
-      if (sv.k !== 'bad' && Object.keys(pending).length) g.append(btn('고친 것 버리기', 'ghost', () => { clearTimeout(retryT); pending = {}; sv = { k: '' }; saveUI(); render(); bar(); }));
+      if (sv.k !== 'bad' && Object.keys(pending).length) g.append(btn('고친 칸 버리기', 'ghost', () => { clearTimeout(retryT); pending = {}; sv = { k: '' }; saveUI(); render(); bar(); }));
       if (sv.k === 'bad') g.append(btn('닫기', 'ghost', () => { sv = { k: 'ok', at: sv.at }; saveUI(); bar(); }));
       b.append(g);
     }
@@ -1211,7 +1285,7 @@
     if (wk && payload.force) delete rowWait[wk];
     if (wk && payload.retry && !(wk in rowWait)) return;          // '그래도 하기'로 이미 끝낸 대기
     const label = btn ? [...btn.childNodes] : [];   // 그림 버튼(IB)이 끝난 뒤 그림을 잃지 않게 원래 내용 그대로(2026-11-12)
-    if (btn) { btn.disabled = true; if (payload.kind.startsWith('sheet')) btn.textContent = '시트에 쓰는 중…'; }
+    if (btn) { btn.disabled = true; if (payload.kind.startsWith('sheet')) btn.textContent = '저장 중…'; }
     try {
       const j = await post(payload);
       const busy = /회차가 시트를 쓰는 중/.test(j.msg);
@@ -1220,7 +1294,7 @@
         if (left > 0) {
           rowWait[wk] = left;
           setTimeout(() => doAct(Object.assign({}, payload, { retry: true }), null, out), 60000);
-          j.msg = `${noE(j.msg).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 자동으로 할게요`;
+          j.msg = `${noE(j.msg).replace(/ — 끝난 뒤에.*$/, '')}. 끝나면 저절로 할게요.`;
         } else delete rowWait[wk];
       } else if (wk) delete rowWait[wk];
       if (!(payload.retry && busy)) toast(String(j.msg || '').split('\n')[0].slice(0, 90), !j.ok);
@@ -1230,7 +1304,7 @@
       }
       if (j.ok && !payload.kind.endsWith('preview')) { load(); loadTables(); }
       return j;
-    } catch (e) { toast(e.message, true); if (out) { out.textContent = ''; out.append(I('alert'), ' ', e.message); out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.replaceChildren(...label); } }
+    } catch (e) { toast(errText(e), true); if (out) { out.textContent = ''; out.append(I('alert'), ' ', errText(e)); out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.replaceChildren(...label); } }
   }
 
   const field = (lab, input) => { const l = E('label', 'dt-field'); l.append(E('span', null, lab), input); return l; };
@@ -1259,27 +1333,27 @@
   function syncAdd() {
     const b = document.querySelector('.dt-add .add'); if (!b) return;
     const r = addRef();
-    IB(b, 'plus', r ? `${r.tab} ${r.row}행으로 재고 줄 추가` : '재고 줄 추가');
+    IB(b, 'plus', r ? `${r.tab} ${r.row}행 상품으로 재고 줄 추가` : '재고 줄 추가');
     b.disabled = !r;
   }
   const copyWait = {};          // 회차가 끝나길 기다리는 재고 복사(탭#행 → 남은 횟수) — 같은 줄을 여러 번 눌러도 한 번만 기다림
   async function stockCopy(r, b, force, retry) {
     if (!r) return;
-    if (!String(r.name || '').trim()) { toast('상품명이 비어 복사 불가 · [재고 넣기]로', true); return; }
+    if (!String(r.name || '').trim()) { toast('상품명이 비어 있어 복사할 수 없어요. [재고 넣기]로 넣어 주세요', true); return; }
     const wk = `${r.tab}#${r.row}`;
     if (!retry && !force && copyWait[wk]) { toast(`${r.tab} ${r.row}행은 회차가 끝나면 자동으로 넣어요`, false, 3600); return; }
     const label = b ? [...b.childNodes] : []; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'stock_copy', tab: r.tab, row: r.row, key: r.key || '', ident: ident(r) };   // 값은 서버가 지금 시트에서 다시 읽어 복사
     if (force) payload.force = true;
     if (retry) payload.retry = true;     // 자동 재시도 — 오류 장부는 첫 번만 셈
-    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: errText(e) }; }
     if (b) { b.disabled = false; b.replaceChildren(...label); }
     const m = String(j.msg || '');
     if (j.ok) {
       delete copyWait[wk];
       const pos = m.match(/(\S+) (\d+)행/);
       newRow = pos ? { tab: pos[1], row: +pos[2] } : null;
-      toast(`${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 · ${r.row}행 상품 정보 복사`, false, 3600);
+      toast(`${r.row}행 상품 정보로 ${pos ? `${pos[1]} ${pos[2]}행` : '맨 아래'}에 재고 줄을 넣었어요`, false, 3600);
       load(); loadTables(); return;
     }
     if (/회차가 시트를 쓰는 중/.test(m)) {
@@ -1287,7 +1361,7 @@
       const left = retry ? (copyWait[wk] || 0) - 1 : 30;     // 1분마다 30번(30분)까지
       if (left > 0) {
         copyWait[wk] = left; setTimeout(() => stockCopy(r, null, false, true), 60000);
-        if (!retry) toast(`${noE(m).replace(/ — 끝난 뒤에.*$/, '')} · 끝나면 ${r.row}행 재고 줄 자동 추가`, false, 4800);
+        if (!retry) toast(`${noE(m).replace(/ — 끝난 뒤에.*$/, '')}. 끝나면 ${r.row}행 재고 줄을 저절로 넣을게요`, false, 4800);
         return;
       }
       delete copyWait[wk];
@@ -1299,13 +1373,13 @@
     const label = b ? [...b.childNodes] : []; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'copy', tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key || '', ident: ident(r) };
     if (force) payload.force = true;
-    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: errText(e) }; }
     if (b) { b.disabled = false; b.replaceChildren(...label); }
     const m = String(j.msg || '');
     if (j.ok) {
       const pos = m.match(/(\S+) (\d+)행에/);
       newRow = pos ? { tab: pos[1], row: +pos[2] } : null;
-      toast(`${pos ? `${pos[1]} ${pos[2]}행` : '새 줄'} 추가 · ${r.row}행 모든 칸 복사(공홈가·공홈주문번호·해외송장·신청번호 빈칸)`, false, 3600);
+      toast(`${r.row}행을 ${pos ? `${pos[1]} ${pos[2]}행` : '맨 아래'}에 복사했어요. 공홈가·공홈주문번호·해외송장·신청번호는 비워 뒀어요`, false, 4800);
       load(); loadTables(); return;
     }
     if (/회차가 시트를 쓰는 중/.test(m) && !force && confirm(m + '\n\n그래도 넣을까요?')) { rowCopy(r, b, true); return; }
@@ -1348,13 +1422,73 @@
 .row-del { color: var(--muted); } .row-del:hover { color: var(--red-ink); }
 .th-filt .dic .ic { width: 12px; height: 12px; } .th-ar .dic .ic { width: 11px; height: 11px; }
 .ov-ed .dic .ic { width: 14px; height: 14px; }
-.sk-done .ok .dic .ic { width: 30px; height: 30px; stroke-width: 2.4; }
+.sk-done .ok .dic .ic { width: 28px; height: 28px; stroke-width: 2.4; }
+/* 2026-11-12 리뉴얼(화면 점검): 공용 칸이 없는 색 이름(--accent)·박은 색을 쓰던 것 → 토큰(어두운 화면에서도) */
+.prod-link:hover { color: var(--blue-ink); }
+.note-dot { color: var(--orange); }
+.ov-link .dic, .prod-link .dic { margin-left: 2px; } .ov-link .dic .ic, .ov-chip .dic .ic, .btn .dic .ic { width: 14px; height: 14px; }
+.ov-note { margin-left: 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
+/* 상태 표시 덧말('해외발송(신청대기)'의 '신청대기')은 작게 */
+.badge .bsub { margin-left: 4px; font-size: .9em; font-weight: 500; opacity: .78; }
+/* 긴 알림이 '…'로 잘려 뜻을 못 읽던 것 — 줄을 바꿔 다 보이게 */
+.dt-toast { white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+/* 머리글: 한 색 + 바로 고칠 칸은 연필(파란 글자·회색 글자가 뜻 없이 섞여 보이던 것) */
+table.dt.sheet th.edh { color: var(--muted); }
+table.dt th .th-sort .th-ed { margin-right: 4px; color: var(--blue-ink); } table.dt th .th-sort .th-ed .ic { width: 12px; height: 12px; }
+/* 시트 색을 칠한 줄: 어두운 화면에서 밝은 하늘색 줄 위 주황·분홍 글자(기한)가 안 읽히던 것 → 어두운 화면은 색을 옅게 섞고 글자는 화면 색 */
+table.dt.sheet tbody tr.painted { background: color-mix(in srgb, var(--row-bg) 72%, var(--card)); }   /* 밝은 화면도 조금 옅게 — 진한 하늘색 줄이 '고른 줄'처럼 보이던 것 */
+@media (prefers-color-scheme: dark) {
+  table.dt.sheet tbody tr.painted { background: color-mix(in srgb, var(--row-bg) 22%, var(--card)); color: var(--ink); }
+  table.dt.sheet tbody tr.painted td.rowh { color: var(--blue-ink); }
+}
+/* 보기 방식 '카드 | 표' — 도구 줄 버튼과 같은 34px 높이 */
+.dt-view { flex: none; padding: 2px; border-radius: 10px; }
+.dt-view button { min-height: 30px; padding: 0 12px; font-size: 13.5px; border-radius: 8px; transition: background-color .18s var(--ease), color .18s var(--ease); }
+.dt-view button:not(.on):hover { color: var(--ink); background: var(--hover); }
+/* 도구 줄의 파란 버튼(재고 넣기·걸린 필터)이 마우스를 올리면 회색으로 바뀌던 것 */
+.dt-tb.dt-sbtn:hover, .dt-tb.on:hover { background: var(--blue-bg); filter: brightness(.96); }
+/* 바로 저장 상태 — 할 일 없을 때도 꺼진 버튼처럼 흐리지 않게(초록 점 + 글) */
+#p-data .dt-save:not(.saving):not(.ok):not(.wait):not(.net):not(.bad):not(.queued) { background: transparent; color: var(--sub); box-shadow: inset 0 0 0 1px var(--line); }
+.dt-save-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--st-good); flex: none; }
+#p-data .dt-save.queued { display: inline-flex; background: var(--orange-bg); color: var(--orange-ink); }   /* 대기 칸 표시가 휴대폰에서 숨고 꺼진 색이던 것 */
+/* 필터 묶음마다 이름·구분선 */
+.dt-facet > .muted { font-weight: 600; color: var(--sub); }
+@media (min-width: 761px) {
+  .dt-facets { column-gap: 32px; }
+  .dt-facets > .dt-facet { position: relative; }
+  .dt-facets > .dt-facet.sep::before { content: ''; position: absolute; left: -16px; top: 4px; bottom: 12px; width: 1px; background: var(--line); }
+}
+/* 옆으로 넘기는 줄: 더 있는 쪽 끝을 흐리게(edgeFade) */
+.ef-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.ef-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.ef-l.ef-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+/* 표 쓰는 법 '?' */
+.dt-fx { position: relative; }
+.dt-form > p, .dt-tool > p { margin: 0; }   /* 서랍 안 설명 줄 위아래에 기본 문단 여백(13px)이 붙어 칸 사이가 벌어지던 것 */
+.fx-help { position: relative; flex: none; }
+.fx-help > summary { list-style: none; width: 24px; height: 24px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--sub); background: var(--card); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.fx-help > summary::before { content: none; }
+.fx-help > summary::-webkit-details-marker { display: none; }
+.fx-help > summary:hover, .fx-help[open] > summary { color: var(--blue-ink); background: var(--blue-bg); box-shadow: none; }
+.fx-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(360px, calc(100vw - 32px)); background: var(--card); color: var(--ink); border-radius: var(--r-sm); box-shadow: var(--pop); padding: 12px 16px; font-size: 13px; }
+.fx-pop > b { display: block; font-size: 14px; margin-bottom: 8px; }
+.fx-pop dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; margin: 0; }
+.fx-pop dt { color: var(--ink2); font-weight: 600; white-space: nowrap; } .fx-pop dd { margin: 0; color: var(--sub); }
+.fx-chip-x { display: inline-grid; place-items: center; } .fx-chip-x .ic { width: 12px; height: 12px; }
+.fx-auto { flex: none; }
+/* 주문 장부 카드: 넓게 쓰되(10/24 사장님) 오른쪽 끝이 보이게 12px 띄우고 모서리를 둥글게(2026-11-12 점검: 화면 끝에 붙어 잘린 듯 보였음) */
+@media (min-width: 1024px) {
+  main.pages:has(> #p-data:not([hidden])) { padding-right: 12px; }
+  #p-data > .dt-card { border-radius: var(--r); border-right: 1px solid var(--line); }
+}
+@media (min-width: 1024px) and (prefers-color-scheme: dark) { #p-data > .dt-card { border-right-color: transparent; } }
 /* 스크롤바는 숨김 — 옆으로 더 있으면 그쪽 끝을 흐리게(2026-10-25). 넘기는 상자에 mask-image를 걸면 사파리가 고정 칸과 함께
-   다시 왼쪽으로 돌아올 때 칸을 안 그려 빈칸이 됨(2026-10-26 사장님) → 겉 상자(.dt-scroll)에 그림자를 겹침(표는 그대로) */
+   다시 왼쪽으로 돌아올 때 칸을 안 그려 빈칸이 됨(2026-10-26 사장님) → 겉 상자(.dt-scroll)에 그림자를 겹침(표는 그대로).
+   2026-11-12 점검: 넓은 표(3,666px)에서 옆으로 더 있는 줄을 놓치던 것 → 끝에 옅은 그림자를 더하고 아래 막대를 진하게 */
 .dt-scroll { position: relative; }
-.dt-scroll::before, .dt-scroll::after { content: ''; position: absolute; top: 0; bottom: 0; width: 36px; pointer-events: none; z-index: 6; opacity: 0; transition: opacity .15s; }
-.dt-scroll::before { left: var(--pin-w, 0px); background: linear-gradient(to right, var(--card), transparent); }
-.dt-scroll::after { right: 0; border-radius: 0 12px 12px 0; background: linear-gradient(to left, var(--card), transparent); }
+.dt-scroll::before, .dt-scroll::after { content: ''; position: absolute; top: 0; bottom: 0; width: 44px; pointer-events: none; z-index: 6; opacity: 0; transition: opacity .18s var(--ease); }
+.dt-scroll::before { left: var(--pin-w, 0px); background: linear-gradient(to right, color-mix(in srgb, var(--ink) 10%, var(--card)), color-mix(in srgb, var(--card) 60%, transparent) 40%, transparent); }
+.dt-scroll::after { right: 0; border-radius: 0 12px 12px 0; background: linear-gradient(to left, color-mix(in srgb, var(--ink) 10%, var(--card)), color-mix(in srgb, var(--card) 60%, transparent) 40%, transparent); }
 .dt-scroll.fade-l::before, .dt-scroll.fade-r::after { opacity: 1; }
 .dt-scroll::before, .dt-scroll::after { top: var(--head-h, 0px); bottom: 16px; }   /* 머리글·아래 가로 막대 칸은 빼고 */
 /* 옆으로 넘기기: 표 아래 얇은 막대(끌기·누르기·휠) + 양 끝 화살표(2026-10-26) — 넘길 칸이 있을 때만 */
@@ -1362,13 +1496,14 @@
 .dt-scroll.has-x .dt-hbar { visibility: visible; }
 .dt-wrap.cards ~ .dt-hbar, .dt-wrap.cards ~ .dt-nav { display: none !important; }
 .dt-hbar::before { content: ''; position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--fill); }
-.dt-hthumb { position: absolute; left: 0; top: 4px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 55%, transparent); cursor: grab; }
-.dt-hbar:hover .dt-hthumb, .dt-hthumb.on { background: var(--muted); } .dt-hthumb.on { cursor: grabbing; }
+.dt-hthumb { position: absolute; left: 0; top: 4px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 75%, transparent); cursor: grab; transition: background-color .18s var(--ease); }
+.dt-hbar:hover .dt-hthumb, .dt-hthumb.on { background: var(--sub); } .dt-hthumb.on { cursor: grabbing; }
 .dt-hbar:hover::before { background: var(--line); }
 .dt-nav { position: absolute; top: calc(50% - 22px); z-index: 7; width: 28px; height: 44px; border: 0; padding: 0; border-radius: 10px; display: none; place-items: center;
-  background: color-mix(in srgb, var(--card) 92%, transparent); color: var(--ink2); box-shadow: 0 1px 4px rgba(0, 0, 0, .14), inset 0 0 0 1px var(--line); cursor: pointer; opacity: .8; transition: opacity .15s; }
+  background: color-mix(in srgb, var(--card) 92%, transparent); color: var(--ink2); box-shadow: 0 1px 4px rgba(0, 0, 0, .14), inset 0 0 0 1px var(--line); cursor: pointer; opacity: .8;
+  transition: opacity .18s var(--ease), background-color .18s var(--ease), color .18s var(--ease); }
 .dt-nav .ic { width: 18px; height: 18px; }
-.dt-nav.l { left: calc(var(--pin-w, 0px) + 6px); } .dt-nav.r { right: 6px; }
+.dt-nav.l { left: calc(var(--pin-w, 0px) + 8px); } .dt-nav.r { right: 8px; }
 .dt-scroll.fade-l .dt-nav.l, .dt-scroll.fade-r .dt-nav.r { display: grid; }
 .dt-scroll:not(:hover) .dt-nav:not(:focus-visible) { opacity: 0; pointer-events: none; }   /* 표 위에 마우스가 있을 때만(칸을 가리지 않게) — 아래 막대는 늘 보임 */
 .dt-scroll:hover .dt-nav, .dt-nav:focus-visible { opacity: .95; } .dt-nav:hover { background: var(--card); color: var(--blue-ink); }
@@ -1376,15 +1511,13 @@
 /* 틀 고정: 표 높이를 화면 바닥까지로 맞추니(fitH) 아래 큰 여백은 줄임 — 화면 전체가 넘어가 위 줄이 사라지지 않게 */
 @media (min-width: 1024px) { main.pages:has(> #p-data:not([hidden])) { padding-bottom: 16px; } }
 .dt-wrap { overscroll-behavior: contain; }
-/* 플랫폼·탭처럼 짧은 칩 줄은 한 줄에 나란히(자리가 모자라면 저절로 다음 줄) — 노트북 낮은 화면에서 표에 줄을 더 */
 .dt-save { min-width: 180px; justify-content: center; }
-.ov-chip.ov-link { background: var(--blue-bg); color: var(--blue-ink); text-decoration: none; } .ov-chip.ov-link:hover { text-decoration: underline; }
-/* 휴대폰: 할 일 없는 저장 표시('바로 저장')는 숨김 — 카드 화면에선 한 줄을 통째로 먹음. 저장 중·저장됨·못 함은 그대로 */
+.ov-chip.ov-link { background: var(--blue-bg); color: var(--blue-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; } .ov-chip.ov-link:hover { text-decoration: underline; }
 /* 휴대폰 줄 자세히(2026-10-26 감사): 붙어 있는 머리(이름·상품 두 줄·칩 세 줄)가 화면 1/3을 먹던 것 → 버튼은 오른쪽 위에 겹치고
    상품명 한 줄(누르면 모두)·칩은 한 줄로 밀어 보기. 손가락 화면: 복사·전화·문자·입력칸을 누르기 쉬운 크기로, 입력 글자 16px(아이폰이 확대하지 않게) */
 @media (max-width: 560px) {
   #dt-detail .ov-head { display: block; }
-  #dt-detail .ov-nav { position: absolute; top: 10px; right: calc(var(--dp, 14px) - 6px); }
+  #dt-detail .ov-nav { position: absolute; top: 12px; right: calc(var(--dp, 14px) - 4px); }
   #dt-detail .ov-pos { display: none; }
   #dt-detail .ov-who { padding-right: 132px; }
   #dt-detail .ov-what:not(.open) { -webkit-line-clamp: 1; }
@@ -1392,11 +1525,11 @@
   #dt-detail .ov-chips { align-items: center; } #dt-detail .ov-chips > * { flex: none; white-space: nowrap; display: inline-flex; align-items: center; min-height: 28px; }
 }
 @media (pointer: coarse) {
-  #dt-detail .ov-ed { min-width: 40px; min-height: 40px; margin: -8px -6px -8px 0; display: inline-grid; place-items: center; }
+  #dt-detail .ov-ed { min-width: 40px; min-height: 40px; margin: -8px -4px -8px 0; display: inline-grid; place-items: center; }
   #dt-detail .ov-link { min-height: 36px; display: inline-flex; align-items: center; padding: 0 8px; }
   #dt-detail .ov-hbtn { min-height: 36px; }
   #p-data input:not([type=checkbox]):not([type=radio]), #p-data select, #p-data textarea, dialog input:not([type=checkbox]), dialog select, dialog textarea { font-size: 16px; }
-  #p-data input:not([type=checkbox]):not([type=radio]):not(.cell-in) { min-height: 40px; } #p-data select:not(.cell-in) { height: 45px; }   /* 옆 입력칸(16px 글자 → 45px)과 같은 높이 — 라벨 줄이 어긋나던 것 */   /* 표 칸 안 입력은 줄 높이 그대로 */
+  #p-data input:not([type=checkbox]):not([type=radio]):not(.cell-in) { min-height: 40px; } #p-data select:not(.cell-in) { height: 44px; }   /* 옆 입력칸과 같은 높이 — 라벨 줄이 어긋나던 것. 표 칸 안 입력은 줄 높이 그대로 */
   #p-data .dt-facet .chipbtn { min-height: 36px; }
 }
 @media (max-width: 760px) { .dt-save { min-width: 0; } .dt-save:not(.saving):not(.ok):not(.wait):not(.net):not(.bad) { display: none; } }
@@ -1404,24 +1537,25 @@
 /* 필터·정렬·바꾼 기록 = 오른쪽 서랍(표가 아래로 밀려 안 보이던 것, 2026-10-26 감사) — 휴대폰은 전처럼 제자리 */
 @media (min-width: 761px) {
   #dt-fpanel:not([hidden]), .dt-audit:not([hidden]) { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); z-index: 61; margin: 0; overflow-y: auto; overscroll-behavior: contain;
-    border-radius: 20px 0 0 20px; box-shadow: -8px 0 32px rgba(0, 0, 0, .18); padding: 6px 18px 40px; }
+    border-radius: 20px 0 0 20px; box-shadow: -8px 0 32px rgba(0, 0, 0, .18); padding: 8px 20px 40px; }
   #dt-fpanel:not([hidden]) { background: var(--fill2); } .dt-audit:not([hidden]) { background: var(--card); }
-  #dt-fpanel .dt-fp-h, .dt-audit .dt-fp-h { position: sticky; top: -6px; z-index: 2; background: var(--fill2); padding: 10px 0; } .dt-audit .dt-fp-h { background: var(--card); }
+  #dt-fpanel .dt-fp-h, .dt-audit .dt-fp-h { position: sticky; top: -8px; z-index: 2; background: var(--fill2); padding: 12px 0; } .dt-audit .dt-fp-h { background: var(--card); }
 }
 .dt-audit .dt-fp-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dt-fp-h > b, .dt-audit .dt-fp-h > b { font-size: 16.5px; letter-spacing: -.02em; }
 /* 낮은 화면(노트북 1280×720·1024×768): 표 위 줄을 촘촘하게 — 틀 고정으로 위 줄이 늘 보이니 표에 줄을 더(2026-10-26, 720 높이에서 표 10줄 → 13줄) */
 @media (min-width: 761px) and (max-height: 820px) {
   #p-data > .dt-card { padding-top: 12px; padding-bottom: 12px; }
-  #p-data .dt-tables { margin-bottom: 6px; } #p-data .dt-tables .tab { min-height: 30px; padding: 4px 11px; font-size: 13px; }
-  #p-data .dt-q { min-height: 36px; padding: 7px 12px; }
-  #p-data .dt-tools { margin-bottom: 6px; } #p-data .dt-tools .btn { min-height: 34px; }
-  #p-data .dt-facet { margin-bottom: 4px; } #p-data .dt-facet .chipbtn { min-height: 26px; padding: 2px 9px; font-size: 12.5px; }
-  #p-data .dt-fx { min-height: 32px; padding: 3px 8px; margin-bottom: 4px; }
+  #p-data .dt-tables { margin-bottom: 8px; } #p-data .dt-tables .tab { min-height: 30px; padding: 4px 12px; font-size: 13px; }
+  #p-data .dt-q { min-height: 36px; padding: 8px 12px; }
+  #p-data .dt-tools { margin-bottom: 8px; } #p-data .dt-tools .btn { min-height: 34px; }
+  #p-data .dt-facet { margin-bottom: 4px; } #p-data .dt-facet .chipbtn { min-height: 28px; padding: 2px 8px; font-size: 12.5px; }
+  #p-data .dt-fx { min-height: 32px; padding: 4px 8px; margin-bottom: 4px; }
   #p-data .dt-more { margin-top: 4px; }
 }
-@media (min-width: 761px) { .dt-facets { display: flex; flex-wrap: wrap; column-gap: 20px; } .dt-facets > .dt-facet { flex: 0 1 auto; min-width: 0; } }
-.dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); }
-table.dt.sheet tr.new > td { animation: dt-new 2.6s ease-out; }
+@media (min-width: 761px) { .dt-facets { display: flex; flex-wrap: wrap; } .dt-facets > .dt-facet { flex: 0 1 auto; min-width: 0; } }
+.dt-tb.dt-sbtn { background: var(--blue-bg); color: var(--blue-ink); box-shadow: none; }
+table.dt.sheet tr.new > td { animation: dt-new 2.6s var(--ease-out); }
 @keyframes dt-new { from { background: var(--green-bg); } }
 table.dt tfoot td { padding: 8px 0 4px; background: var(--card); border: 0; overflow: visible; max-width: none; }
 .dt-add { position: sticky; left: 8px; z-index: 8; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 40px); }
@@ -1429,46 +1563,50 @@ table.dt tfoot td { padding: 8px 0 4px; background: var(--card); border: 0; over
 .dt-add .add:hover { border-style: solid; }
 .dt-add .muted { font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { table.dt.sheet tr.new > td { animation: none; } }
+/* 재고 넣기 창 — 모서리는 다른 창과 같은 20px, 안쪽 칸 10px, 간격 4의 배수 */
 dialog.sk { border: 0; padding: 0; border-radius: 20px; width: min(600px, calc(100vw - 24px)); max-height: min(880px, calc(100dvh - 32px)); background: var(--card); color: var(--ink); box-shadow: var(--pop); overflow: hidden; }
-dialog.sk[open] { display: flex; flex-direction: column; animation: sk-in .18s ease-out; }
+dialog.sk[open] { display: flex; flex-direction: column; animation: sk-in .24s var(--ease-out); }
 dialog.sk::backdrop { background: rgba(0, 0, 0, .42); }
 .sk-f { display: flex; flex-direction: column; min-height: 0; flex: 1; margin: 0; }
 .sk-grab { display: none; }
-.sk-h { display: flex; align-items: flex-start; gap: 12px; padding: 20px 20px 10px; }
-.sk-h h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
-.sk-h p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
-.sk-x { margin-left: auto; flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--fill); color: var(--sub); font-size: 16px; cursor: pointer; }
+.sk-h { display: flex; align-items: flex-start; gap: 12px; padding: 20px 20px 12px; }
+.sk-h h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.025em; line-height: 1.35; }
+.sk-h p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.sk-x { margin-left: auto; flex: none; width: 40px; height: 40px; border: 0; border-radius: 10px; background: var(--fill); color: var(--sub); cursor: pointer; display: grid; place-items: center; transition: background-color .18s var(--ease), color .18s var(--ease); }
 .sk-x:hover { background: var(--hover); color: var(--ink); }
-.sk-body { overflow: auto; overscroll-behavior: contain; padding: 6px 20px 18px; display: grid; gap: 20px; }
+.sk-body { overflow: auto; overscroll-behavior: contain; padding: 4px 20px 20px; display: grid; gap: 20px; }
 .sk-sec { display: grid; gap: 16px; min-width: 0; }
-.sk-sec.tabs { gap: 10px; }
-.sk-lab { font-size: 13px; font-weight: 700; color: var(--sub); display: flex; gap: 6px; align-items: baseline; }
+.sk-sec.tabs { gap: 8px; }
+.sk-lab { font-size: 13px; font-weight: 700; color: var(--sub); display: flex; gap: 8px; align-items: baseline; }
 .sk-req { color: var(--blue-ink); font-weight: 600; font-size: 12px; }
 .sk-opt { color: var(--muted); font-weight: 500; font-size: 12px; }
-.sk-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.sk-chip { border: 0; border-radius: 999px; padding: 0 15px; min-height: 38px; font: inherit; font-size: 14px; font-weight: 600; background: var(--fill); color: var(--ink2); cursor: pointer; transition: background .12s, color .12s; }
+.sk-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.sk-chip { border: 0; border-radius: 999px; padding: 0 16px; min-height: 40px; font: inherit; font-size: 14px; font-weight: 600; background: var(--fill); color: var(--ink2); cursor: pointer; transition: background-color .18s var(--ease), color .18s var(--ease); }
 .sk-chip:hover { background: var(--hover); }
 .sk-chip[aria-pressed="true"] { background: var(--ink); color: var(--card); }
-.sk-chip.s { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 30px; padding: 0 11px; font-size: 13px; font-weight: 500; background: var(--fill2); box-shadow: inset 0 0 0 1px var(--line); color: var(--sub); }
-.sk-chip.s:hover { color: var(--ink); }
+.sk-chip.s { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 32px; padding: 0 12px; font-size: 13px; font-weight: 500; background: var(--fill2); box-shadow: inset 0 0 0 1px var(--line); color: var(--sub); }
+.sk-chip.s:hover { color: var(--ink); background: var(--hover); }
 .sk-chip:focus-visible, .sk-x:focus-visible, .sk-step button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.sk-in { display: grid; gap: 6px; min-width: 0; }
-.sk-in > span { font-size: 13px; color: var(--sub); font-weight: 600; display: flex; gap: 6px; align-items: baseline; }
-.sk-in input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill2); border: 1.5px solid transparent; border-radius: 12px; padding: 0 14px; height: 48px; width: 100%; min-width: 0; transition: border-color .12s, background .12s, box-shadow .12s; }
+.sk-in { display: grid; gap: 8px; min-width: 0; }
+.sk-in > span { font-size: 13px; color: var(--sub); font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.sk-in input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill2); border: 1.5px solid transparent; border-radius: var(--r-sm); padding: 0 16px; height: 48px; width: 100%; min-width: 0;
+  transition: border-color .18s var(--ease), background-color .18s var(--ease), box-shadow .18s var(--ease); }
 .sk-in input::placeholder { color: var(--muted); }
 .sk-in input:hover { background: var(--fill); }
 .sk-in input:focus { outline: none; background: var(--card); border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
 .sk-in input[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
 .sk-msg { font-size: 12.5px; color: var(--muted); min-height: 0; }
+.sk-msg:empty { display: none; }
 .sk-msg.bad { color: var(--red-ink); }
 .sk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
-.sk-step { display: flex; align-items: center; background: var(--fill2); border-radius: 12px; min-height: 48px; }
-.sk-step button { width: 44px; height: 48px; border: 0; background: transparent; font-size: 20px; line-height: 1; color: var(--ink2); cursor: pointer; border-radius: 12px; }
+.sk-step { display: flex; align-items: center; background: var(--fill2); border-radius: var(--r-sm); min-height: 48px; }
+.sk-step button { width: 44px; height: 48px; border: 0; background: transparent; color: var(--ink2); cursor: pointer; border-radius: var(--r-sm); display: grid; place-items: center; transition: background-color .18s var(--ease); }
+.sk-step button .ic { width: 18px; height: 18px; }
 .sk-step button:hover:not(:disabled) { background: var(--fill); }
-.sk-step button:disabled { color: var(--line); cursor: default; }
-.sk-in .sk-step input { width: 44px; text-align: center; border: 0; background: transparent; font-size: 17px; font-weight: 700; padding: 0; box-shadow: none; }
+.sk-step button:disabled { color: var(--axis); cursor: default; }
+.sk-in .sk-step input { width: 44px; text-align: center; border: 0; background: transparent; font-size: 16.5px; font-weight: 700; padding: 0; box-shadow: none; }
 .sk-money { position: relative; display: block; }
-.sk-money b { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; font-size: 15px; pointer-events: none; }
+.sk-money b { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; font-size: 15px; pointer-events: none; }
 .sk-in .sk-money input { padding-left: 40px; }
 .sk-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; align-items: start; }
 .sk-grid2 > .full { grid-column: 1 / -1; }
@@ -1476,13 +1614,15 @@ details.sk-more { border-top: 1px solid var(--line); padding-top: 4px; }
 details.sk-more > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; color: var(--ink2); font-size: 15px; font-weight: 700; cursor: pointer; list-style: none; padding: 0; }
 details.sk-more > summary::-webkit-details-marker { display: none; }
 details.sk-more > summary::before { content: none; }
-details.sk-more > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 20px; transform: rotate(90deg); transition: transform .15s; }
+details.sk-more > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 20px; transform: rotate(90deg); transition: transform .18s var(--ease); }
 details.sk-more[open] > summary::after { transform: rotate(-90deg); }
 .sk-sumv { color: var(--muted); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
-.sk-prev { margin: 0 20px 12px; padding: 12px 14px; border-radius: 12px; background: var(--fill2); color: var(--sub); font-size: 14px; display: flex; gap: 10px; align-items: center; min-height: 48px; line-height: 1.4; }
-.sk-prev .pi { flex: none; width: 24px; display: grid; place-items: center; font-size: 18px; }
+details.sk-more > .sk-grid2 { padding: 4px 0 8px; }
+.sk-prev { margin: 0 20px 12px; padding: 12px 16px; border-radius: var(--r-sm); background: var(--fill2); color: var(--sub); font-size: 14px; display: flex; gap: 8px; align-items: center; min-height: 48px; line-height: 1.45; }
+.sk-prev .pi { flex: none; width: 24px; display: grid; place-items: center; }
+.sk-prev .pi .ic { width: 18px; height: 18px; }
 .sk-prev .tx { flex: 1; min-width: 0; }
+.sk-prev .tx .btn { margin-left: 4px; }
 .sk-prev b { color: inherit; }
 .sk-prev.ok { background: var(--blue-bg); color: var(--blue-ink); }
 .sk-prev.bad { background: var(--red-bg); color: var(--red-ink); }
@@ -1490,23 +1630,26 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
 .sk-foot { display: flex; gap: 8px; align-items: center; padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); }
 .sk-why { flex: 1; color: var(--muted); font-size: 13px; min-width: 0; }
 .sk-kbd { color: var(--muted); font-size: 12px; }
-.sk-foot .btn { min-height: 48px; padding: 0 20px; font-size: 15px; border-radius: 12px; }
-.sk-foot .btn.primary:disabled { opacity: 1; background: var(--fill); color: var(--muted); cursor: not-allowed; }
+.sk-foot .btn { min-height: 48px; padding: 0 20px; font-size: 15px; border-radius: 10px; }
+.sk-foot .btn.primary:disabled { opacity: 1; background: var(--fill); color: var(--muted); cursor: not-allowed; box-shadow: none; }
 .sk-body[hidden], .sk-prev[hidden], .sk-chips[hidden] { display: none; }
 .sk-done { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 24px 20px 20px; overflow: auto; }
-.sk-done .ok { width: 60px; height: 60px; border-radius: 50%; background: var(--green-bg); color: var(--green-ink); display: grid; place-items: center; font-size: 30px; font-weight: 700; animation: sk-pop .3s ease-out; }
-.sk-done h3 { margin: 0; font-size: 20px; }
+.sk-done .ok { width: 56px; height: 56px; border-radius: 50%; background: var(--green-bg); color: var(--green-ink); display: grid; place-items: center; animation: sk-pop .3s var(--ease-out); }
+.sk-done h3 { margin: 0; font-size: 16.5px; font-weight: 700; letter-spacing: -.02em; }
 .sk-done p { margin: 0; color: var(--muted); font-size: 14px; }
-.sk-kv { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; text-align: left; background: var(--fill2); border-radius: 12px; padding: 14px 16px; font-size: 14px; margin: 4px 0 0; }
+.sk-kv { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; text-align: left; background: var(--fill2); border-radius: var(--r-sm); padding: 12px 16px; font-size: 14px; margin: 4px 0 0; }
 .sk-kv dt { color: var(--muted); } .sk-kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-@keyframes sk-in { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+@keyframes sk-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
 @keyframes sk-up { from { transform: translateY(100%); } }
-@keyframes sk-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.08); } }
+@keyframes sk-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.06); } }
 @media (max-width: 760px) {
-  dialog.sk { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 22px 22px 0 0; max-height: 94dvh; }
-  dialog.sk[open] { animation: sk-up .24s cubic-bezier(.2, .8, .2, 1); }
-  .sk-grab { display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 0; }
-  .sk-h { padding-top: 12px; }
+  dialog.sk { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 20px 20px 0 0; max-height: 94dvh; }
+  dialog.sk[open] { animation: sk-up .28s var(--ease-out); }
+  .sk-grab { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 8px auto 0; }
+  .sk-h { padding: 12px 16px 12px; }
+  .sk-body { padding: 4px 16px 20px; }
+  .sk-prev { margin: 0 16px 12px; }
+  .sk-foot { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); }
   .sk-grid2 { grid-template-columns: minmax(0, 1fr); }
   .sk-kbd { display: none; }
   .sk-foot .btn.primary { flex: 1; }
@@ -1523,7 +1666,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const f = E('form', 'sk-f'); f.noValidate = true; f.autocomplete = 'off';
     const head = E('div', 'sk-h'); const ht = E('div');
     const h2 = E('h2', null, '재고 넣기'); h2.id = 'sk-t';
-    const hp = E('p', null, '고객 없이 들어온 물건. 상품명·수량만 있어도 돼요.'); hp.id = 'sk-d';
+    const hp = E('p', null, '고객 주문 없이 들어온 물건을 넣어요. 상품명과 수량만 적어도 돼요.'); hp.id = 'sk-d';
     ht.append(h2, hp);
     const x = E('button', 'sk-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.onclick = () => tryClose();
     head.append(ht, x);
@@ -1549,17 +1692,17 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const dlName = dl('sk-l-name'), dlShop = dl('sk-l-shop'), dlCenter = dl('sk-l-center'), dlCar = dl('sk-l-car');
 
     // 1) 어느 탭
-    const tabSec = E('div', 'sk-sec tabs'); const tabLab = E('div', 'sk-lab', '어느 탭에'); tabLab.append(E('span', 'sk-req', '필수'));
-    const tabBox = E('div', 'sk-chips'); tabBox.setAttribute('role', 'group'); tabBox.setAttribute('aria-label', '탭');
+    const tabSec = E('div', 'sk-sec tabs'); const tabLab = E('div', 'sk-lab', '넣을 시트 탭'); tabLab.append(E('span', 'sk-req', '필수'));
+    const tabBox = E('div', 'sk-chips'); tabBox.setAttribute('role', 'group'); tabBox.setAttribute('aria-label', '넣을 시트 탭');
     tabSec.append(tabLab, tabBox);
 
     // 2) 무엇을 몇 개
     const what = E('div', 'sk-sec');
-    const nameF = mk('name', '상품명', { req: true, ph: '예: 유세린 우레아 10% 로션 400ml', list: 'sk-l-name', hint: '이 탭에 있던 이름은 적기 시작하면 골라 넣을 수 있어요' });
+    const nameF = mk('name', '상품명', { req: true, ph: '예: 유세린 우레아 10% 로션 400ml', list: 'sk-l-name', hint: '이 탭에서 쓰던 이름은 몇 글자만 적으면 목록에서 골라요.' });
     const step = (i) => {
       const w = E('div', 'sk-step');
-      const minus = E('button', null, '−'); minus.type = 'button'; minus.setAttribute('aria-label', '수량 하나 줄이기');
-      const plus = E('button', null, '+'); plus.type = 'button'; plus.setAttribute('aria-label', '수량 하나 늘리기');
+      const minus = E('button'); minus.append(I('minus')); minus.type = 'button'; minus.setAttribute('aria-label', '수량 하나 줄이기');
+      const plus = E('button'); plus.append(I('plus')); plus.type = 'button'; plus.setAttribute('aria-label', '수량 하나 늘리기');
       const set = (n) => { i.value = String(Math.max(1, n)); changed('qty'); };
       minus.onclick = () => set((parseInt(i.value, 10) || 1) - 1); plus.onclick = () => set((parseInt(i.value, 10) || 0) + 1);
       i.addEventListener('input', () => { minus.disabled = !((parseInt(i.value, 10) || 0) > 1); });
@@ -1575,23 +1718,23 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const shopChips = chipsFor('shop'), centerChips = chipsFor('center');
     const money = (i) => { const w = E('span', 'sk-money'); const b = E('b', null, '$'); w.append(b, i); money.b = b; return w; };
     const buy = E('details', 'sk-more'); const bs = E('summary'); const bsv = E('span', 'sk-sumv');
-    bs.append(document.createTextNode('어디서 샀나요'), E('span', 'sk-opt', '선택'), bsv); buy.append(bs);
+    bs.append(document.createTextNode('구매 정보'), E('span', 'sk-opt', '선택'), bsv); buy.append(bs);
     const bg = E('div', 'sk-grid2');
     const shopF = mk('shop', '구매처', { ph: '예: 아마존 · 츄위 · 공홈', list: 'sk-l-shop' }); shopF.insertBefore(shopChips, shopF.lastChild); shopF.classList.add('full');
     bg.append(shopF, mk('order_no', '공홈주문번호', { ph: '있으면 적어 주세요', hint: '같은 번호는 두 번 들어가지 않아요' }),
-      mk('price', '공홈가', { ph: '모르면 비워 두세요', mode: 'decimal', wrap: money, hint: '모르면 빈칸' }));
+      mk('price', '공홈가', { ph: '예: 24.99', mode: 'decimal', wrap: money, hint: '모르면 비워 두세요. 0을 넣지 않아요.' }));
     buy.append(bg);
     const ship = E('details', 'sk-more'); const ss = E('summary'); const ssv = E('span', 'sk-sumv');
     ss.append(document.createTextNode('배송 정보'), E('span', 'sk-opt', '선택'), ssv); ship.append(ss);
     const sg = E('div', 'sk-grid2');
     const centerF = mk('center', '배대지센터', { ph: '예: 미국 NJ', list: 'sk-l-center' }); centerF.insertBefore(centerChips, centerF.lastChild); centerF.classList.add('full');
-    sg.append(centerF, mk('tracking', '해외송장', { ph: '있으면' }), mk('carrier', '해외운송사', { ph: '예: UPS · ONTRAC', list: 'sk-l-car' }), Object.assign(mk('memo', '메모', { ph: '예: 오토쉽 남은 것 · 반품 재입고' }), { className: 'sk-in full' }));
+    sg.append(centerF, mk('tracking', '해외송장', { ph: '있으면 적어 주세요' }), mk('carrier', '해외운송사', { ph: '예: UPS · ONTRAC', list: 'sk-l-car' }), Object.assign(mk('memo', '메모', { ph: '예: 오토쉽 남은 것 · 반품 재입고' }), { className: 'sk-in full' }));
     ship.append(sg);
     body.append(tabSec, what, buy, ship);
 
     // 아래 막대 — 왜 못 넣는지(있으면) · 단축키 · 취소 · 넣기
     const why = E('span', 'sk-why'); const kbd = E('span', 'sk-kbd', (/Mac|iP/.test(navigator.platform) ? '⌘' : 'Ctrl') + '+Enter');
-    const cancel = E('button', 'btn ghost', '취소'); cancel.type = 'button'; cancel.onclick = () => tryClose();
+    const cancel = E('button', 'btn ghost', '닫기'); cancel.type = 'button'; cancel.onclick = () => tryClose();
     const go = E('button', 'btn primary', '넣기'); go.type = 'submit';
     foot.append(why, kbd, cancel, go);
 
@@ -1606,17 +1749,17 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     function blocker() {
       if (!tab) return '탭을 골라 주세요';
       if (!val('name')) return '상품명을 적어 주세요';
-      if (qtyBad()) return '보낼수량은 1 이상 숫자로';
-      if (priceBad()) return '공홈가는 숫자만(모르면 빈칸)';
+      if (qtyBad()) return '보낼수량은 1 이상 숫자로 적어 주세요';
+      if (priceBad()) return '공홈가는 숫자만 적어 주세요';
       if (dup) return '같은 공홈주문번호가 이미 있어요';
       return '';
     }
     function sync() {
       const b = blocker();
       go.disabled = !!b || sending || !!wait; why.textContent = b;
-      go.textContent = sending ? '넣는 중…' : wait ? '회차 끝나면 넣어요…' : tab ? `${tab} 탭에 넣기` : '넣기';
-      setMsg('price', priceBad() ? '숫자만(예: 24.99)' : null, priceBad());
-      setMsg('qty', qtyBad() && val('qty') ? '1 이상 숫자' : '', qtyBad() && !!val('qty'));
+      go.textContent = sending ? '넣는 중…' : wait ? '회차가 끝나면 넣어요' : tab ? `${tab} 탭에 넣기` : '넣기';
+      setMsg('price', priceBad() ? '숫자만 적어 주세요. 예: 24.99' : null, priceBad());
+      setMsg('qty', qtyBad() && val('qty') ? '1 이상 숫자로 적어 주세요' : '', qtyBad() && !!val('qty'));
       money.b.textContent = curOf(tab, val('name')) || '¤';
       bsv.textContent = buy.open ? '' : [val('shop'), val('order_no'), val('price') && (curOf(tab, val('name')) || '') + val('price')].filter(Boolean).join(' · ');
       ssv.textContent = ship.open ? '' : [val('center'), val('tracking'), val('carrier'), val('memo')].filter(Boolean).join(' · ');
@@ -1632,21 +1775,21 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       pvT = setTimeout(async () => {
         const my = ++pv;
         showPrev('', 'refresh', '확인하는 중…');
-        let j; try { j = await post({ kind: 'sheet_row', op: 'stock', dry: true, tab, name: val('name') || '확인', qty: '1', order_no: val('order_no') }); } catch (e) { j = { ok: false, msg: e.message }; }
+        let j; try { j = await post({ kind: 'sheet_row', op: 'stock', dry: true, tab, name: val('name') || '확인', qty: '1', order_no: val('order_no') }); } catch (e) { j = { ok: false, msg: errText(e) }; }
         if (my !== pv) return;
         dup = null;
         const m = String(j.msg || '');
         if (j.ok) {
           const [t, r] = m.split(' ');
-          showPrev('ok', 'check', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄' + (val('order_no') ? ' · 중복 없음' : ''))]);
-          setMsg('order_no', val('order_no') ? '중복 없음' : null);
+          showPrev('ok', 'check', [E('b', null, `${t} 탭 ${r}`), document.createTextNode('에 새 줄로 들어가요' + (val('order_no') ? '. 같은 주문번호는 없어요.' : '.'))]);
+          setMsg('order_no', val('order_no') ? '같은 번호 없음' : null);
         } else if (/이미 있음/.test(m)) {
           const at = (m.split('→')[1] || '').trim(); dup = at;
           const b = E('button', 'btn sm weak', '그 줄 보기'); b.type = 'button';
           const pos = at.split(',')[0].trim().match(/^(\S+) (\d+)행$/);
           b.onclick = () => { if (pos) goRow(pos[1], pos[2], val('order_no')); };
           showPrev('bad', 'alert', [document.createTextNode('같은 공홈주문번호가 이미 '), E('b', null, at), document.createTextNode('에 있어요. '), ...(pos ? [b] : [])]);
-          setMsg('order_no', `이미 ${at}에 있음 · 다른 물건이면 비우기`, true);
+          setMsg('order_no', `이미 ${at}에 있어요. 다른 물건이면 비워 주세요.`, true);
         } else {
           showPrev('warn', 'alert', noE(m));
         }
@@ -1709,7 +1852,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     // 넣기
     async function submit(retry) {
       if (sending) return;
-      if (wait && !retry && !busyTry) { showPrev('warn', 'clock', `앞서 적은 '${wait.p.name}'은 회차가 끝나면 자동으로 넣어요`); return; }
+      if (wait && !retry && !busyTry) { showPrev('warn', 'clock', `회차가 끝나면 앞서 적은 '${wait.p.name}'부터 넣어요`); return; }
       if (!wait) { const b = blocker(); if (b) { why.textContent = b; (b.includes('상품명') ? fld.name : b.includes('수량') ? fld.qty : b.includes('공홈가') ? fld.price : b.includes('주문번호') ? fld.order_no : tabBox.firstChild || go).focus(); return; } }
       const forced = busyTry;
       if (wait) clearTimeout(wait.t);
@@ -1719,7 +1862,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const payload = { ...base };
       if (forced) payload.force = true;
       if (retry) payload.retry = true;     // 자동 재시도 — 오류 장부는 첫 번만 셈
-      let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+      let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: errText(e) }; }
       sending = false; busyTry = false;
       const m = String(j.msg || '');
       if (j.ok) {
@@ -1736,7 +1879,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
           wait = { p: base, left, t: setTimeout(() => submit(true), 60000) };
           sync();
           const fb = E('button', 'btn sm weak', '그래도 넣기'); fb.type = 'button'; fb.onclick = () => { busyTry = true; submit(); };
-          showPrev('warn', 'clock', [document.createTextNode(noE(m).replace(/ — 끝난 뒤에.*$/, '') + ' · 끝나면 자동으로 넣어요(닫아도 돼요) '), fb]);
+          showPrev('warn', 'clock', [document.createTextNode(noE(m).replace(/ — 끝난 뒤에.*$/, '') + '. 끝나면 저절로 넣어요. 창을 닫아도 돼요. '), fb]);
           return;
         }
       }
@@ -1773,7 +1916,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       foot.textContent = '';
       const look = E('button', 'btn ghost', '그 줄 보기'); look.type = 'button'; look.onclick = () => goRow(done.tab, done.row, p.name);
       const more = E('button', 'btn primary', '하나 더 넣기'); more.type = 'button'; more.onclick = again;
-      const sp = E('span', 'sk-why', `${done.tab} 탭·구매처·센터는 그대로 둬요`);
+      const sp = E('span', 'sk-why', `하나 더 넣을 때 ${done.tab} 탭·구매처·센터는 그대로 둬요`);
       foot.append(sp, look, more);
       more.focus();
     }
@@ -1827,12 +1970,12 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const head = E('div', 'od-head ov-head'); const tt = E('div', 'od-title');
     const ttl = fmt('', r.title || r.name || r.summary || r.receiver || r.key || r.lead_id || r.source_key || '줄');
     const st = ['state', 'status', 'handling'].map((k) => r[k]).find((v) => v != null && v !== '');
-    const chips = E('div', 'ov-chips'); chips.append(E('span', 'ov-chip', last.label)); if (st) { const v = ko(st); chips.append(E('span', 'badge ' + badgeCls(v), v)); }
+    const chips = E('div', 'ov-chips'); chips.append(E('span', 'ov-chip', tableName(cur.table, last.label))); if (st) chips.append(badge(ko(st)));
     tt.append(E('div', 'ov-who', ttl), chips);
     const i = last.rows.indexOf(r), nav = E('div', 'ov-nav');
     const pv = btn('', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); }); pv.append(I('up')); nx.append(I('down'));
     pv.setAttribute('aria-label', '위 줄'); nx.setAttribute('aria-label', '아래 줄'); pv.disabled = i <= 0; nx.disabled = i < 0 || i >= last.rows.length - 1;
-    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
+    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 · Esc'; x.onclick = closeDetail;
     nav.append(E('span', 'ov-pos', i >= 0 ? `${i + 1}/${last.rows.length}` : ''), pv, nx, x);
     head.append(tt, nav); box.append(head);
     const dl = E('dl', 'kv');
@@ -1842,22 +1985,22 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const A = last.actions || [];
     if (A.includes('sheet_edit')) sheetActs(r, acts, out);
     if (A.includes('order_mark') && r.key) {
-      const h = select(['해외구매', '재고발송', '취소', '반품환불', '예외', '옛 주문', '미정'], r.handling), m = inp('메모(예: 재고로 보냄, 호주 12행)');
-      acts.append(form('처리 방식(장부)', E('p', 'muted small', '남기면 감시가 다시 묻지 않아요.'), field('처리 방식', h), field('메모', m),
+      const h = select(['해외구매', '재고발송', '취소', '반품환불', '예외', '옛 주문', '미정'], r.handling), m = inp('예: 재고로 보냄, 호주 12행');
+      acts.append(form('처리 방식', E('p', 'muted small', '남겨 두면 감시가 이 주문을 다시 묻지 않아요.'), field('처리 방식', h), field('메모', m),
         btn('장부에 남기기', 'weak', (b) => doAct({ kind: 'order_mark', key: r.key, handling: h.value, memo: m.value.trim() }, b, out))));
     }
     if (A.includes('state')) {
-      const s = select(STATES, r.state), m = inp('왜 바꾸는지(일지에 남아요)');
+      const s = select(STATES, r.state), m = inp('바꾸는 이유 · 일지에 남아요');
       acts.append(form('상태', field('새 상태', s), field('메모', m), btn('상태 바꾸기', 'weak', (b) => doAct({ kind: 'sourcing_state', lead_id: r.lead_id, state: s.value, memo: m.value }, b, out))));
     }
     if (A.includes('recheck')) {
-      const c = inp('도착원가(원)', r.cost_krw), n = inp('네이버 최저가(원, 없으면 -)'), cp = inp('쿠팡 최저가(원, 없으면 -)'), m = inp('근거 한 줄(어디서 언제 봤는지)');
-      acts.append(form('원가·시장가 재확인', field('도착원가', c), field('네이버 최저', n), field('쿠팡 최저', cp), field('근거', m),
+      const c = inp('원 단위', r.cost_krw), n = inp('원 단위 · 없으면 -'), cp = inp('원 단위 · 없으면 -'), m = inp('어디서 언제 봤는지 한 줄');
+      acts.append(form('원가·시장가 다시 확인', field('도착원가', c), field('네이버 최저', n), field('쿠팡 최저', cp), field('근거', m),
         btn('다시 판정', 'weak', (b) => doAct({ kind: 'recheck', lead_id: r.lead_id, cost: c.value, naver: n.value, coupang: cp.value, memo: m.value }, b, out))));
     }
     if (A.includes('register')) {
       let plan = {}; try { plan = JSON.parse(r.plan || '{}') || {}; } catch (e) { /* 없음 */ }
-      const how = select(['네이버옵션', '쿠팡옵션']), id = inp('네이버 그룹 번호 / 쿠팡 상품 번호'), q = inp('수량', r.quantity), p = inp('판매가(원)', plan.naver || ''), base = inp('기준 수량·순번(선택)');
+      const how = select(['네이버옵션', '쿠팡옵션']), id = inp('네이버 그룹 번호 또는 쿠팡 상품 번호'), q = inp('수량', r.quantity), p = inp('원 단위', plan.naver || ''), base = inp('선택');
       how.onchange = () => { p.value = (how.value === '네이버옵션' ? plan.naver : plan.coupang) || ''; };
       const args = () => {
         const a = [how.value, r.lead_id, how.value === '네이버옵션' ? '--그룹' : '--상품', id.value.trim(), '--수량', q.value.trim(), '--가격', p.value.trim()];
@@ -1866,11 +2009,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       };
       const bs = E('div', 'btns');
       bs.append(btn('미리보기', '', (b) => doAct({ kind: 'register_preview', args: args() }, b, out)),
-        btn('등록 실행', 'primary', (b) => doAct({ kind: 'register', args: args(), confirm: `${how.value === '네이버옵션' ? '네이버' : '쿠팡'}에 ${q.value}개 ${(+p.value).toLocaleString('ko-KR')}원으로 실제 등록할까요?` }, b, out)));
-      acts.append(form('등록(공용 등록 도구)', field('방식', how), field('그룹·상품 번호', id), field('수량', q), field('판매가', p), field('기준', base), bs));
+        btn('등록하기', 'primary', (b) => doAct({ kind: 'register', args: args(), confirm: `${how.value === '네이버옵션' ? '네이버' : '쿠팡'}에 ${q.value}개 ${(+p.value).toLocaleString('ko-KR')}원으로 실제 등록할까요?` }, b, out)));
+      acts.append(form('상품 등록', field('방식', how), field('그룹·상품 번호', id), field('수량', q), field('판매가', p), field('기준 수량·순번', base), bs));
     }
     const kvc = E('section', 'ov-card wide'); kvc.append(E('h3', null, '모든 칸'), dl); box.append(kvc);     // 보기만 하는 표는 칸이 본문(접지 않음)
-    if (acts.childNodes.length) box.append(out, acts); else box.append(E('p', 'muted small', '보기 전용 표예요.'));
+    if (acts.childNodes.length) box.append(out, acts); else box.append(E('p', 'muted small', '이 표는 보기만 해요.'));
     if (r.key && !isStock(r) && ['orders', 'order_ledger'].includes(cur.table)) { const f = E('section', 'ov-card wide'); f.append(E('h3', null, '이 주문 기록')); box.append(f); historyBox(f, r, true); }
     if (!keep) { box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true }); }
   }
@@ -1920,12 +2063,12 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   // 줄마다 '할 일' — 지금 단계에서 채울 칸을 바로 넣게(자동이 하는 단계는 무엇이 언제 하는지만)
   const NEXT = {
     1: ['구매처에서 산 뒤 아래 칸을 채워 주세요.', ['shop', 'shop_order', 'shop_price']],
-    2: ['보통 자동으로 채워져요(⑤ 메일·구매처 주문내역 대조). 먼저 알았으면 넣어 주세요.', ['intl_carrier', 'intl_tracking']],
-    3: ['훗타운은 ② 배대지 신청이 자동으로 신청해요. 직접 신청했으면 신청번호를 넣어 주세요.', ['ship_mode', 'fwd_center', 'fwd_request']],
-    4: ['배대지가 국내 택배로 넘기면 자동으로 채워져요. 먼저 알았으면 넣어 주세요.', ['kr_invoice']],
-    5: ['국내송장이 있으면 ① 주문·발송이 플랫폼에 발송 처리해요(자동).', []],
+    2: ['⑤ 메일이 구매처 메일·주문내역과 맞춰 보고 채워요. 먼저 알았으면 넣어 주세요.', ['intl_carrier', 'intl_tracking']],
+    3: ['훗타운 건은 ② 배대지 신청이 알아서 신청해요. 직접 신청했으면 신청번호를 넣어 주세요.', ['ship_mode', 'fwd_center', 'fwd_request']],
+    4: ['배대지가 국내 택배로 넘기면 저절로 채워져요. 먼저 알았으면 넣어 주세요.', ['kr_invoice']],
+    5: ['국내송장이 들어오면 ① 주문·발송이 플랫폼에 발송 처리해요.', []],
   };
-  const PH = { shop: '예: amazon.com', shop_order: '구매처 주문번호', shop_price: '외화 금액 예: 39.99', intl_carrier: 'DHL·UPS·FedEx…', intl_tracking: '해외 송장번호',
+  const PH = { shop: '예: amazon.com', shop_order: '구매처 주문번호', shop_price: '외화 금액, 예: 39.99', intl_carrier: 'DHL·UPS·FedEx…', intl_tracking: '해외 송장번호',
     fwd_center: '예: 독일', fwd_request: '배대지 신청번호', kr_invoice: '국내 송장번호' };
   function orderView(box, r, keep) {
     const stock = isStock(r), pg = String(r.progress || ''), sg = stageOf(r), ds = dueState(r);
@@ -1934,19 +2077,20 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const head = E('div', 'od-head ov-head'); const tt = E('div', 'od-title');
     const chips = E('div', 'ov-chips');
     const chip = (t, cls) => { if (t) chips.append(E('span', cls || 'ov-chip', t)); };
-    chip(r.tab); chip(stock ? '재고' : ko(r.platform || '')); chip(r.ship_mode); chip(pg, 'badge ' + badgeCls(pg));
+    chip(r.tab); chip(stock ? '재고' : ko(r.platform || '')); chip(r.ship_mode); if (pg) chips.append(badge(pg));
     if (sg.ost) chip(`${ko(r.platform || '') || '플랫폼'} ${ko(sg.ost)}`, 'badge ' + (sg.delivered ? 'ok' : sg.stop ? 'bad' : 'run'));
-    if (sg.mismatch) chip('상태 다름 · 시트 진행상태 확인', 'badge warn');
+    if (sg.mismatch) chip('상태 다름 · 시트 확인', 'badge warn');
     if (ds && ds.k !== 'ok') chip('발송기한 ' + ds.t, 'badge ' + (ds.k === 'late' ? 'bad' : 'warn'));
-    if (!stock && r._url) { const a = prodLink(r, `${ko(r.platform || '') || '판매처'} 상품페이지 ↗`); a.className = 'ov-chip ov-link'; chips.append(a); }
+    if (!stock && r._url) { const a = prodLink(r, `${ko(r.platform || '') || '판매처'} 상품페이지`); a.append(I('external')); a.className = 'ov-chip ov-link'; chips.append(a); }
+    edgeFade(chips);
     const what = E('div', 'ov-what', stock ? ['재고 줄', r.option, r.shop].filter(Boolean).join(' · ') : [r.name, r.option].filter(Boolean).join(' · '));
-    what.title = '모두 보기'; what.onclick = () => what.classList.toggle('open');     // 긴 상품명은 두 줄까지, 누르면 모두
-    tt.append(E('div', 'ov-who' + (stock ? ' long' : ''), stock ? (r.name || '재고') : (r.receiver || '(받는 분 없음)')), what, chips);
+    what.title = '눌러서 모두 보기'; what.onclick = () => what.classList.toggle('open');     // 긴 상품명은 두 줄까지, 누르면 모두
+    tt.append(E('div', 'ov-who' + (stock ? ' long' : ''), stock ? (r.name || '재고') : (r.receiver || '받는 분 없음')), what, chips);
     const nav = E('div', 'ov-nav');
     const i = last.rows.indexOf(r);
     const pv = btn('', 'ghost', () => { if (i > 0) openRow(last.rows[i - 1]); }), nx = btn('', 'ghost', () => { if (i < last.rows.length - 1) openRow(last.rows[i + 1]); }); pv.append(I('up')); nx.append(I('down'));
-    pv.title = '위 줄 ( [ )'; nx.title = '아래 줄 ( ] )'; pv.setAttribute('aria-label', '위 줄'); nx.setAttribute('aria-label', '아래 줄'); pv.disabled = i <= 0; nx.disabled = i < 0 || i >= last.rows.length - 1;
-    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 (Esc)'; x.onclick = closeDetail;
+    pv.title = '위 줄 · ['; nx.title = '아래 줄 · ]'; pv.setAttribute('aria-label', '위 줄'); nx.setAttribute('aria-label', '아래 줄'); pv.disabled = i <= 0; nx.disabled = i < 0 || i >= last.rows.length - 1;
+    const x = E('button', 'icon-btn ov-x'); x.append(I('x')); x.type = 'button'; x.setAttribute('aria-label', '닫기'); x.title = '닫기 · Esc'; x.onclick = closeDetail;
     nav.append(E('span', 'ov-pos', `${r.row}행` + (i >= 0 ? ` · ${i + 1}/${last.rows.length}` : '')), pv, nx, x);
     head.append(tt, nav); box.append(head);
     // 알림: 문제(바로 풀기) · 다시 구매 · 취소·반품 흐름
@@ -1955,11 +2099,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       a.append(btn('문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out)));
       box.append(a);
     }
-    if (sg.rebuy) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: '구매처 주문 취소됨 · 다시 사서 구매처·주문번호·공홈가 새로 넣기' }));
-    else if (sg.stop) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: `취소·반품 · ${[pg, sg.ost && '플랫폼 ' + ko(sg.ost), sg.claim && '클레임 ' + ko(sg.claim)].filter(Boolean).join(' · ')}\n승인·거절은 #할-일 카드에서` }));
+    if (sg.rebuy) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: '구매처가 주문을 취소했어요. 다시 산 뒤 구매처·공홈주문번호·공홈가를 새로 넣어 주세요.' }));
+    else if (sg.stop) box.append(Object.assign(E('div', 'ov-alert warn'), { textContent: `취소·반품 진행 중 · ${[pg, sg.ost && '플랫폼 ' + ko(sg.ost), sg.claim && '클레임 ' + ko(sg.claim)].filter(Boolean).join(' · ')}\n승인·거절은 디스코드 #할-일 카드에서 해 주세요.` }));
     // 진행 단계(7) + 지금
     if (!stock) {
-      const ol = E('ol', 'ov-steps' + (sg.stop ? ' stopped' : '')); ol.setAttribute('aria-label', `진행 ${sg.done}/7 단계`);
+      const ol = E('ol', 'ov-steps' + (sg.stop ? ' stopped' : '')); ol.setAttribute('aria-label', `7단계 중 ${sg.done}단계 끝`);
       sg.steps.forEach(([n, ok], j) => ol.append(E('li', ok ? 'done' : j === sg.cur && !sg.stop ? 'now' : '', n)));
       box.append(ol);
       if (!sg.stop) box.append(E('p', 'ov-next' + (sg.cur < 0 ? ' fin' : ''), sg.cur < 0 ? '배송완료' : `지금: ${sg.next}` + (ds ? ` · 발송기한 ${String(dueOf(r)).slice(5, 10).replace('-', '/')} (${ds.t})` : '')));
@@ -1991,13 +2135,14 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const row = E('div', 'ov-kv' + (need.has(c) ? ' need' : '')); row.append(E('span', 'ov-k', opt.label || cname(c)));
       const val = E('span', 'ov-v' + (opt.cls ? ' ' + opt.cls : '')); const shown = (opt.fmt ? opt.fmt(raw) : fmt(c, raw)) || (need.has(c) ? '채울 칸' : '—');
       val.textContent = shown + (c === 'due' && raw && dueState(r) ? dday(raw) : '');
+      if (opt.note) val.append(E('span', 'ov-note', opt.note));
       const editable = canEdit(c, r);
       if (raw && !editable) { val.classList.add('copy'); val.title = '눌러서 복사'; val.tabIndex = 0; val.setAttribute('role', 'button'); const cp = () => copyText(raw, cname(c) + ' 복사'); val.onclick = cp; val.onkeydown = (e) => { if (e.key === 'Enter') cp(); }; }
       if (raw && /^-|^약\s*-/.test(raw) && NUMC.includes(c)) val.classList.add('neg');
       row.append(val);
-      for (const [t, href, cls] of (opt.links || []).filter(() => raw)) { const a = E('a', 'ov-link' + (cls ? ' ' + cls : ''), t); a.href = href(raw); if (/^https?:/.test(a.href)) { a.target = '_blank'; a.rel = 'noopener'; a.title = t.replace(' ↗', '') + ' (새 창)'; } row.append(a); }
+      for (const [t, href, cls] of (opt.links || []).filter(() => raw)) { const a = E('a', 'ov-link' + (cls ? ' ' + cls : ''), t); a.href = href(raw); if (/^https?:/.test(a.href)) { a.target = '_blank'; a.rel = 'noopener'; a.title = t + ' · 새 창'; a.append(I('external')); } row.append(a); }
       if (editable) {      // 2026-10-24 사장님 "원클릭만으로 수정": 값을 한 번 누르면 그 자리 입력칸 — 벗어나거나 Enter면 바로 저장(표와 같은 자동 저장 길), Esc는 그대로
-        val.classList.add('ov-edv'); val.title = '눌러서 고치기 · 벗어나면 저장'; val.tabIndex = 0; val.setAttribute('role', 'button');
+        val.classList.add('ov-edv'); val.title = '눌러서 고치기 · 다른 곳을 누르면 저장돼요'; val.tabIndex = 0; val.setAttribute('role', 'button');
         const go = () => {
           const opts = dropOpts(r, c); let el;
           if (opts) { el = select(['', ...opts, ...(raw && !opts.includes(raw) ? [raw] : [])], raw); } else { el = inp(PH[c] || '', raw); el.autocomplete = 'off'; if (NUMC.includes(c)) el.inputMode = 'decimal'; }
@@ -2026,19 +2171,19 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       const g = E('section', 'ov-card' + (wide ? ' wide' : '')); const h = E('h3', null, title); if (tool) h.append(tool); g.append(h, ...ks); grid.append(g);
     };
     const domain = (v) => /^https?:\/\//.test(v) ? v : /^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(v) ? 'https://' + v : '';
-    const track = ['조회 ↗', trackUrl];
+    const track = ['조회', trackUrl];
     const digits = (v) => String(v).replace(/[^\d+]/g, '');
     if (!stock) {           // 받는 분 정보 한 번에 복사(배대지 신청서·문의에 붙여 넣기)
       const lines = [['수령인', r.receiver], ['연락처', r.tel], ['통관부호', r.pccc], ['우편번호', r.zip], ['주소', r.addr], ['배송메모', r.ship_memo]].filter(([, v]) => v);
-      const cb = E('button', 'ov-hbtn', '받는 분 정보 복사'); cb.type = 'button'; cb.title = '수령인·연락처·통관부호·주소 줄마다';
+      const cb = E('button', 'ov-hbtn', '받는 분 정보 복사'); cb.type = 'button'; cb.title = '수령인·연락처·통관부호·주소를 줄마다 나눠 복사해요';
       cb.onclick = () => copyText(lines.map(([k, v]) => `${k}: ${v}`).join('\n'), '받는 분 정보 복사');
       card('고객·배송지', [kv('receiver', { always: true }), kv('tel', { links: [['전화', (v) => 'tel:' + digits(v), 'tap'], ['문자', (v) => 'sms:' + digits(v), 'tap']] }),
         kv('pccc'), kv('zip'), kv('addr'), kv('ship_memo')], true, lines.length ? cb : null);
-      card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due', { raw: dueOf(r), label: dueMoved(r) ? `발송기한(늘어남 · 처음 ${String(r.due).slice(5, 10).replace('-', '/')})` : '' }), kv('qty'), kv('send_qty')]);
+      card('주문', [kv('platform'), kv('order_no'), kv('ordered'), kv('due', { raw: dueOf(r), note: dueMoved(r) ? `처음 ${String(r.due).slice(5, 10).replace('-', '/')}에서 늘어남` : '' }), kv('qty'), kv('send_qty')]);
     }
-    card('구매(해외)', [kv('shop', { links: domain(String(r.shop || '')) ? [['열기 ↗', domain]] : [] }), kv('shop_price'), kv('shop_order'), kv('intl_carrier'), kv('intl_tracking', { links: [track] }), stock ? kv('send_qty') : null]);
+    card('해외 구매', [kv('shop', { links: domain(String(r.shop || '')) ? [['열기', domain]] : [] }), kv('shop_price'), kv('shop_order'), kv('intl_carrier'), kv('intl_tracking', { links: [track] }), stock ? kv('send_qty') : null]);
     card('배대지·국내', [kv('ship_mode'), kv('fwd_center'), kv('fwd_request'), kv('kr_invoice', { links: [track] })]);
-    if (!stock) card('돈', [kv('settle'), kv('cost'), kv('ship_cost'), kv('profit', { cls: 'big' }), kv('margin'), kv('point'), kv('tax_rate')]);
+    if (!stock) card('금액', [kv('settle'), kv('cost'), kv('ship_cost'), kv('profit', { cls: 'big' }), kv('margin'), kv('point'), kv('tax_rate')]);
     card('메모', [kv('memo', { always: true }), kv('stock_note'), kv('problem')], true);
     // 같은 주문의 다른 줄(나눈 줄) — 플랫폼 기록을 한 번만 불러와 같이 씀
     const hp = r.key && !stock ? fetchJ('/api/db/history?key=' + encodeURIComponent(r.key)).catch((e) => ({ error: e.message })) : null;
@@ -2047,15 +2192,15 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       hp.then((j) => {
         const others = ((j && j.rows) || []).filter((x) => !(x.tab === r.tab && +x.row === +r.row));
         if (!others.length || sel !== r) return;
-        same.hidden = false; same.append(E('span', 'muted small', `같은 주문 ${others.length + 1}줄:`));
+        same.hidden = false; same.append(E('span', 'muted small', `같은 주문 ${others.length + 1}줄`));
         for (const o of others) same.append(btn(`${o.tab} ${o.row}행${o.progress ? ' · ' + o.progress : ''}`, 'ghost', () => jumpTo(o, r)));
       });
     }
     // 접어 둔 것: 플랫폼 기록 · 조치 · 바꾼 기록 · 모든 칸
     const fold = (title, fill, open, eager) => { const d = E('details', 'ov-fold'); d.append(E('summary', null, title)); let done = false; const go = () => { if (!done) { done = true; fill(d); } }; d.ontoggle = () => { if (d.open) go(); }; if (open) d.open = true; if (open || eager) go(); box.append(d); };
     if (hp) fold('플랫폼 주문·처리 기록', (d) => historyBox(d, r, true, hp), true);
-    fold('조치', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
-    if (rowName(r)) fold('이 줄 바꾼 기록(되돌리기)', (d) => auditList(d, { tab: r.tab, key: rowName(r), limit: 50 }));
+    fold('줄 관리', (d) => { const acts = E('div', 'dt-acts'); sheetActs(r, acts, out, true); d.append(acts); }, false, true);
+    if (rowName(r)) fold('이 줄 바꾼 기록', (d) => auditList(d, { tab: r.tab, key: rowName(r), limit: 50 }));
     fold('모든 칸 보기', (d) => { const dl = E('dl', 'kv'); for (const [k, v] of Object.entries(r)) { if (v == null || v === '' || k.startsWith('_')) continue; dl.append(E('dt', null, cname(k))); const dd = E('dd'); dd.append(E('pre', null, fmt(k, v))); dl.append(dd); } d.append(dl); }, false, true);
     if (!keep) { box.scrollTop = 0; box.tabIndex = -1; box.focus({ preventScroll: true }); }   // ✕에 포커스를 주면 파란 테두리가 크게 떠서(10/24 감사) 서랍 자체에
   }
@@ -2064,7 +2209,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const hit = last.rows.find((x) => x.tab === o.tab && +x.row === +o.row);
     if (hit) return openRow(hit);
     cur.q = r.order_no || r.key; cur.preset = ''; cur.filters = []; cur.offset = 0; document.querySelector('.dt-q').value = cur.q;
-    jump = { tab: o.tab, row: o.row }; toast('주문번호로 찾는 중'); load();
+    jump = { tab: o.tab, row: o.row }; toast('같은 주문의 다른 줄을 찾는 중…'); load();
   }
   document.addEventListener('keydown', (e) => {      // 자세히가 열려 있으면 [ ] 로 위·아래 줄
     if (!sel || !last || typing(e) || !pageOn() || (e.key !== '[' && e.key !== ']')) return;
@@ -2078,25 +2223,25 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const out = E('div', 'what'); out.hidden = true; out.setAttribute('role', 'status'); box.append(out);
     const draw = async () => {
       list.textContent = '불러오는 중…';
-      let j; try { j = await fetchJ('/api/db/audit?' + new URLSearchParams(q).toString()); } catch (e) { list.textContent = '기록을 불러오지 못했어요: ' + e.message; return; }
+      let j; try { j = await fetchJ('/api/db/audit?' + new URLSearchParams(q).toString()); } catch (e) { list.textContent = '기록을 불러오지 못했어요. ' + errText(e); return; }
       list.textContent = '';
       if (j.error) { list.textContent = j.error; return; }
-      if (!j.batches.length) { list.append(E('p', 'muted small', '바꾼 기록이 없어요')); return; }
+      if (!j.batches.length) { list.append(E('p', 'muted small', '아직 바꾼 기록이 없어요. 칸을 고치면 여기에 쌓여요.')); return; }
       for (const b of j.batches) {
         const g = E('div', 'dt-batch');
         const h = E('div', 'dt-batch-h');
-        h.append(E('b', null, `${fmt('at', b.at)} · ${b.by} · ${b.op}`), E('span', 'muted small', ` ${b.items.length}건`));
+        h.append(E('b', null, `${fmt('at', b.at)} · ${b.by} · ${opName(b.op)}`), E('span', 'muted small', ` ${b.items.length}건`));
         const can = b.items.some((x) => UNDO_OPS.includes(x.op));
-        if (can) h.append(btn(b.items.length > 1 ? '이 묶음 되돌리기' : '되돌리기', 'weak', (bt) => undo({ batch: b.batch }, bt, out, `${b.op} ${b.items.length}건을 되돌릴까요? (그사이 또 바뀐 칸은 되돌리지 않아요)`)));
+        if (can) h.append(btn(b.items.length > 1 ? '이 묶음 되돌리기' : '되돌리기', 'weak', (bt) => undo({ batch: b.batch }, bt, out, `${opName(b.op)} ${b.items.length}건을 되돌릴까요?\n그사이 또 바뀐 칸은 그대로 둬요.`)));
         g.append(h);
         const ul = E('ul', 'dt-ev');
         for (const it of b.items.slice(0, 40)) {
           const li = E('li');
           const where = it.op === '일지실패' ? '' : `${it.tab} ${it.row ? it.row + '행 ' : ''}${it.col ? (COLNAME[it.col] || it.col) + ' ' : ''}`;
           li.append(document.createTextNode(it.op === '지우기' ? `${where}줄 지움: ${it.old}` : it.op === '되살리기' ? `${where}줄 되살림: ${it.new}`
-            : it.op === '줄옮기기' ? `${it.tab} ${it.old}행 줄 → ${it.new}행으로 옮김` : it.op === '줄복사' ? `${it.tab} ${it.old}행 줄 → ${it.new}행에 복사(되돌리면 새 줄 지움)`
+            : it.op === '줄옮기기' ? `${it.tab} ${it.old}행을 ${it.new}행으로 옮김` : it.op === '줄복사' ? `${it.tab} ${it.old}행을 ${it.new}행에 복사 · 되돌리면 새 줄을 지워요`
             : `${where}'${it.old || '빈칸'}' → '${it.new || '빈칸'}'`));
-          if (b.items.length > 1 && UNDO_OPS.includes(it.op)) { const u = btn(it.op === '지우기' ? '되살리기' : '이 칸만', 'ghost', (bt) => undo({ id: it.id }, bt, out)); li.append(' ', u); }
+          if (b.items.length > 1 && UNDO_OPS.includes(it.op)) { const u = btn(it.op === '지우기' ? '되살리기' : '이것만 되돌리기', 'ghost', (bt) => undo({ id: it.id }, bt, out)); li.append(' ', u); }
           ul.append(li);
         }
         if (b.items.length > 40) ul.append(E('li', 'muted', `… 외 ${b.items.length - 40}건`));
@@ -2115,7 +2260,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   async function deletedList(box) {
     const out = E('div', 'what'); out.hidden = true; out.setAttribute('role', 'status');
     const ul = E('ul', 'dt-ev'); box.append(ul, out);
-    let j; try { j = await fetchJ('/api/db/deleted?limit=30'); } catch (e) { ul.append(E('li', 'muted', '불러오지 못했어요: ' + e.message)); return; }
+    let j; try { j = await fetchJ('/api/db/deleted?limit=30'); } catch (e) { ul.append(E('li', 'muted', '지운 줄 목록을 불러오지 못했어요. ' + errText(e))); return; }
     if (!j.rows.length) ul.append(E('li', 'muted', '지운 줄 백업이 없어요'));
     for (const d of j.rows) {
       const li = E('li', null, `${fmt('at', d.at)} · ${d.by} · ${d.tab} ${d.row || ''}행 ${d.receiver || '재고'} · ${d.name || ''} ${d.option || ''} `);
@@ -2130,7 +2275,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     box.append(hd,
       E('p', 'muted small', '묶음이나 한 칸씩 되돌려요. 그사이 또 바뀐 칸은 건너뛰어요.'));
     auditList(box, { limit: 100 });
-    const dd = E('details', 'dt-all'); dd.append(E('summary', null, '지운 줄 백업(기록 전에 지운 줄 포함)'));
+    const dd = E('details', 'dt-all'); dd.append(E('summary', null, '지운 줄 백업 모두 보기'));
     let done = false; dd.ontoggle = () => { if (dd.open && !done) { done = true; deletedList(dd); } };
     box.append(dd);
   }
@@ -2142,48 +2287,48 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   };
   function sheetActs(r, acts, out, noEdit) {
     const ordered = r.key && !isStock(r);
-    acts.append(tool('재고 줄 추가', '이 줄 상품 정보로 새 재고 줄', btn('이 줄로 재고 추가', 'primary', (b) => stockCopy(r, b))));
+    acts.append(tool('재고 줄 추가', '이 줄 상품 정보로 새 재고 줄을 넣어요', btn('이 줄로 재고 추가', 'primary', (b) => stockCopy(r, b))));
     // 칸 고치기(표에서 누르기 어려운 휴대폰용 — 같은 저장 길)
     const cols = (last.edit.editable || []).concat(isStock(r) ? last.edit.stock_only : r._copy ? ['name'] : []);
     const c = select(cols.map((x) => COLNAME[x] || x)), v = inp('새 값');
     const syncV = () => { const k = cols[c.selectedIndex]; v.value = r[k] == null ? '' : r[k]; }; c.onchange = syncV; syncV();
-    if (!noEdit) acts.append(tool('칸 고치기', '휴대폰에서 값 고치기', field('칸', c), field('값', v), btn('시트에 저장', 'primary', (b) => {
+    if (!noEdit) acts.append(tool('칸 고치기', '표에서 누르기 어려울 때', field('칸', c), field('값', v), btn('저장', 'primary', (b) => {
       const k = cols[c.selectedIndex];
       doAct({ kind: 'sheet_edit', edits: [{ tab: r.tab, row: r.row, key: r.key, col: sheetCol(k), old: r[k] == null ? '' : String(r[k]), new: v.value.trim(), ident: ident(r) }] }, b, out);
     })));
-    if (r.problem) acts.append(tool('문제 줄', '해결했으면 풀기', E('p', 'small', noE(r.problem)), btn('문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out))));
+    if (r.problem) acts.append(tool('문제 줄', '해결했으면 풀어 주세요', E('p', 'small', noE(r.problem)), btn('문제 풀기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'unproblem', tab: r.tab, row: r.row }, b, out))));
     else {
-      const pc = select(['해외송장', '국내송장', '공홈주문번호', '공홈가', '구매처', '훗타운신청번호', '배송방식', '수령인', '메모']), why = inp('무엇이 문제인지(근거)'), todo = inp('할 일');
-      acts.append(tool('문제 표시', '빨간 줄 + #할-일 카드', field('칸', pc), field('문제', why), field('할 일', todo),
+      const pc = select(['해외송장', '국내송장', '공홈주문번호', '공홈가', '구매처', '훗타운신청번호', '배송방식', '수령인', '메모']), why = inp('무엇이 문제인지, 근거와 함께'), todo = inp('누가 무엇을 하면 되는지');
+      acts.append(tool('문제 표시', '빨간 줄로 표시하고 #할-일 카드를 올려요', field('칸', pc), field('문제', why), field('할 일', todo),
         btn('문제로 표시', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'problem', tab: r.tab, row: r.row, key: rowName(r), col: pc.value, why: why.value.trim(), todo: todo.value.trim() }, b, out))));
     }
     // 칸 메모·줄 색(시트의 메모·배경색 대신 — barun.db grid_meta, 줄이 밀려도 그 줄을 따라감)
     const mcols = visCols().filter((x) => !['tab', 'row'].includes(x));
-    const mc = select(mcols.map(cname)), mt = inp('메모(비우면 지움)');
+    const mc = select(mcols.map(cname)), mt = inp('비우면 메모를 지워요');
     const syncM = () => { const n = noteOf(r, mcols[mc.selectedIndex]); mt.value = n ? n.text : ''; }; mc.onchange = syncM; syncM();
     const metaPost = (b, kind, col, oldv, newv) => doAct({ kind: 'sheet_meta', tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key, ident: ident(r), col, mkind: kind, old: oldv, new: newv }, b, out);
-    acts.append(tool('칸 메모', '칸에 설명 붙이기', field('칸', mc), field('메모', mt), btn('메모 남기기', 'weak', (b) => {
+    acts.append(tool('칸 메모', '칸에 설명을 붙여요', field('칸', mc), field('메모', mt), btn('메모 남기기', 'weak', (b) => {
       const k = mcols[mc.selectedIndex], n = noteOf(r, k);
       metaPost(b, 'note', sheetCol(k), n ? n.text : '', mt.value.trim());
     })));
     const pal = last.colors || {};
-    const cs = select(['(없음)', ...Object.keys(pal)]); const nowC = (r._meta || {}).ucolor || '';
-    cs.value = Object.keys(pal).find((k) => pal[k] === nowC) || '(없음)';
-    acts.append(tool('줄 색', '눈에 띄게 표시', E('p', 'muted small', (r._meta || {}).color ? '자동 색 위에 보여요.' : '자동 칠하기가 지우지 않아요.'),
+    const cs = select(['색 없음', ...Object.keys(pal)]); const nowC = (r._meta || {}).ucolor || '';
+    cs.value = Object.keys(pal).find((k) => pal[k] === nowC) || '색 없음';
+    acts.append(tool('줄 색', '눈에 띄게 칠해요', E('p', 'muted small', (r._meta || {}).color ? '자동으로 칠한 색보다 위에 보여요.' : '자동 칠하기가 이 색을 지우지 않아요.'),
       field('색', cs), btn('색 바꾸기', 'weak', (b) => metaPost(b, 'ucolor', '', nowC, pal[cs.value] || ''))));
     if (!ordered) { stockActs(r, acts, out); return; }
     const tot = +(r.send_qty || r.qty || 0) || 2;
     const keep = inp('이 줄 수량', String(Math.max(1, tot - 1))), mv = inp('새 줄 수량', '1');
-    acts.append(tool('줄 나누기', '두 상자로 나눠 보낼 때', E('p', 'muted small', '새 줄은 탭 맨 아래, 송장·신청번호는 빈칸.'), field('이 줄 보낼수량', keep), field('새 줄 보낼수량', mv),
+    acts.append(tool('줄 나누기', '두 상자로 나눠 보낼 때', E('p', 'muted small', '새 줄은 탭 맨 아래에 생기고, 송장·신청번호는 비워 둬요.'), field('이 줄 보낼수량', keep), field('새 줄 보낼수량', mv),
       btn('두 줄로 나누기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'split', tab: r.tab, row: r.row, key: r.key, keep: keep.value.trim(), move: mv.value.trim(),
-        confirm: `${r.receiver} 주문을 ${keep.value}개 + ${mv.value}개 두 줄로 나눌까요?` }, b, out))));
+        confirm: `${r.receiver} 주문을 ${keep.value}개와 ${mv.value}개, 두 줄로 나눌까요?` }, b, out))));
     const to = select(tabsOf().filter((t) => t !== r.tab));
     acts.append(tool('다른 탭으로 옮기기', '탭이 잘못 들어갔을 때', E('p', 'muted small', '다음부터 이 상품은 그 탭으로 들어가요.'), field('옮길 탭', to),
-      btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: r.key, to: to.value, confirm: `${r.receiver} 줄을 ${r.tab} → ${to.value} 탭으로 옮길까요?` }, b, out))));
+      btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: r.key, to: to.value, confirm: `${r.receiver} 줄을 ${r.tab} 탭에서 ${to.value} 탭으로 옮길까요?` }, b, out))));
     reorderTool(r, acts, out);
-    acts.append(tool('줄 지우기', '잘못 들어온 줄', E('p', 'muted small', '다시 자동으로 들어오지 않아요. 나눈 줄인지 먼저 확인.'),
+    acts.append(tool('줄 지우기', '잘못 들어온 줄', E('p', 'muted small', '지우면 자동으로 다시 들어오지 않아요. 같은 주문을 나눈 줄인지 먼저 확인해 주세요.'),
       btn('이 줄 지우기', 'danger', (b) => {
-        const t = prompt(`정말 지우려면 받는 분 이름(${r.receiver})을 적어 주세요`);
+        const t = prompt(`지우려면 받는 분 이름을 똑같이 적어 주세요: ${r.receiver}`);
         if (t == null) return;
         if (t.trim() !== String(r.receiver || '').trim()) { out.hidden = false; out.textContent = '이름이 달라 지우지 않았어요'; return; }
         doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: r.key }, b, out);
@@ -2193,11 +2338,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   // 표 줄 끝 🗑(2026-10-24 사장님 "원클릭만으로 삭제") — 서버 확인(줄 번호 + 상품명·공홈주문번호·수령인)·백업은 조치 칸 지우기와 같은 길
   async function rowDel(r, b, force) {
     const stock = isStock(r) || !r.key, name = r.name || r.shop_order || '재고';
-    if (!stock && !force && !confirm(`${r.receiver || '받는 분 없음'} 주문 줄(${r.tab} ${r.row}행 · ${name})을 지울까요?\n같은 주문의 나눈 줄인지 먼저 확인해 주세요. 지운 줄은 백업돼요.`)) return;
+    if (!stock && !force && !confirm(`${r.receiver || '받는 분 없음'} 주문 줄을 지울까요?\n${r.tab} ${r.row}행 · ${name}\n같은 주문을 나눈 줄인지 먼저 확인해 주세요. 지운 줄은 백업돼요.`)) return;
     if (b) b.disabled = true;
     const payload = { kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: stock ? '' : r.key, ident: ident(r) };
     if (force) payload.force = true;
-    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
+    let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: errText(e) }; }
     if (b) b.disabled = false;
     const m = String(j.msg || j.error || '');
     if (!j.ok) {
@@ -2208,7 +2353,7 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     load(); loadTables();
     let line = 0;          // 방금 지운 줄 백업 번호 → 되살리기 버튼
     try { const d = await fetchJ('/api/db/deleted?limit=5'); const x = (d.rows || []).find((y) => y.tab === r.tab && String(y.row) === String(r.row) && (y.name || '') === (r.name || '')); if (x) line = x.line; } catch (e) { /* 버튼 없이 */ }
-    undoToast(`${r.tab} ${r.row}행 ${stock ? '재고 ' + name : r.receiver || ''} 지움`, line ? () => doAct({ kind: 'sheet_undo', line }, null, null) : null);
+    undoToast(`지웠어요 · ${r.tab} ${r.row}행 ${stock ? '재고 ' + name : r.receiver || ''}`.trim(), line ? () => doAct({ kind: 'sheet_undo', line }, null, null) : null);
   }
   function undoToast(msg, fn) {
     toast(msg, false, fn ? 8000 : 2400);
@@ -2225,11 +2370,11 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
     const label = (x) => `${x.row}행 ${(isStock(x) || !x.key ? '재고 ' + (x.name || x.shop_order || '') : x.receiver || '')}`.trim().slice(0, 40) + ' 아래로';
     const dest = select(['맨 아래로', '맨 위로', ...others.map(label)]);
     const who = isStock(r) || !r.key ? `재고 '${r.name || r.shop_order || ''}'` : r.receiver || '';
-    acts.append(tool('같은 탭에서 옮기기', '줄 순서 바꾸기', E('p', 'muted small', '칸 값은 그대로, 사이 줄은 한 칸씩 당겨지거나 밀려요. 바꾼 기록에서 되돌릴 수 있어요.'), field('어디로', dest),
+    acts.append(tool('같은 탭에서 옮기기', '줄 순서 바꾸기', E('p', 'muted small', '칸 값은 그대로 두고, 사이 줄은 한 칸씩 당겨지거나 밀려요. 바꾼 기록에서 되돌릴 수 있어요.'), field('옮길 자리', dest),
       btn('옮기기', 'weak', (b) => {
         const i = dest.selectedIndex, a = i >= 2 ? others[i - 2] : null;
         const p = { kind: 'sheet_row', op: 'reorder', tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key, ident: ident(r), after: i === 1 ? 1 : a ? a.row : '',
-          confirm: `${who} 줄(${r.tab} ${r.row}행)을 ${dest.value.replace(/ 아래로$/, ' 바로 아래로').replace(/로$/, '')}로 옮길까요?` };
+          confirm: `${r.tab} ${r.row}행 ${who} 줄을 ${dest.value.replace(/ 아래로$/, ' 바로 아래로').replace(/로$/, '')}로 옮길까요?` };
         if (a) { if (isStock(a) || !a.key) p.after_ident = ident(a); else p.after_key = a.key; }
         doAct(p, b, out);
       })));
@@ -2237,21 +2382,27 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
   function stockActs(r, acts, out) {     // 재고 줄(key 없음): 옮기기·지우기 — 줄 번호 + 상품명·공홈주문번호·수령인이 화면과 같을 때만
     const name = r.name || r.shop_order || '재고';
     const to = select(tabsOf().filter((t) => t !== r.tab));
-    acts.append(tool('다른 탭으로 옮기기', '재고를 다른 탭에', E('p', 'muted small', '새 탭 맨 아래로.'), field('옮길 탭', to),
-      btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: '', ident: ident(r), to: to.value, confirm: `재고 '${name}' 줄을 ${r.tab} → ${to.value} 탭으로 옮길까요?` }, b, out))));
+    acts.append(tool('다른 탭으로 옮기기', '재고를 다른 탭으로', E('p', 'muted small', '옮길 탭 맨 아래에 들어가요.'), field('옮길 탭', to),
+      btn('옮기기', 'weak', (b) => doAct({ kind: 'sheet_row', op: 'move', tab: r.tab, row: r.row, key: '', ident: ident(r), to: to.value, confirm: `재고 '${name}' 줄을 ${r.tab} 탭에서 ${to.value} 탭으로 옮길까요?` }, b, out))));
     reorderTool(r, acts, out);
-    acts.append(tool('줄 지우기', '다 쓴·잘못 넣은 재고 줄', E('p', 'muted small', '백업돼요. 남은 재고인지 먼저 확인.'),
+    acts.append(tool('줄 지우기', '다 쓴 재고나 잘못 넣은 줄', E('p', 'muted small', '지운 줄은 백업돼요. 아직 남은 재고인지 먼저 확인해 주세요.'),
       btn('이 재고 줄 지우기', 'danger', (b) => doAct({ kind: 'sheet_row', op: 'delete', tab: r.tab, row: r.row, key: '', ident: ident(r), confirm: `재고 '${name}'(${r.tab} ${r.row}행) 줄을 지울까요?` }, b, out))));
   }
 
   // 플랫폼 상태 코드를 사람 말로(10/24 감사: 'CANCELED · 클레임 CANCEL'·'RETURNS_COMPLETED'가 그대로 보임)
-  const CODE_COLS = ['status', 'claim', 'claim_status', 'platform', 'type'];
+  const CODE_COLS = ['status', 'claim', 'claim_status', 'platform', 'type', 'courier', 'old', 'new'];   // courier = 플랫폼 택배사 코드(HANJIN → 한진택배)
   const ST_KO = { coupang: '쿠팡', naver: '네이버', CANCELED_BY_NOPAYMENT: '미입금 취소', PURCHASE_DECIDE: '구매확정', PAYED: '결제완료', ACCEPT: '결제완료', INSTRUCT: '상품준비중', PLACE: '발주확인', DEPARTURE: '출고', DELIVERING: '배송중', DELIVERED: '배송완료',
     FINAL_DELIVERY: '배송완료', NONE_TRACKING: '송장 없이 배송', PURCHASE_DECIDED: '구매확정', CANCELED: '취소됨', CANCEL: '취소', CANCEL_REQUEST: '취소요청',
     RETURN: '반품', RETURNED: '반품됨', RETURNS_COMPLETED: '반품완료', RETURN_REQUEST: '반품요청', EXCHANGE: '교환', EXCHANGE_REQUEST: '교환요청', DISPATCHED: '발송',
     CANCEL_DONE: '취소완료', CANCEL_REJECT: '취소거부', RETURN_DONE: '반품완료', RETURN_REJECT: '반품거부', EXCHANGE_DONE: '교환완료', EXCHANGE_REJECT: '교환거부',
-    ADMIN_CANCEL: '직권취소', ADMIN_CANCEL_DONE: '직권취소', COLLECT_DONE: '수거완료', PURCHASE_DECISION_REQUEST: '구매확정 요청' };
-  const ko = (t) => { const v = String(t == null ? '' : t); return ST_KO[v] || v.replace(/\b[A-Z][A-Z_]{3,}\b/g, (m) => ST_KO[m] || m); };
+    ADMIN_CANCEL: '직권취소', ADMIN_CANCEL_DONE: '직권취소', COLLECT_DONE: '수거완료', PURCHASE_DECISION_REQUEST: '구매확정 요청',
+    SALE: '판매 중', SUSPENSION: '판매중지', OUTOFSTOCK: '품절', PROHIBITION: '판매금지', PAYMENT_WAITING: '입금 대기', EXCHANGED: '교환됨' };
+  // 화면 말은 공용 koLabel(index.html) 먼저 — 그 표에 없는 것(판매 상태 등)만 여기 표로(2026-11-12)
+  const ko = (t) => { const v = String(t == null ? '' : t), s = window.koLabel ? window.koLabel(v) : v; return ST_KO[s] || s.replace(/\b[A-Z][A-Z_]{3,}\b/g, (m) => ST_KO[m] || m); };
+  // 바꾼 기록의 일 이름(서버 op 이름 → 화면 말 — 되돌리기 판단은 원래 이름으로)
+  const OP_KO = { 칸: '칸 고침', 일괄: '여러 칸 고침', 붙여넣기: '붙여넣기', 채우기: '아래로 채우기', 되돌리기: '되돌리기', 설정: '설정', 메모: '칸 메모', 색: '줄 색', 지우기: '줄 지움', 되살리기: '줄 되살림',
+    줄옮기기: '줄 순서 옮김', 줄복사: '줄 복사', 옮기기: '탭 옮김', 줄나누기: '줄 나눔', 문제해제: '문제 풀기', 재고아래로: '재고 아래로', 아래로: '아래로 옮김', 나눠다시보냄: '나눠 다시 보냄', 재고풀기: '재고 풀기', 탭이름: '탭 이름', 일지실패: '일지 못 남김' };
+  const opName = (op) => OP_KO[op] || op;
   async function historyBox(box, r, bare, pre) {
     const h = E('div', 'dt-hist'); if (!bare) h.append(E('div', 'od-t', '이 주문 기록')); box.append(h);
     try {
@@ -2259,14 +2410,14 @@ details.sk-more > .sk-grid2 { padding: 4px 0 6px; }
       if (j.error) throw new Error(j.error);
       const o = j.order, l = j.ledger;
       const p = E('p', 'small'); p.style.whiteSpace = 'pre-wrap';
-      p.textContent = [o ? `${o.platform === 'naver' ? '네이버' : '쿠팡'} · ${ko(o.status)}${o.claim_status ? ' · 클레임 ' + ko(o.claim_status) : ''} · 결제 ${o.paid ? won(o.paid) : '-'} · 송장 ${o.invoice || '없음'}` : '플랫폼 주문 없음',
-        l ? `처리 방식 ${l.handling}${l.memo ? ' (' + l.memo + ')' : ''}` : '', j.rows.length > 1 ? `시트 ${j.rows.length}줄: ` + j.rows.map((x) => `${x.tab} ${x.row}행`).join(', ') : ''].filter(Boolean).join('\n');
+      p.textContent = [o ? `${o.platform === 'naver' ? '네이버' : '쿠팡'} · ${ko(o.status)}${o.claim_status ? ' · 클레임 ' + ko(o.claim_status) : ''} · 결제 ${o.paid ? won(o.paid) : '-'} · 송장 ${o.invoice || '없음'}` : '플랫폼 주문 기록 없음',
+        l ? `처리 방식 ${l.handling}${l.memo ? ' · ' + l.memo : ''}` : '', j.rows.length > 1 ? `시트 ${j.rows.length}줄: ` + j.rows.map((x) => `${x.tab} ${x.row}행`).join(', ') : ''].filter(Boolean).join('\n');
       h.append(p);
       const ul = E('ul', 'dt-ev');
       for (const e of j.events.slice(0, 30)) ul.append(E('li', null, `${fmt('at', e.at)} · ${e.src} · ${COLNAME[e.field] || e.field}: ${ko(e.old) || '빈칸'} → ${ko(e.new) || '빈칸'}`));
       if (!j.events.length) ul.append(E('li', 'muted', '바뀐 기록이 아직 없어요'));
       h.append(ul);
-    } catch (e) { h.append(E('p', 'muted small', '기록을 불러오지 못했어요: ' + e.message)); }
+    } catch (e) { h.append(E('p', 'muted small', '기록을 불러오지 못했어요. ' + errText(e))); }
   }
 
   const typing = (e) => !!(e.target && e.target.closest && e.target.closest('input,select,textarea'));

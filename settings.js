@@ -12,6 +12,9 @@
   const NUM = ['int', 'money', 'pct', 'float', 'minutes'];
   const DOMAIN = { orders: '주문·발송·배대지', mail: '메일·송장', pricing: '가격·위너·판매', inquiry: '고객문의', close: '마감', improve: '자가개선',
     infra: '인프라·감시', sourcing: '소싱·등록' };
+  const MODEL = { 'claude-opus-5-5': 'Opus 5.5 · 가장 꼼꼼', 'claude-sonnet-5-5': 'Sonnet 5.5 · 보통', 'claude-haiku-5-5': 'Haiku 5.5 · 빠르고 저렴', 'claude-fable-5-1': 'Fable 5.1' };
+  const EFFORT = { low: '가볍게', medium: '보통', high: '깊게' };
+  const optName = (c) => MODEL[c] || EFFORT[c] || String(c) || '바른청년(기본)';
   const when = (at) => String(at || '').slice(5, 16).replace('T', ' ');
   let D = null, busy = false, q = '', grp = '', onlyChanged = false;
   const openJobs = new Set(), openAcct = new Set(), acctMsg = new Map();   // 계정마다 마지막 결과 글(다시 그려도 남게)
@@ -22,6 +25,8 @@
     const sec = $('p-settings'); if (!sec || sec.dataset.ready) return !!sec; sec.dataset.ready = '1';
     const css = E('style'); css.textContent = `
       #p-settings { display: grid; gap: 14px; }
+      .st-sticky { position: sticky; top: calc(var(--bar-h) + 6px); z-index: 5; box-shadow: 0 6px 20px rgba(16, 24, 40, .06); }
+      @media (max-width: 1023px) { .st-sticky { top: calc(var(--bar-h) + 4px); padding: 12px; } }
       .st-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       .st-bar input[type=search] { font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); flex: 1 1 240px; min-width: 0; }
       .st-chip { font: inherit; font-size: 13px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer; }
@@ -36,7 +41,7 @@
       .st-risk { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--st-serious, #c2410c); color: var(--st-serious, #c2410c); margin-left: 6px; }
       .st-l { word-break: keep-all; overflow-wrap: anywhere; }   /* 한글 낱말 중간에서 줄이 안 바뀌게 */
       .st-help { font-size: 13px; color: var(--sub); margin-top: 4px; line-height: 1.5; }
-      .st-eff { font-size: 12.5px; color: var(--sub); margin-top: 3px; line-height: 1.5; } .st-eff::before { content: '바꾸면 · '; color: var(--muted); }
+      .st-eff { font-size: 12.5px; color: var(--sub); margin-top: 3px; line-height: 1.5; } .st-eff::before { content: '↳ '; color: var(--muted); }
       .st-def { font-size: 12px; color: var(--muted); margin-top: 4px; }
       .st-v { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
       .st-v input, .st-v select, .st-v textarea { font: inherit; font-size: 13.5px; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; }
@@ -47,7 +52,7 @@
       .st-dom { margin: 14px 0 2px; font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
       .st-job { border-top: 1px solid var(--line); } .st-job > summary { list-style: none; cursor: pointer; padding: 11px 2px 11px 20px; position: relative; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .st-job > summary::-webkit-details-marker { display: none; }
-      .st-job > summary::before { content: '▸'; color: var(--muted); position: absolute; left: 4px; top: 11px; } .st-job[open] > summary::before { content: '▾'; }
+      .st-job > summary::before { content: '›'; color: var(--sub); position: absolute; left: 4px; top: 8px; font-size: 18px; line-height: 1; transition: transform .18s var(--ease, ease); } .st-job[open] > summary::before { transform: rotate(90deg); }
       .st-job b { font-size: 14px; } .st-job .sum { font-size: 12.5px; color: var(--sub); margin-left: auto; font-variant-numeric: tabular-nums; }
       .st-job .jd { font-size: 12.5px; color: var(--sub); line-height: 1.5; padding: 0 2px 6px 22px; }
       .st-job .st-row { padding-left: 22px; border-top: 0; }
@@ -76,21 +81,21 @@
       @media (max-width: 720px) { .ac-f { grid-template-columns: 1fr; } .ac-f .hint { grid-column: 1; } .ac-h .sp { margin-left: 0; } .st-row { grid-template-columns: 1fr; gap: 8px; } .st-v { justify-content: flex-start; } .st-msg { text-align: left; } .st-job .sum { margin-left: 22px; flex-basis: 100%; } }`;
     document.head.append(css);
     sec.innerHTML = `
-      <div class="card hero"><h2 id="st-title">불러오는 중</h2><p class="lead">코드를 고치지 않고 바꾸는 값이에요. 저장하면 늦어도 10초 뒤 모든 업무가 새 값을 써요.</p>
+      <div class="card hero"><h2 id="st-title">불러오는 중</h2><p class="lead">한도, 기준 시간, 자동 처리 스위치, 예약 시각을 여기서 바꿔요. 저장하면 10초 안에 모든 업무에 반영돼요.</p>
         <div class="stats" id="st-stats"></div>
         <details class="st-guide" id="st-guide"><summary>어떻게 쓰나요</summary><ul>
-          <li><b>바꾸기</b> — 칸을 고치면 <b>저장</b>이 켜져요. 엔터로도 저장, Esc는 되돌리기. 결과는 그 줄 아래에 바로 나와요.</li>
-          <li><b>기본값</b> — 칸마다 원래 값이 적혀 있고, 바꾼 칸에는 <b>기본값으로</b> 버튼이 생겨요. 아래 '바꾼 기록'에 누가 언제 무엇을 바꿨는지 남아요.</li>
-          <li><b>바깥에 써요</b> 표시 — 결제·등록·고객 답변·자동 승인처럼 바깥에 실제로 쓰는 스위치예요. 실수하지 않게 저장을 두 번 눌러야 해요.</li>
-          <li><b>예약 업무</b> — 업무 이름을 누르면 시각·주기·모델이 펼쳐져요. 시각을 바꾸면 그 업무 예약만 다시 걸고, 돌고 있으면 끝난 뒤에 걸어요. 잠깐 쉬게 하려면 시각을 지우지 말고 <b>멈춤</b>.</li>
-          <li><b>지침의 숫자</b>(48시간·5일·하루 10줄 등)는 기본값이에요 — 에이전트는 판단 전에 여기 지금 값을 봐요(바꾸지는 못해요).</li>
-          <li>비밀번호·카드번호·API 키는 넣지 않아요 — 넣으면 거부돼요. 카드는 결제 화면에 끝 4자리만, 로그인은 사장님이 직접.</li>
+          <li><b>바꾸기</b>: 칸을 고치면 <b>저장</b> 버튼이 켜져요. 엔터로 저장하고 Esc로 되돌려요. 결과는 그 줄 아래에 나와요.</li>
+          <li><b>기본값</b>: 칸마다 원래 값이 적혀 있어요. 바꾼 칸에는 <b>기본값으로</b> 버튼이 생기고, 누가 언제 바꿨는지는 아래 '바꾼 기록'에 남아요.</li>
+          <li><b>바깥에 써요</b>: 결제, 등록, 고객 답변, 자동 승인처럼 쿠팡·네이버·구매처에 실제로 쓰는 설정이에요. 실수하지 않게 두 번 눌러야 저장돼요.</li>
+          <li><b>예약 업무</b>: 업무 이름을 누르면 시각, 주기, 모델이 펼쳐져요. 시각을 바꾸면 그 업무만 다시 예약하고, 도는 중이면 끝난 뒤에 예약해요. 잠깐 쉬게 하려면 <b>멈춤</b>을 눌러 주세요.</li>
+          <li><b>지침에 적힌 숫자</b>(48시간, 5일, 하루 10줄 같은 것)는 기본값이에요. 에이전트는 판단하기 전에 여기서 지금 값을 확인하고, 직접 바꾸지는 않아요.</li>
+          <li>비밀번호와 카드번호는 여기 넣지 않아요. 카드는 결제 화면에 끝 4자리만 적고, 사이트 로그인은 사장님이 직접 해요. 쿠팡 계정 키는 아래 쿠팡 계정 카드에서만 넣어요.</li>
         </ul></details></div>
-      <div class="card"><div class="st-bar"><input id="st-q" type="search" placeholder="설정 찾기 — 한도, 위너, 소싱, 시각, 모델…" aria-label="설정 찾기"></div>
+      <div class="card st-sticky"><div class="st-bar"><input id="st-q" type="search" placeholder="설정 찾기 (한도, 위너, 소싱, 시각, 모델)" aria-label="설정 찾기"></div>
         <div class="st-bar" id="st-groups" style="margin-top:10px"></div></div>
       <div class="card" id="st-links-card" hidden><div class="card-h"><h2>다른 화면에서 바꾸는 설정</h2><span class="desc">원본이 그 화면에 있어요</span></div><div class="st-links" id="st-links"></div></div>
       <div id="st-body" style="display:grid;gap:14px"></div>
-      <div class="card"><div class="card-h"><h2>바꾼 기록</h2><span class="desc">누가 언제 무엇을 — 최근 50개</span></div><div id="st-hist"></div></div>`;
+      <div class="card"><div class="card-h"><h2>바꾼 기록</h2><span class="desc">최근 50개</span></div><div id="st-hist"></div></div>`;
     $('st-q').addEventListener('input', (e) => { q = e.target.value.trim().toLowerCase(); body(); });
     document.addEventListener('barun:page', (e) => { if (e.detail === 'settings') load(); });
     if (!sec.hidden) load();
@@ -108,7 +113,7 @@
       if (window.toast) window.toast(j.msg);
       if (j.ok) setTimeout(load, 900);       // 결과 글을 잠깐 보여 준 뒤 다시 그림
       return j;
-    } catch (e) { if (msg) { msg.textContent = '저장하지 못했어요 — 연결을 확인해 주세요'; msg.className = 'st-msg bad'; } return null; }
+    } catch (e) { if (msg) { msg.textContent = '저장하지 못했어요. 연결을 확인해 주세요'; msg.className = 'st-msg bad'; } return null; }
     finally { if (el) el.disabled = false; }
   }
 
@@ -119,7 +124,7 @@
     let armed = 0;
     const save = (v, el) => {
       if (it.risk && Date.now() - armed > 4000) {          // 바깥에 쓰는 스위치 — 4초 안에 한 번 더
-        armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = '바깥에 실제로 쓰는 설정이에요 — 맞으면 4초 안에 한 번 더 눌러 주세요';
+        armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = '바깥에 실제로 쓰는 설정이에요. 맞으면 4초 안에 한 번 더 눌러 주세요';
         if (el && el.tagName === 'BUTTON') { const t = el.textContent; el.textContent = '한 번 더 눌러 확정'; setTimeout(() => { el.textContent = t; }, 4000); }
         return null;
       }
@@ -128,7 +133,7 @@
     if (it.kind === 'bool' || it.kind === 'choice') {
       const s = E('select');
       if (it.kind === 'bool') s.append(new Option('켬', '1'), new Option('끔', '0'));
-      else for (const c of it.choices) s.append(new Option(String(c) || '바른청년(기본)', c));
+      else for (const c of it.choices) s.append(new Option(optName(c), c));
       const cur = it.kind === 'bool' ? (it.value ? '1' : '0') : it.value;
       s.value = cur; s.setAttribute('aria-label', it.label);
       const b = E('button', 'btn sm', '저장'); b.type = 'button'; b.disabled = true;
@@ -164,11 +169,12 @@
     const d = E('div', 'st-row'); d.dataset.key = it.key;
     const l = E('div', 'st-l'), h = E('div'); h.append(E('b', '', it.label));
     if (it.changed) h.append(E('span', 'badge', '바꿈'));
-    if (it.risk) h.append(E('span', 'st-risk', '바깥에 써요'));
+    if (it.risk) { const r = E('span', 'st-risk', '바깥에 써요'); r.title = '쿠팡·네이버·구매처에 실제로 쓰는 설정이라 두 번 눌러야 저장돼요'; h.append(r); }
     l.append(h);
     if (it.help) l.append(E('div', 'st-help', it.help));
     if (it.effect) l.append(E('div', 'st-eff', it.effect));
-    l.append(E('div', 'st-def', [`기본값 ${it.show_default}`, it.changed && it.by ? `${it.by} · ${when(it.at)} 바꿈` : '', it.used ? `쓰는 곳 ${it.used}` : ''].filter(Boolean).join(' · ')));
+    l.append(E('div', 'st-def', [`기본값 ${it.show_default}`, it.changed && it.by ? `${it.by} · ${when(it.at)} 바꿈` : ''].filter(Boolean).join(' · ')));
+    if (it.used) l.title = `쓰는 곳: ${it.used}`;
     d.append(l, input(it, d));
     return d;
   }
@@ -178,7 +184,7 @@
   function jobSummary(xs) {
     const j = xs[0].job, sch = xs.find((x) => x.key.endsWith('.schedule')), ev = xs.find((x) => x.key.endsWith('.every')), mdl = xs.find((x) => x.key.endsWith('.model'));
     const freq = sch ? `${j.weekly ? '매주 ' : j.monthly ? '매월 ' : '매일 '}${sch.show}` : ev ? `${ev.show}마다` : '이벤트로 깨움';
-    return [freq, mdl ? String(mdl.show).replace('claude-', '') : '', j.next ? `다음 ${j.next}` : ''].filter(Boolean).join(' · ');
+    return [freq, mdl ? optName(mdl.value).split(' · ')[0] : '', j.next ? `다음 ${j.next}` : ''].filter(Boolean).join(' · ');
   }
 
   function jobCard(items) {
@@ -197,7 +203,8 @@
         const j = xs[0].job, box = E('details', 'st-job'), sm = E('summary');
         box.open = openJobs.has(jid) || !!q || onlyChanged;
         box.addEventListener('toggle', () => { if (box.open) openJobs.add(jid); else openJobs.delete(jid); });
-        sm.append(E('b', '', j.job_name), E('span', 'badge', j.job_kind === 'agent' ? 'AI 업무' : '스크립트'));
+        const nm = (window.noEmoji ? window.noEmoji(j.job_name) : j.job_name).trim();
+        sm.append(E('b', '', /^[a-z0-9-]+$/.test(nm) ? `기타 업무 (${nm})` : nm), E('span', 'badge', j.job_kind === 'agent' ? 'AI 업무' : '스크립트'));
         const paused = D.paused.includes(jid);
         if (paused) sm.append(E('span', 'badge', '멈춤'));
         if (xs.some((x) => x.changed)) sm.append(E('span', 'badge', '바꿈'));
@@ -238,7 +245,7 @@
       out.append(card);
       if (acctHere) out.append(acctCard());
     }
-    if (!n) out.append(Object.assign(E('div', 'card'), { textContent: onlyChanged ? '바꾼 설정이 없어요 — 모두 기본값이에요' : '맞는 설정이 없어요 — 다른 말로 찾아 보세요' }));
+    if (!n) out.append(Object.assign(E('div', 'card'), { textContent: onlyChanged ? '바꾼 설정이 없어요. 모두 기본값이에요' : '맞는 설정이 없어요. 다른 말로 찾아 보세요' }));
   }
 
   function chips() {
@@ -261,7 +268,7 @@
   function acctCard() {
     const card = E('div', 'card'), h = E('div', 'card-h');
     const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
-    h.append(E('h2', '', '쿠팡 계정 — 새 상품을 어디에 올릴까'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
+    h.append(E('h2', '', '쿠팡 계정'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
     card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품이 올라가요. 키를 넣은 계정은 그 계정 주문도 수집·발주확인·송장 올리기·취소·반품까지 바른청년과 똑같이 처리하고, 시트 플랫폼 칸에 "쿠팡·계정 이름"으로 보여요.'));
     const list = E('div', 'ac-list');
     for (const a of D.accounts) list.append(acctTile(a));
@@ -298,7 +305,7 @@
     const label = name ? null : inp('ak-label', '보이는 이름', '예: 푸드투 상사', 'text', '목록에 보일 이름(아무거나)');
     const vendor = inp('ak-vendor', '업체코드', 'A00123456', 'text', '영문 1자 + 숫자');
     const access = inp('ak-access', 'Access Key', '붙여 넣기', 'password', '저장한 뒤엔 끝 4자리만 보여요');
-    const secret = inp('ak-secret', 'Secret Key', '붙여 넣기', 'password', '이 맥미니 비밀 폴더에만 저장 — 화면·기록에 다시 나오지 않아요');
+    const secret = inp('ak-secret', 'Secret Key', '붙여 넣기', 'password', '이 맥미니 비밀 폴더에만 저장돼요. 화면과 기록에는 다시 나오지 않아요');
     const row = E('div', 'st-bar'); row.style.marginTop = '12px';
     const go = E('button', 'btn primary', name ? '연결 확인하고 키 바꾸기' : '연결 확인하고 저장'); go.type = 'button';
     const cancel = E('button', 'btn ghost', '취소'); cancel.type = 'button';
@@ -336,7 +343,7 @@
       let armed = 0;
       go.onclick = () => {
         if (Date.now() - armed > 4000) {
-          armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = `새 쿠팡 상품을 '${a.label || a.name}'에 올리게 바꿔요 — 맞으면 4초 안에 한 번 더 눌러 주세요`;
+          armed = Date.now(); msg.className = 'st-msg bad'; msg.textContent = `새 쿠팡 상품을 '${a.label || a.name}'에 올리게 바꿔요. 맞으면 4초 안에 한 번 더 눌러 주세요`;
           go.textContent = '한 번 더 눌러 확정'; setTimeout(() => { go.textContent = '여기에 올리기'; }, 4000); return;
         }
         post({ op: 'set', key: ACCT_KEY, value: a.name }, go, msg).then(keep);
@@ -356,10 +363,10 @@
     const places = Object.entries(a.places || {}).map(([c, code]) => `${COUNTRY[c] || c} ${code}`).join(' · ');
     const rc = (ch.return_centers || []).find((x) => x.code === a.return_center);
     const info = a.main
-      ? ['본보기 상품의 출고지·반품지·연락처를 그대로 써요', ch.vendor_id ? `판매자 ${ch.vendor_id}` : '', ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' — 실패'}` : '']
-      : [ch.vendor_id ? `판매자 ${ch.vendor_id}` : '판매자 번호 — 연결 확인 전', a.vendor_user_id ? `Wing ${a.vendor_user_id}` : '', places ? `출고지 ${places}` : '',
+      ? ['본보기 상품의 출고지·반품지·연락처를 그대로 써요', ch.vendor_id ? `판매자 ${ch.vendor_id}` : '', ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' 실패'}` : '']
+      : [ch.vendor_id ? `판매자 ${ch.vendor_id}` : '판매자 번호는 연결 확인 뒤에 보여요', a.vendor_user_id ? `Wing ${a.vendor_user_id}` : '', places ? `출고지 ${places}` : '',
         rc ? `반품지 ${rc.name}` : '', a.contact ? `고객센터 ${a.contact}` : '', a.detail_image ? '공통 상세 사진 있음' : '공통 상세 사진 없음(설계 상세를 씀)',
-        ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' — 실패'}` : ''];
+        ch.at ? `연결 확인 ${when(ch.at)}${ch.ok ? '' : ' 실패'}` : ''];
     const meta = E('div', 'ac-m'); info.filter(Boolean).forEach((x, i) => { if (i) meta.append(' · '); const sp = E('span', '', x); if (x.length <= 22) sp.style.whiteSpace = 'nowrap'; meta.append(sp); });   // 번호·코드가 줄 끝에서 안 쪼개지게
     box.append(meta);
     if (a.problems.length) { const ul = E('ul', 'ac-todo'); for (const p of a.problems) ul.append(E('li', '', p)); box.append(ul); }
@@ -381,7 +388,7 @@
     text('as_info', 'A/S 안내', '비우면 "해외구매대행 상품입니다. 문의는 고객센터 …"');
     text('detail_image', '공통 상세 사진 주소', 'https://…', '다른 사업자 계정 상세는 공통 안내 사진 한 장(비우면 설계 상세를 쓰고 바른청년 안내 띠만 뺌)');
     const rs = E('select'); rs.append(new Option('(고르기)', ''));
-    for (const x of (ch.return_centers || []).filter((x) => x.usable)) rs.append(new Option(`${x.name} — ${x.addr} ${x.detail}`.trim(), x.code));
+    for (const x of (ch.return_centers || []).filter((x) => x.usable)) rs.append(new Option(`${x.name} · ${x.addr} ${x.detail}`.trim(), x.code));
     rs.value = a.return_center || ''; lab('반품지', rs); val.return_center = () => rs.value;
     if (!(ch.return_centers || []).length) f.append(E('div', 'hint', '[연결 확인]을 먼저 누르면 그 계정 반품지가 나와요'));
     const usable = (ch.places || []).filter((x) => x.usable);
@@ -405,7 +412,7 @@
     const rm = E('button', 'btn sm ghost', '계정 빼기'); rm.type = 'button';
     let armed = 0;
     rm.onclick = () => {
-      if (Date.now() - armed > 4000) { armed = Date.now(); rm.textContent = '한 번 더 눌러 빼기'; msg.className = 'st-msg bad'; msg.textContent = '이 계정을 목록에서 빼요(키 파일은 보관 폴더로 옮겨 되살릴 수 있어요) — 맞으면 4초 안에 한 번 더'; setTimeout(() => { rm.textContent = '계정 빼기'; }, 4000); return; }
+      if (Date.now() - armed > 4000) { armed = Date.now(); rm.textContent = '한 번 더 눌러 빼기'; msg.className = 'st-msg bad'; msg.textContent = '이 계정을 목록에서 빼요. 키 파일은 보관 폴더로 옮겨 둬서 다시 넣을 수 있어요. 맞으면 4초 안에 한 번 더 눌러 주세요'; setTimeout(() => { rm.textContent = '계정 빼기'; }, 4000); return; }
       openAcct.delete(a.name); post({ op: 'acct_remove', name: a.name }, rm, msg).then(keep);
     };
     kr.append(rk, rm);
@@ -416,10 +423,10 @@
 
   function render(d) {
     D = { group_help: {}, links: [], paused: [], history: [], accounts: [], register_account: '', ...d };
-    const changed = D.items.filter((x) => x.changed);
-    $('st-title').textContent = changed.length ? `설정 ${D.items.length}개 · 바꾼 것 ${changed.length}개` : `설정 ${D.items.length}개 · 모두 기본값`;
+    const changed = D.items.filter((x) => x.changed), total = D.items.filter((x) => x.key !== ACCT_KEY).length;
+    $('st-title').textContent = changed.length ? `설정 ${total}개 중 ${changed.length}개를 바꿨어요` : `설정 ${total}개 · 모두 기본값이에요`;
     const st = $('st-stats'); st.innerHTML = '';
-    st.append(stat('설정', String(D.items.length), `${D.groups.length}묶음`), stat('바꾼 것', String(changed.length), '기본값과 다름'),
+    st.append(stat('설정', String(total), `${D.groups.length}묶음`), stat('바꾼 것', String(changed.length), '기본값과 다름'),
       stat('바깥에 쓰는 스위치', String(D.items.filter((x) => x.risk).length), '두 번 눌러 저장'),
       stat('최근 바꿈', D.history[0] ? when(D.history[0].at) : '없음', D.history[0] ? D.history[0].label : ''));
     chips();

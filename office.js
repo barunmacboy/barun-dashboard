@@ -183,7 +183,7 @@
 
   // ── 글자 정리 ──────────────────────────────────────────────────────────────
   const noE = (t) => (window.noEmoji ? window.noEmoji(t) : String(t || ''));
-  const clip = (t, n) => { t = noE(String(t || '').replace(/<@[!&]?\d+>/g, '@')).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+  const clip = (t, n) => { t = noE(String(t || '').replace(/<@[!&]?\d+>/g, '@')).replace(/\s+[—–]\s+/g, ' · ').replace(/\s*[—–]\s*$/, '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };   // 서버 글의 ' — '는 '·'로
   const hm = (iso) => iso ? iso.slice(11, 16) : '';
   const day = (iso, nowIso) => !iso ? '' : (iso.slice(0, 10) === (nowIso || '').slice(0, 10) ? hm(iso) : iso.slice(5, 10).replace('-', '/') + ' ' + hm(iso));
   const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -204,7 +204,7 @@
       j.runs.forEach((r, i) => {
         if (!r.end) return;
         const ic = r.skip ? 'minus' : (r.rc === 0 ? 'check' : 'x');
-        const sum = r.skip ? '건너뜀' + (r.why ? ' · ' + r.why : '') : (i === 0 && r.summary ? r.summary.split('\n').find((x) => x.trim().replace(/^[-#•\s]+/, '')) || '' : (r.rc === 0 ? `정상 ${r.secs}초` : `실패 rc=${r.rc}`));
+        const sum = r.skip ? '건너뜀' + (r.why ? ' · ' + r.why : '') : (i === 0 && r.summary ? r.summary.split('\n').find((x) => x.trim().replace(/^[-#•\s]+/, '')) || '' : (r.rc === 0 ? `끝남 · ${mmss(r.secs)}` : `실패 · 오류 코드 ${r.rc}`));
         out.push({ at: r.start, ic, text: `${nm} · ${clip(sum.replace(/^[-#•\s]+/, ''), 140)}` });
       });
     }
@@ -228,13 +228,13 @@
     const nx = m.next || {};
     if (nx.at) out.push({ ic: 'clock', text: `${day(nx.at, s.now)} ${nx.job || ''}` });
     else if (nx.job) out.push({ ic: 'clock', text: nx.job });
-    if (m.wake) out.push({ ic: 'radio', text: `${m.wake}이면 바로` });
+    if (m.wake) out.push({ ic: 'radio', text: `${m.wake}이면 바로 시작` });
     if (m.cards) out.push({ ic: 'bell', text: `#할-일 ${m.cards}건${m.urgent ? ` · 긴급 ${m.urgent}` : ''}${m.top_card ? ' · ' + clip(m.top_card, 70) : ''}` });
     for (const t of s.tasks || []) {
       const mine = m.domain === 'commander' || (t.domains || []).includes(m.domain);
       if (mine && t.state === 'wait') out.push({ ic: 'hand', text: `승인 대기 · ${clip(t.title, 60)}` });
     }
-    if (m.debt) out.push({ ic: 'alert', text: `기술부채 ${m.debt}건 · ${clip((m.debt_top || {}).text, 60)}` });
+    if (m.debt) out.push({ ic: 'alert', text: `고칠 코드 ${m.debt}건 · ${clip((m.debt_top || {}).text, 60)}` });
     return out;
   }
   // 한 줄 요약(목록·카드 공통): 지금 하는 일 > 결재 대기 카드 > 최근 회차
@@ -249,7 +249,7 @@
 
   // ── 화면 ─────────────────────────────────────────────────────────────────
   let frame = 0, timer = null, sel = null, hover = null, last = null, order = [], extra = [];
-  const STATE_TXT = { busy: '일하는 중', todo: '결재 대기', blocked: '막혔어요', idle: '쉬는 중', paused: '멈춤' };
+  const STATE_TXT = { busy: '일하는 중', todo: '결재 대기', blocked: '막힘', idle: '쉬는 중', paused: '멈춤' };
   const look = (d) => LOOK[d] || AG_LOOK[String(d).split(':')[0]] || { hair: '#333', shirt: '#777' };
   const kinds = new Map();
   let cv = null, pop = null;
@@ -307,9 +307,9 @@
     const L = m.last || {};
     if (L.at) add('최근', `${day(L.at, last.now)} · ${L.kind === 'skip' ? '건너뜀' : clip(L.text, 90)}`);
     const nx = m.next || {};
-    add('다음', nx.at ? `${day(nx.at, last.now)} ${nx.job || ''}` : (m.wake ? `${m.wake}이면 바로` : ''));
+    add('다음', nx.at ? `${day(nx.at, last.now)} ${nx.job || ''}` : (m.wake ? `${m.wake}이면 바로 시작` : ''));
     if ((m.improving || []).length) add('개선 중', clip(m.improving.map((x) => x.what).join(' · '), 80));
-    pop.append(dl, E('div', 'op-foot', '눌러서 자세히'));
+    pop.append(dl, E('div', 'op-foot', '누르면 한 일과 할 일이 모두 보여요'));
     pop.hidden = false;
     // 자리 위치에 맞춰(위쪽 자리는 아래로, 아래쪽 자리는 위로) — 사무실 칸 안에서
     const wrap = pop.parentElement.getBoundingClientRect(), a = anchor.getBoundingClientRect();
@@ -347,7 +347,7 @@
       c.append(ul); return c;
     };
     const g = E('div', 'od-grid');
-    g.append(col('하는 일', doing(m, last), '쉬는 중'), col('할 일', upcoming(m, last), '없음'), col('했던 일', history(m, last), '없음'));
+    g.append(col('지금 하는 일', doing(m, last), '쉬는 중이에요'), col('할 일', upcoming(m, last), '정해진 일이 없어요'), col('한 일', history(m, last), '최근 기록이 없어요'));
     box.append(g);
     if (/^https?:\/\//i.test(m.top_card_link || '')) { const a = E('a', 'btn sm', '디스코드에서 열기'); a.href = m.top_card_link; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
   }
@@ -387,7 +387,9 @@
   //   가장 오래 도는 일 = 팀장(지휘) 자리 말풍선 · 그 일이 분야 직원에게 맡긴 보조 에이전트 = 그 직원 자리 말풍선
   //   직원이 아닌 도우미(조사·탐색 등)와 동시에 도는 다른 지휘 일꾼 = 아래 줄 '알바' 자리(모자·앞치마) — 일이 끝나면 자리가 빔
   const AG_LOOK = { alba: { hair: '#4a3426', shirt: '#e9a23b', hat: '#d64545', apron: true, prop: 'cup' } };
+  const helper = (type) => ({ Explore: '찾기 도우미', Plan: '계획 도우미' })[type] || '도우미';   // 보조 에이전트 종류(영어 이름)는 화면에 내지 않음
   const mmss = (s) => s == null ? '' : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분` : s >= 60 ? `${Math.floor(s / 60)}분` : `${s}초`;
+  const since = (s) => s == null ? '' : s < 60 ? '방금 시작' : `${mmss(s)}째`;   // 시작한 지(1분 안이면 '방금')
   let raw = null;
   function withAgents(s) {
     const D = window.barunTasksData; if (!D) return s;
@@ -400,7 +402,7 @@
       else alba.push({ t, what: t.doing || '', role: '지휘 일꾼' });
       for (const a of t.subagents || []) {
         if (a.staff && SPOT[a.type] && !busy.has(a.type)) busy.set(a.type, { t, what: a.what || '' });
-        else alba.push({ t, what: a.what || '', role: a.staff ? a.who : (a.type || '도우미') });
+        else alba.push({ t, what: a.what || '', role: a.staff ? a.who : helper(a.type) });
       }
     });
     const team = (s.team || []).map((m) => {
@@ -408,13 +410,13 @@
       const out = { ...m, ag_queue: m.domain === 'commander' ? queued : 0 };
       if (b) {
         out.state = '🟢 ' + (m.state || '').replace(/^\S+\s*/, '');
-        out.now = `${clip(b.t.title, 30)} · ${mmss(b.t.secs)}째${b.what ? ' · ' + b.what : ''}`;
+        out.now = `${clip(b.t.title, 30)} · ${since(b.t.secs)}${b.what ? ' · ' + b.what : ''}`;
         out.ag_secs = b.t.secs; out.ag_title = b.t.title; out.ag_subs = m.domain === 'commander' ? (b.t.subagents || []).length : 0;
       }
       return out;
     });
     alba.slice(0, 8).forEach((x, i) => team.push({ domain: `alba:${i}`, name: '알바', role: `${x.role} · ${clip(x.t.title, 24)}`, state: '🟢 알바',
-      now: `${clip(x.t.title, 30)} · ${mmss(x.t.secs)}째${x.what ? ' · ' + x.what : ''}`, ag_secs: x.t.secs, ag_title: x.t.title, ag_extra: 'alba', last: {}, next: {} }));
+      now: `${clip(x.t.title, 30)} · ${since(x.t.secs)}${x.what ? ' · ' + x.what : ''}`, ag_secs: x.t.secs, ag_title: x.t.title, ag_extra: 'alba', last: {}, next: {} }));
     return { ...s, team };
   }
   window.barunOfficeAgents = () => { if (raw) render(raw); };
@@ -448,7 +450,7 @@
       sig.hidden = kind === 'idle' || kind === 'paused';
       // 머리 위 말풍선(지금 하는 일·경과·보조 에이전트) · 책상 옆 대기 꼬리표 · 멈춤 표시
       let bub = b.querySelector('.bub'); if (!bub) { bub = E('span', 'bub'); b.append(bub); }
-      bub.textContent = kind === 'busy' && m.ag_secs != null ? `${clip(m.ag_title, 9)} · ${mmss(m.ag_secs)}` : '';   // 디스코드 일 제목 짧게 · 몇 분째
+      bub.textContent = kind === 'busy' && m.ag_secs != null ? `${clip(m.ag_title, 9)} · ${m.ag_secs < 60 ? '방금' : mmss(m.ag_secs)}` : '';   // 디스코드 일 제목 짧게 · 몇 분째
       bub.hidden = !bub.textContent;
       let qt = b.querySelector('.qtag'); if (!qt) { qt = E('span', 'qtag'); b.append(qt); }
       qt.textContent = m.ag_queue ? `대기 ${m.ag_queue}` : ''; qt.hidden = !m.ag_queue;
@@ -459,18 +461,15 @@
     // 목록: 막힘·결재 대기·일하는 중 먼저(사장님이 볼 것부터), 같은 상태는 자리 순
     rows.sort((a, b) => rank[a.kind] - rank[b.kind] || order.indexOf(a.d) - order.indexOf(b.d));
     for (const { d, m, kind, nm, ln } of rows) {
-      const nx = m.next || {};
       const li = E('li'); const row = E('button', 'row'); row.type = 'button'; row.dataset.seat = d; row.setAttribute('aria-pressed', String(sel === d));
       row.onclick = () => select(d);
       row.onmouseenter = () => setHover(d); row.onmouseleave = () => setHover(null);
       const body = E('span', 'row-body');
-      const t1 = E('span', 'row-title'); t1.append(document.createTextNode(short(nm)), E('span', 'badge k-' + kind, STATE_TXT[kind]));
+      const t1 = E('span', 'row-title'); t1.append(E('span', 'nm', short(nm)), E('span', 'badge k-' + kind, STATE_TXT[kind]));
+      if (m.cards) t1.append(E('span', 'row-cards' + (m.urgent ? ' bad' : ''), `할 일 ${m.cards}`));
       const sub = E('span', 'row-sub'); if (ln.k) sub.append(E('b', null, ln.k + ' ')); sub.append(document.createTextNode(ln.t));
       body.append(t1, sub);
-      const right = E('span', 'row-right');
-      right.append(E('span', 'row-meta', (m.ag_queue ? `대기 ${m.ag_queue} · ` : '') + (nx.at ? `다음 ${day(nx.at, s.now)}` : (m.wake ? '이벤트로' : (m.ag_extra === 'alba' ? `알바 · ${mmss(m.ag_secs)}째` : '')))));
-      if (m.cards) right.append(E('span', 'row-cards' + (m.urgent ? ' bad' : ''), `할 일 ${m.cards}`));
-      row.append(avatar(d, 'avatar sm k-' + kind), body, right);
+      row.append(avatar(d, 'avatar sm k-' + kind), body);
       li.append(row); roster.append(li);
     }
     if (keepSeat) roster.querySelector(`.row[data-seat="${CSS.escape(keepSeat)}"]`)?.focus({ preventScroll: true });
@@ -479,14 +478,34 @@
       c.textContent = '';
       for (const [k, lab] of [['busy', '일하는 중'], ['todo', '결재 대기'], ['blocked', '막힘'], ['paused', '멈춤'], ['idle', '쉬는 중']]) if (cnt[k] || k === 'busy') c.append(E('span', 'badge k-' + k, `${lab} ${cnt[k]}`));
       const D = window.barunTasksData;
-      if (D && D.counts && D.counts.run) c.append(E('span', 'badge run', `디스코드 일 ${D.counts.run}`));
+      if (D && D.counts && D.counts.run) c.append(E('span', 'badge run', `맡긴 일 ${D.counts.run}건 진행`));
     }
     paint(); renderDetail();
     if (pop && !pop.hidden && hover) { const a = root.querySelector(`.st[data-seat="${hover}"]`); if (a) showPop(hover, a); }
     if (!timer && !reduce) timer = setInterval(() => { if (document.hidden || !cv || !cv.offsetParent) return; frame++; paint(); }, 260);
   }
   if (darkQ && darkQ.addEventListener) darkQ.addEventListener('change', paint);
-  (() => { const st = document.createElement('style'); st.textContent = '.od-col li .oi, .op-kv .oi { display: inline-flex; margin-right: 5px; color: var(--muted); vertical-align: -1px; } .avatar .ic { width: .9em; height: .9em; }'; document.head.append(st); })();
+  // 2026-11-12 리뉴얼: 목록 줄 모양을 고르게(이름 · 상태 · 할 일 / 지금 하는 일 두 줄까지), 그림 위 글자는 휴대폰에서도 11.5px 이상
+  (() => {
+    const st = document.createElement('style');
+    st.textContent = `
+      .od-col li .oi, .op-kv .oi { display: inline-flex; margin-right: 4px; color: var(--muted); vertical-align: -1px; }
+      .avatar .ic { width: .9em; height: .9em; }
+      #office-roster .row { align-items: flex-start; padding: 8px; min-height: 0; gap: 8px; }
+      #office-roster .row .avatar { margin-top: 2px; }
+      #office-roster .row-body { gap: 2px; }
+      #office-roster .row-title { min-width: 0; flex-wrap: nowrap; }
+      #office-roster .row-title .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #office-roster .row-title .badge, #office-roster .row-cards { flex: none; }
+      #office-roster .row-cards { font-size: 12px; line-height: 20px; padding: 0 8px; }
+      #office-roster .row-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 18px; }
+      @container (min-width: 480px) and (max-width: 760px) { #office-roster > li:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+      .room .st .tag { font-size: 11.5px; line-height: 16px; }
+      .room .st .sig { width: 16px; height: 16px; font-size: 11.5px; }
+      .od-col li { overflow-wrap: anywhere; }
+      @media (max-width: 520px) { .room .st .tag { font-size: 11.5px; padding: 0 4px; line-height: 16px; } .room .st .sig { width: 16px; height: 16px; font-size: 11.5px; } .room .st .bub { display: none; } }`;
+    document.head.append(st);
+  })();
   window.barunOffice = render;
   window.barunOfficeRepaint = paint;
 })();

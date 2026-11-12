@@ -12,7 +12,7 @@
    구조: 왼쪽 메뉴(묶음 5개 · 화면 12개) + 위 막대(지금 화면 이름·전체 상태·맡기기) + 화면. 휴대폰은 아래 탭 막대 + 전체 메뉴 서랍.
    화면을 붙이는 모듈(*.js)은 index.html에 미리 있는 #p-<이름>을 채우고, 'barun:page' 이벤트로 보임·숨김을 안다(탭 덧붙이기·showTab 덮어쓰기 없음). */
 :root {
-  --bg: #f4f5f7; --card: #ffffff; --ink: #17191e; --ink2: #30353d; --sub: #545c69; --muted: #8a919c; --line: #e7e9ed;
+  --bg: #f4f5f7; --card: #ffffff; --ink: #17191e; --ink2: #30353d; --sub: #545c69; --muted: #6b7684; --line: #e7e9ed;   /* 2026-11-12 시인성: 옅은 글자 대비 3.3→4.6 */
   --fill: #eff1f4; --fill2: #f7f8fa; --hover: #f1f3f6; --side: #fbfbfc;
   --blue: #3182f6; --blue-d: #1b64da; --blue-bg: #ebf3fe; --blue-ink: #1b64da;
   --red: #f04452; --red-bg: #fdeeef; --red-ink: #d22030;
@@ -66,7 +66,9 @@ button { font: inherit; color: inherit; }
 .brand b { display: block; font-size: 16px; letter-spacing: -.02em; line-height: 1.2; }
 .brand small { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; }
 .sidebar .ask-btn { margin: 4px 14px 10px; }
-.nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
+.nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }   /* 아래에 메뉴가 더 있음을 흐림으로 */
+.side-close { display: none; margin-left: auto; }
 .nav-g { font-size: 11.5px; font-weight: 700; color: var(--muted); padding: 14px 10px 4px; letter-spacing: .02em; }
 .nav-i { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 10px; height: 38px; border-radius: 10px;
   color: var(--sub); font-size: 14.5px; font-weight: 500; cursor: pointer; }
@@ -116,7 +118,8 @@ main.pages { padding: 8px 28px 72px; }
 @media (max-width: 1023px) {
   .sidebar { transform: translateX(-100%); transition: transform .2s ease; box-shadow: none; width: min(300px, 86vw); }
   .sidebar.open { transform: none; box-shadow: 8px 0 40px rgba(0, 0, 0, .2); }
-  .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 39; }
+  .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 39; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  .side-close { display: inline-grid; }
   .scrim.open { display: block; }
   .shell { margin-left: 0; }
   .topbar { padding: 0 12px 0 8px; gap: 6px; }
@@ -132,7 +135,7 @@ main.pages { padding: 8px 28px 72px; }
   .tb-i { all: unset; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
   .tb-i .ico { width: 22px; height: 22px; }
   .tb-i[aria-current="page"] { color: var(--blue-ink); }
-  .tb-i .nb { position: absolute; top: 7px; left: calc(50% + 6px); }
+  .tb-i .nb { position: absolute; top: 5px; left: calc(50% + 9px); font-size: 10.5px; line-height: 16px; min-width: 16px; padding: 0 4px; box-shadow: 0 0 0 2px var(--card); }
   .tb-i:focus-visible { outline: 2px solid var(--blue); outline-offset: -4px; border-radius: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }
@@ -147,6 +150,14 @@ main.pages { padding: 8px 28px 72px; }
 .more-link { all: unset; margin-left: auto; cursor: pointer; color: var(--blue-ink); font-size: 13.5px; font-weight: 600; padding: 4px 6px; border-radius: 8px; }
 .more-link:hover { background: var(--blue-bg); } .more-link:focus-visible { outline: 2px solid var(--blue); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.grid2.top { align-items: start; }
+@media (hover: hover) { .job .run-now { opacity: .55; } .job:hover .run-now, .job .run-now:focus-visible { opacity: 1; } }
+.chain .seg { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; max-width: 100%; }
+.chain .seg .pill { white-space: normal; }
+.log li.wl { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px 8px; align-items: baseline; }
+.log li.wl .wt { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 650; }
+.log li.wl .wa { color: var(--blue-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 560px) { .log li.wl { grid-template-columns: auto minmax(0, 1fr); } .log li.wl > span:last-child { grid-column: 1 / -1; } }   /* 짧은 카드가 옆 카드 높이만큼 늘어나 비어 보이지 않게 */
 @media (max-width: 1100px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 560px) { .card { padding: 16px 14px; border-radius: 14px; } }
 
@@ -167,19 +178,21 @@ main.pages { padding: 8px 28px 72px; }
 .stat.ok .k::before { background: var(--st-good); } .stat.warn .k::before { background: var(--st-warn); } .stat.bad .k::before { background: var(--st-crit); } .stat.run .k::before { background: var(--st-run); }
 .stat .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 24px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.3; margin-top: 2px; }
 .stat .v small { font-size: 13.5px; font-weight: 600; margin-left: 2px; color: var(--sub); }
-.stat .d { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .d { color: var(--muted); font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }   /* 2026-11-12 잘림 → 두 줄까지 */
 .stat.warn .v { color: var(--orange-ink); } .stat.bad .v { color: var(--red); } .stat.run .v { color: var(--blue); }
 @media (max-width: 480px) { .stat { padding: 10px 12px; min-height: 72px; } .stat .v { font-size: clamp(17px, 5.4vw, 21px); } .hero h2 { font-size: 20px; } }
 
 /* 버튼 */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 10px; padding: 0 16px; min-height: 42px;
-  font-size: 14.5px; font-weight: 600; cursor: pointer; background: var(--fill); color: var(--ink2); text-decoration: none; white-space: nowrap; }
+  font-size: 14.5px; font-weight: 600; cursor: pointer; background: var(--fill); color: var(--ink); text-decoration: none; white-space: nowrap; }
+/* 버튼 체계(2026-11-12 리뉴얼 — 한 줄에 주 행동 하나): .primary 주 행동(파랑) · .weak 두 번째(옅은 파랑) · 기본 .btn 보조(회색 칸)
+   · .ghost 셋째(테두리만, 글자 버튼처럼 보이지 않게) · .danger 지우기·되돌릴 수 없는 일(빨강). 글자만 있는 링크는 .more-link. */
 .btn:hover { filter: brightness(.97); text-decoration: none; }
 .btn:disabled { opacity: .5; cursor: progress; }
 .btn.primary { background: var(--blue); color: #fff; } .btn.primary:hover { background: var(--blue-d); filter: none; }
 .btn.weak { background: var(--blue-bg); color: var(--blue-ink); }
 .btn.danger { background: var(--red-bg); color: var(--red-ink); }
-.btn.ghost { background: transparent; color: var(--sub); }
+.btn.ghost { background: transparent; color: var(--ink2); box-shadow: inset 0 0 0 1px var(--line); }
 .btn.ghost:hover { background: var(--hover); }
 .btn.sm { min-height: 34px; padding: 0 12px; font-size: 13.5px; border-radius: 9px; }
 .btn.xs { min-height: 28px; padding: 0 10px; font-size: 12.5px; border-radius: 8px; }
@@ -353,6 +366,9 @@ dialog#ask-dlg::backdrop { background: rgba(0, 0, 0, .4); }
 .todo .t { font-weight: 600; font-size: 16px; color: var(--ink); cursor: pointer; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .todo.open .t { -webkit-line-clamp: unset; display: block; }
 .todo .what { margin-top: 6px; background: var(--fill2); border-radius: 10px; padding: 8px 12px; font-size: 14px; color: var(--ink2); }
+.todo:not(.open) .card-facts li:nth-child(n+3), .todo:not(.open) .effects, .todo.open .facts-more { display: none; }
+.todo .facts-more { margin: -4px 0 4px 20px; font-size: 13px; padding: 2px 4px; }
+.todo .btns .btn.ghost { color: var(--sub); }
 .todo.hl { background: var(--blue-bg); border-radius: 12px; padding-left: 10px; padding-right: 10px; }
 .preview .row-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .preview .row-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; }
@@ -535,36 +551,35 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .todo-fil { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 /* 절감 장부 */
 /* 절감 장부 — 사람 시간(보라)·AI 시간(청록) 두 줄기 (2026-10-25 사장님 "훨씬 더 드라마틱하게") */
-:root { --sv-h: #7c4dff; --sv-a: #0e9f8f; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sv-h: #8a68ff; --sv-a: #14a291; } }
+:root { --sv-h: var(--blue); --sv-a: #0e9f8f; }   /* 사람 = 브랜드 파랑, AI = 청록(2026-11-12 리뉴얼) */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sv-h: var(--blue); --sv-a: #2fc4b2; } }
 .sv { display: grid; gap: 14px; min-width: 0; }
-.sv-hero { position: relative; overflow: hidden; border-radius: 22px; padding: 28px 28px 22px; color: #fff;
-  background: radial-gradient(120% 140% at 0% 0%, #3b1f8f 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #08584f 0%, transparent 55%), #12131c; }
-.sv-kick { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, .72); letter-spacing: .01em; }
+.sv-hero { position: relative; overflow: hidden; border-radius: var(--r); padding: 24px 24px 20px; color: var(--ink); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.sv-kick { font-size: 14px; font-weight: 600; color: var(--sub); }
 .sv-big { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); gap: 28px; margin: 14px 0 18px; align-items: stretch; }
-.sv-big > i { background: rgba(255, 255, 255, .14); }
+.sv-big > i { background: var(--line); }
 .sv-n .lab { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .sv-n .lab b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.sv-n.h .lab b { background: #a48bff; } .sv-n.a .lab b { background: #3fd6c3; }
+.sv-n.h .lab b { background: var(--sv-h); } .sv-n.a .lab b { background: var(--sv-a); }
 .sv-n .num { font-size: clamp(40px, 6vw, 76px); font-weight: 850; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sv-n .num small { font-size: .42em; font-weight: 700; letter-spacing: -.01em; margin: 0 .18em 0 .06em; opacity: .85; }
-.sv-n.h .num { color: #c9b8ff; } .sv-n.a .num { color: #7ff0df; }
-.sv-n .eq { font-size: 14px; color: rgba(255, 255, 255, .82); line-height: 1.55; }
-.sv-n .eq b { color: #fff; }
-.sv-pace { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, .07); font-size: 14px; color: rgba(255, 255, 255, .86); }
-.sv-pace b { color: #fff; font-size: 16px; } .sv-pace .tag { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 8px; background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .8); }
+.sv-n.h .num { color: var(--sv-h); } .sv-n.a .num { color: var(--sv-a); }
+.sv-n .eq { font-size: 14px; color: var(--sub); line-height: 1.55; }
+.sv-n .eq b { color: var(--ink); }
+.sv-pace { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 14px 16px; border-radius: var(--r-sm); background: var(--fill2); font-size: 14px; color: var(--sub); }
+.sv-pace b { color: var(--ink); font-size: 15px; } .sv-pace .tag { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--fill); color: var(--sub); }
 .sv-mini { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-.sv-mini > div { border-radius: 12px; padding: 10px 14px; background: rgba(255, 255, 255, .05); font-size: 13px; color: rgba(255, 255, 255, .74); }
-.sv-mini b { color: #fff; font-size: 15px; font-variant-numeric: tabular-nums; }
-.sv-mini .h { color: #c9b8ff; } .sv-mini .a { color: #7ff0df; }
+.sv-mini > div { border-radius: var(--r-sm); padding: 10px 14px; background: var(--fill2); font-size: 13px; color: var(--sub); }
+.sv-mini b { color: var(--ink); font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.sv-mini .h { color: var(--sv-h); font-weight: 600; } .sv-mini .a { color: var(--sv-a); font-weight: 600; }
 @media (max-width: 760px) {
   .sv-hero { padding: 22px 18px 18px; border-radius: 18px; }
   .sv-big { grid-template-columns: minmax(0, 1fr); gap: 16px; } .sv-big > i { height: 1px; }
   .sv-mini { grid-template-columns: minmax(0, 1fr); }
 }
 /* 날마다 */
-.sv-chart { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: 220px auto; gap: 0 8px; margin-top: 26px; }
-.sv-y { position: relative; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sv-chart { position: relative; display: grid; grid-template-columns: 46px minmax(0, 1fr); grid-template-rows: 220px auto; gap: 0 8px; margin-top: 26px; }
+.sv-y { position: relative; font-size: 11.5px; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sv-y span { position: absolute; right: 0; transform: translateY(50%); }
 .sv-plot { position: relative; border-bottom: 1px solid var(--axis); display: flex; align-items: flex-end; gap: 4px; padding: 0 2px; }
 .sv-plot .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--grid); pointer-events: none; }
@@ -574,7 +589,8 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .sv-day b.h { background: var(--sv-h); } .sv-day b.a { background: var(--sv-a); }
 .sv-day b em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10.5px; color: var(--ink2); white-space: nowrap; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
 .sv-x { grid-column: 2; display: flex; gap: 4px; padding: 6px 2px 0; font-size: 11.5px; color: var(--muted); }
-.sv-x span { flex: 1 1 0; text-align: center; min-width: 0; }
+.sv-x span { flex: 1 1 0; text-align: center; min-width: 0; white-space: nowrap; overflow: hidden; }
+@media (max-width: 560px) { .sv-x span:nth-child(even) { visibility: hidden; } }   /* 좁으면 날짜를 하나 걸러(10/·30 두 줄로 깨지던 것) */
 .sv-legend { display: flex; gap: 14px; margin-top: 4px; font-size: 12.5px; color: var(--sub); flex-wrap: wrap; }
 .sv-legend span { display: inline-flex; align-items: center; gap: 6px; } .sv-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .sv-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--card); box-shadow: var(--pop); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; white-space: nowrap; }
@@ -607,14 +623,12 @@ table.rep th { background: var(--fill2); color: var(--sub); font-weight: 600; te
 table.rep td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 table.rep td.long { white-space: normal; min-width: 240px; max-width: 420px; }
 table.rep td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-table.rep td.ed { background: #fff8db; padding: 3px 6px; }
-.rep-in { font: inherit; width: 100%; min-width: 90px; padding: 5px 8px; border: 1px solid #e8d48a; border-radius: 8px; background: var(--card); color: var(--ink); }
+table.rep td.ed { background: color-mix(in srgb, var(--orange-bg) 70%, var(--card)); padding: 3px 6px; }   /* 고칠 수 있는 칸(노란 칸) — 토큰으로 다크 모드도 */
+.rep-in { font: inherit; width: 100%; min-width: 90px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--line)); border-radius: 8px; background: var(--card); color: var(--ink); }
 .rep-in:focus { outline: 2px solid var(--blue); border-color: transparent; }
 .rep-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: var(--fill2); }
 .rep-bar[hidden] { display: none; }
 .rep-out { font-size: 13px; white-space: pre-wrap; flex-basis: 100%; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) table.rep td.ed { background: #3a3215; } }
-:root[data-theme="dark"] table.rep td.ed { background: #3a3215; }
 
 /* 매출분석 그래프 — 계열색: 네이버=분류 3번·쿠팡=2번·합계=1번(dataviz 검사기 통과, 어두운 화면은 따로 고른 값) */
 #rep-card { --rep-s1: #2a78d6; --rep-s2: #eb6834; --rep-s3: #1baf7a; }
@@ -924,11 +938,60 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 @media(max-width: 760px) { #p-health .sys { grid-template-columns: 1fr; } }
 #connection-notice { margin-bottom: 16px; }
 @media(max-width: 600px) { .health { width: auto; height: 32px; padding: 0 10px; } .health .htxt { display: inline; font-size: 12px; max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #p-health .stats { grid-template-columns: 1fr; } .nav-search input { font-size: 16px; } }
+
+/* ── 움직임·마우스 반응(2026-11-12 사장님 "인터랙티브한 애니메이션·마우스 반응, 시인성·사용성") — 값은 dashboard/motion.js가 붙임 ──
+   부드러운 기본 곡선 하나(--ease), 누를 때 살짝 작아짐, 커서를 따라가는 옅은 빛(.lit), 화면 들어올 때 카드가 차례로(.enter), 숫자 바뀜(.bump), 불러오는 중(.ld).
+   '동작 줄이기'면 모두 끔(맨 아래). */
+:root { --ease: cubic-bezier(.2, .8, .2, 1); --ease-out: cubic-bezier(.16, 1, .3, 1); --glow: color-mix(in srgb, var(--blue) 10%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .stat, .nav-i, .tb-i, .chip, .st-chip, .st-link, .more-link, .icon-btn, .health, .ac, .card {
+    transition: background-color .18s var(--ease), color .18s var(--ease), box-shadow .22s var(--ease), transform .18s var(--ease), border-color .18s var(--ease), filter .18s var(--ease); }
+  .btn:active:not(:disabled), .stat:active, .nav-i:active, .tb-i:active, .icon-btn:active, .health:active, .st-chip:active, .chip:active, .st-link:active { transform: scale(.97); }
+  /* 누를 수 있는 카드·숫자 칸은 마우스를 올리면 살짝 떠오름 */
+  @media (hover: hover) {
+    .stat:hover, .st-link:hover, .ac:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(16, 24, 40, .07), inset 0 0 0 1px var(--line); }
+    .btn.primary:hover:not(:disabled) { box-shadow: 0 6px 16px color-mix(in srgb, var(--blue) 28%, transparent); }
+  }
+  /* 커서를 따라가는 옅은 빛 */
+  .lit:is(.stat, .btn:not(.primary), .ac, .st-link, .nav-i, .card) { background-image: radial-gradient(220px circle at var(--mx, -999px) var(--my, -999px), var(--glow), transparent 70%); }
+  .card.lit { background-image: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--blue) 4%, transparent), transparent 70%); }
+  /* 화면 들어올 때 — 카드가 차례로 떠오름(9번째부터는 같이) */
+  .page.enter > * { animation: rise .42s var(--ease-out) both; }
+  .page.enter > *:nth-child(2) { animation-delay: .035s; } .page.enter > *:nth-child(3) { animation-delay: .07s; }
+  .page.enter > *:nth-child(4) { animation-delay: .105s; } .page.enter > *:nth-child(5) { animation-delay: .14s; }
+  .page.enter > *:nth-child(6) { animation-delay: .175s; } .page.enter > *:nth-child(7) { animation-delay: .21s; } .page.enter > *:nth-child(n+8) { animation-delay: .24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  /* 숫자가 바뀌면 잠깐 강조 */
+  .bump { animation: bump .4s var(--ease); }
+  @keyframes bump { 40% { transform: translateY(-2px); color: var(--blue); } }
+  /* 불러오는 중 — 글자에 지나가는 빛 */
+  .ld { background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 40%, var(--axis) 50%, var(--muted) 60%, var(--muted) 100%) 0 0 / 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent !important; animation: shine 1.4s linear infinite; }
+  @keyframes shine { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  /* 알림창 — 아래에서 올라옴 */
+  #toast:not([hidden]) { animation: toast .32s var(--ease-out); }
+  @keyframes toast { from { opacity: 0; transform: translate(-50%, 12px) scale(.98); } }
+  /* 접기·펼치기 */
+  details[open] > :not(summary) { animation: unfold .24s var(--ease-out); }
+  @keyframes unfold { from { opacity: 0; transform: translateY(-4px); } }
+  /* 일하는 중 점 — 살아 있는 느낌(숨쉬듯) */
+  .dot.run, .tl .dot.run { animation: breathe 1.8s ease-in-out infinite; }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--st-run) 16%, transparent); } }
+  /* 할 일·맡긴 일 줄 — 마우스가 있는 줄 */
+  @media (hover: hover) { .mine > li, .tl > li { transition: background-color .15s var(--ease); border-radius: 10px; }
+    .mine > li:hover, .tl > li:hover { background: color-mix(in srgb, var(--hover) 80%, transparent); } }
+  /* 메뉴 — 지금 화면 표시가 부드럽게 */
+  .nav-i[aria-current="page"] { box-shadow: inset 3px 0 0 var(--blue); }
+  /* 표 줄 — 마우스가 있는 줄 */
+  @media (hover: hover) { table tbody tr:hover > td { background: color-mix(in srgb, var(--hover) 70%, transparent); } }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .ld { color: var(--muted) !important; background: none; } }
 </style>
 </head>
 <body>
 <aside class="sidebar" id="side" aria-label="메뉴">
-  <div class="brand"><span class="logo" aria-hidden="true">바</span><span><b>바른청년</b><small>운영 현황</small></span></div>
+  <div class="brand"><span class="logo" aria-hidden="true">바</span><span><b>바른청년</b><small>운영 현황</small></span>
+    <button class="icon-btn side-close" id="side-close" type="button" aria-label="메뉴 닫기"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <button class="btn primary sm ask-btn" type="button" data-open-ask><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 에이전트에게 맡기기</button>
   <label class="nav-search"><span class="sr-only">메뉴 찾기</span><input id="nav-search" type="search" placeholder="메뉴 찾기" aria-label="메뉴 찾기"></label>
   <nav class="nav" id="nav" aria-label="주요 메뉴"></nav>
@@ -960,13 +1023,13 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
       <div class="home-cols">
         <div class="stack">
           <div class="card" id="mine-sec">
-            <div class="card-h"><h2>내 차례</h2><span class="badge" id="mine-n" hidden></span><button class="more-link" type="button" data-goto="todo">할 일 전체 ›</button>
-              <span class="desc">급한 것부터 · 디스코드와 같이 처리</span></div>
+            <div class="card-h"><h2>내 차례</h2><span class="badge" id="mine-n" hidden></span><button class="more-link" type="button" data-goto="todo">전체 보기 ›</button>
+              <span class="desc">급한 것부터, 디스코드와 같이 처리돼요</span></div>
             <ul class="mine" id="todo-preview"></ul>
           </div>
           <div class="card" id="office-sec">
             <div class="card-h"><h2>사무실</h2><span class="office-count" id="office-count"></span>
-              <span class="desc">누르면 한 일·할 일</span></div>
+              <span class="desc">누르면 한 일과 할 일이 보여요</span></div>
             <div id="office"></div>
             <div id="office-detail" hidden></div>
           </div>
@@ -988,12 +1051,12 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
     <section class="page" id="p-todo" aria-label="할 일" hidden>
       <div class="card" id="todo">
         <div class="card-h"><h2>할 일 카드</h2>
-          <span class="act"><button class="btn sm" data-act="review" type="button">끝난 것 다시 확인</button><button class="btn sm ghost" data-act="refresh" type="button">디스코드 카드 새로고침</button></span>
-          <span class="desc">#할-일과 같은 카드</span></div>
+          <span class="act"><button class="btn sm ghost" data-act="review" type="button">끝난 것 다시 확인</button><button class="btn sm ghost" data-act="refresh" type="button">디스코드와 맞추기</button></span>
+          <span class="desc">디스코드 #할-일과 같은 카드예요</span></div>
         <div id="todo-list"></div>
       </div>
       <div class="card" id="board-sec">
-        <div class="card-h"><h2>일 보드</h2><span class="desc">모든 일을 상태별로</span></div>
+        <div class="card-h"><h2>일 보드</h2><span class="desc">모든 일을 상태별로 모았어요</span></div>
         <div class="board" id="board"></div>
       </div>
     </section>
@@ -1015,13 +1078,13 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 
     <section class="page" id="p-work" aria-label="회차·허브" hidden>
       <div class="card" id="jobs-sec">
-        <div class="card-h"><h2>자동작업</h2><span class="desc">대기열(barund)이 차례대로 실행</span></div>
+        <div class="card-h"><h2>자동작업</h2><span class="desc">대기열이 차례대로 실행해요</span></div>
         <div id="fails24-box" hidden><div class="group-h">최근 24시간 실패</div><ul class="log" id="fails24"></ul></div>
         <div id="barund-info"></div>
         <div id="jobs"></div>
       </div>
       <div class="card" id="hub-sec">
-        <div class="card-h"><h2>이벤트 허브</h2><span class="desc">바뀌면 바로 처리 · 최근 24시간</span></div>
+        <div class="card-h"><h2>이벤트 허브</h2><span class="desc">바뀌면 바로 처리해요 · 최근 24시간</span></div>
         <div class="hub-health" id="hub-health"></div>
         <div class="hub-counts" id="hub-counts"></div>
         <ul class="flow" id="hub-flow"></ul>
@@ -1034,23 +1097,23 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
 
     <section class="page" id="p-activity" aria-label="활동 기록" hidden>
       <div class="card">
-        <div class="card-h"><h2>에이전트 활동</h2><span class="desc">막대는 회차, 점은 한 일</span></div>
+        <div class="card-h"><h2>에이전트 활동</h2><span class="desc">누가 언제 무엇을 했는지 시간 순서로 봐요. 막대는 회차, 점은 그때 한 일이에요.</span></div>
         <div class="act-head" id="act-controls"></div>
         <div id="act-chart"><div id="act-tip" hidden></div></div>
         <div id="act-table" hidden></div>
       </div>
-      <div class="card"><div class="card-h"><h2>선택한 항목</h2></div><div id="act-detail"></div></div>
+      <div class="card"><div class="card-h"><h2>고른 항목</h2></div><div id="act-detail"></div></div>
     </section>
 
     <section class="page" id="p-records" aria-label="일지·알림" hidden>
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>오늘 작업 일지</h2></div><ul class="log" id="worklog"></ul></div>
-        <div class="card"><div class="card-h"><h2>현재 상태</h2><span class="desc">STATUS.md</span></div><div class="md" id="status"></div></div>
+        <div class="card"><div class="card-h"><h2>현재 상태</h2><span class="desc">매일 밤 정리하는 상황 메모예요</span></div><div class="md" id="status"></div></div>
       </div>
       <div class="card"><div class="card-h"><h2>알림 기록</h2></div><ul class="log" id="events"></ul></div>
       <div class="card" id="invoices"><div class="card-h"><h2>인보이스</h2><button class="more-link" type="button" data-goto="vat">세금 환급 화면 ›</button><span class="desc">메일로 받은 PDF · 독일 19%는 세금 환급 화면에 모여요</span></div><ul class="log" id="inv"></ul></div>
-      <div class="grid2">
-        <div class="card" id="git-sec"><div class="card-h"><h2>git 기록</h2></div><div id="git"></div></div>
+      <div class="grid2 top">
+        <div class="card" id="git-sec"><div class="card-h"><h2>코드 기록</h2></div><div id="git"></div></div>
         <div class="card" id="backup-sec"><div class="card-h"><h2>백업</h2></div><div id="backup"></div></div>
       </div>
     </section>
@@ -1069,9 +1132,9 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   </form>
 </dialog>
 
-<script src="config.js?v=d8703360e8"></script>
-<script src="transport.js?v=d8703360e8"></script>
-<script src="navigation.js?v=d8703360e8"></script>
+<script src="config.js?v=eb461015d0"></script>
+<script src="transport.js?v=eb461015d0"></script>
+<script src="navigation.js?v=eb461015d0"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1120,6 +1183,27 @@ function showLogin() {
   $l('lg-id').focus();
 }
 function logout() { try { localStorage.removeItem('barun.token'); } catch (e) { /* 무시 */ } TOKEN = ''; location.reload(); }
+// 영어 코드·내부 이름 → 화면 말(2026-11-12 리뉴얼 — 화면마다 따로 두던 표를 한 곳에). 모듈은 window.koLabel(값)만 쓴다. 모르는 값은 그대로.
+const KO_LABEL = {
+  coupang: '쿠팡', naver: '네이버', CANCELED_BY_NOPAYMENT: '미입금 취소', PURCHASE_DECIDE: '구매확정', PAYED: '결제완료', ACCEPT: '결제완료', INSTRUCT: '상품준비중', PLACE: '발주확인',
+  DEPARTURE: '출고', DELIVERING: '배송 중', DELIVERED: '배송완료', FINAL_DELIVERY: '배송완료', NONE_TRACKING: '송장 없이 배송', PURCHASE_DECIDED: '구매확정', CANCELED: '취소됨',
+  CANCEL: '취소', CANCEL_REQUEST: '취소요청', RETURN: '반품', RETURNED: '반품됨', RETURNS_COMPLETED: '반품완료', RETURNS_UNCHECKED: '반품 접수', RETURN_REQUEST: '반품요청',
+  EXCHANGE: '교환', EXCHANGE_REQUEST: '교환요청', DISPATCHED: '발송', CANCEL_DONE: '취소완료', CANCEL_REJECT: '취소거부', RETURN_DONE: '반품완료', RETURN_REJECT: '반품거부',
+  EXCHANGE_DONE: '교환완료', EXCHANGE_REJECT: '교환거부', ADMIN_CANCEL: '직권취소', ADMIN_CANCEL_DONE: '직권취소', COLLECT_DONE: '수거완료', COLLECTING: '수거 중',
+  PURCHASE_DECISION_REQUEST: '구매확정 요청', VENDOR_WAREHOUSE_CONFIRM: '입고 확인', RELEASE_STOP_UNCHECKED: '출고중지 요청', OUTOFSTOCK: '품절', ONSALE: '판매 중', SUSPENSION: '판매중지',
+  HANJIN: '한진택배', CJGLS: 'CJ대한통운', EPOST: '우체국택배', LOTTE: '롯데택배', LOGEN: '로젠택배', ACIEXPRESS: 'ACI', USPS: 'USPS', UPS: 'UPS', DHL: 'DHL', FEDEX: 'FedEx',
+  paid: '결제됨', blocked: '멈춤', failed: '실패', ready: '확인 중', pending: '대기', later: '나중에', new: '새로', done: '끝', open: '열림', resolved: '끝남', waiting_human: '사람 차례',
+  hoottown: '훗타운', postgo: '포스트고', iporter: '아이포터', malltail: '몰테일', postmall: '포스트몰', prohealth: '프로헬스', amazon: '아마존', amazonjp: '아마존 일본',
+  amazonit: '아마존 이탈리아', amazonde: '아마존 독일', chewy: 'Chewy', doctormurray: '닥터머레이', iherb: '아이허브',
+  'prohealth.com': '프로헬스', aponeo: '아포네오', 'aponeo.de': '아포네오', 'apone.de': '아포네오', atida: 'Atida', 'atida.fr': 'Atida', 'chewy.com': 'Chewy', 'amazon.com': '아마존',
+  'amazon.co.jp': '아마존 일본', shopapotheke: '샵 아포테케', 'shop-apotheke.com': '샵 아포테케', salvati: '살바티', rosehip: '로즈힙 바이탈', healthomart: 'HealthOmart',
+};
+function koLabel(t) {
+  const v = String(t == null ? '' : t).trim();
+  if (Object.prototype.hasOwnProperty.call(KO_LABEL, v)) return KO_LABEL[v];
+  return v.replace(/\b[A-Z][A-Z_]{3,}\b/g, (m) => KO_LABEL[m] || m);
+}
+window.koLabel = koLabel;
 function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); } t.textContent = noEmoji(msg); t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000); }
 async function act(body, btn) {
   if (body.action === 'reject' && !confirm('거절할까요?')) return;
@@ -1154,8 +1238,8 @@ function failWhy(raw) {
   const w = !t ? '이유가 기록되지 않았어요 · 아래 회차 기록을 봐 주세요'
     : /로그인|권한|401|403/.test(t) ? '로그인이 풀렸거나 권한이 없어요'
     : /\b50[234]\b|응답하지 않|timed? ?out|시간 초과|Timeout/i.test(t) ? '상대 서버가 잠깐 응답하지 않았어요(보통 저절로 풀려요)'
-    : /HTTP 404/.test(t) ? '사이트 주소를 찾지 못했어요(사이트가 바뀌었을 수 있어요)'
-    : /JSON 아님|JSONDecode/.test(t) ? '사이트가 예상과 다른 화면을 줬어요(로그인 화면일 수 있어요)'
+    : /HTTP 404/.test(t) ? '사이트 주소를 찾지 못했어요. 주소가 바뀌었는지 확인해 주세요'
+    : /JSON 아님|JSONDecode/.test(t) ? '사이트가 다른 화면을 보여 줬어요. 로그인이 풀렸는지 봐 주세요'
     : /(?:Attribute|Type|Name|Key|Index|Value|Syntax|Import)Error|Traceback/.test(t) ? '프로그램 오류예요 · 코드를 고쳐야 해요'
     : /^(?:rc=|종료코드 )[1-9]/.test(t) ? '프로그램이 오류로 끝났어요 · 회차 기록을 봐 주세요'
     : /Connection|urlopen|네트워크|연결/i.test(t) ? '인터넷·서버 연결이 끊겼어요' : t.split(' · ')[0].slice(0, 80);
@@ -1169,8 +1253,9 @@ function failLine(tag, head, raw) {   // 머리 · 쉬운 이유 + [원문] 접�
 const KIND_KO = { launchd: '프로그램', agent: '에이전트', 'claude-desktop': '데스크톱 앱', 'agent-pending': '이전 대기', retired: '그만 씀', external: '바른청년 밖' };
 function chip(text, cls) { return el('span', 'badge ' + (cls || ''), text); }
 const relDay = (iso, now) => !iso ? '' : (iso.slice(0, 10) === (now || '').slice(0, 10) ? iso.slice(11, 16) : iso.slice(5, 10).replace('-', '/') + ' ' + iso.slice(11, 16));
+const usd = (x) => '$' + (Number(x) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // $2,392.85
 const durK = (x) => { x = Math.round(x || 0); return x >= 3600 ? `${Math.floor(x / 3600)}시간 ${Math.floor(x % 3600 / 60)}분` : x >= 60 ? `${Math.floor(x / 60)}분` : `${x}초`; };
-const dur = (s) => s == null ? '' : s >= 86400 ? `${Math.floor(s / 86400)}일` : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분` : s >= 60 ? `${Math.floor(s / 60)}분` : `${s}초`;
+const dur = (s) => s == null ? '' : s === 0 ? '방금' : s >= 86400 ? `${Math.floor(s / 86400)}일` : s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.floor(s % 3600 / 60)}분` : s >= 60 ? `${Math.floor(s / 60)}분` : `${s}초`;
 
 // ── 메뉴·화면 ───────────────────────────────
 const P = (d) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -1193,7 +1278,7 @@ const ICON = {
   savings: P('M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM14.8 9.2c-.4-1-1.5-1.7-2.8-1.7-1.6 0-2.8.9-2.8 2.1 0 2.8 5.6 1.4 5.6 4.3 0 1.2-1.2 2.1-2.8 2.1-1.4 0-2.5-.7-2.9-1.8M12 6v1.5M12 16.5V18'),
   activity: P('M3 12h4l3-8 4 16 3-8h4'),
   records: P('M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h10M9 8h5'),
-  more: P('M5 12h.01M12 12h.01M19 12h.01'),
+  more: P('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'),
 };
 
 // ── 공용 아이콘(2026-10-25 사장님: "이모지 최소화, 다 SVG 아이콘으로") ─────────────
@@ -1234,6 +1319,7 @@ const ico = (name, cls) => IC[name] ? `<svg class="ic${cls ? ' ' + cls : ''}" vi
 const dot = (tone) => `<span class="dot ${tone || ''}" aria-hidden="true"></span>`;
 const EMOJI_RE = /(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{24C2}\u{3030}\u{303D}\u{3297}\u{3299}][\u{FE0F}\u{200D}]?)+\s?/gu;
 const noEmoji = (t) => String(t ?? '').replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+window.ico = ico; window.noEmoji = noEmoji; window.IC = IC;   // 2026-11-12: 모듈들이 window.ico·noEmoji를 찾는데 붙어 있지 않아 모듈 화면의 아이콘이 비고 이모지가 그대로 나오던 것
 Object.assign(window, { IC, ico, dot, noEmoji });
 // [이름, 글, 그림, 숫자 표시, 설명]
 ICON.health = ICON.work;
@@ -1332,6 +1418,7 @@ $('nav-search').addEventListener('input', e => {
   document.querySelectorAll('#nav .nav-g').forEach(g => { let n = g.nextElementSibling, any = false; while (n && !n.classList.contains('nav-g')) { if (!n.hidden) any = true; n = n.nextElementSibling; } g.hidden = !any; });
 });
 $('scrim').onclick = () => drawer(false);
+$('side-close').onclick = () => drawer(false);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('side').classList.contains('open')) drawer(false);
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) { e.preventDefault(); openAsk(); }
@@ -1346,7 +1433,8 @@ function showTab(name, push = true) {
   document.title = name === 'home' ? '바른청년 운영 현황' : `${PAGES[name].label} · 바른청년`;
   try { localStorage.setItem('barun.tab', name); localStorage.setItem(seenKey(name), String(Date.now())); } catch (e) { /* 무시 */ }
   document.querySelectorAll(`.nav-i[data-tab="${name}"] .nb.new`).forEach((n) => { n.hidden = true; });
-  const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
+  const more = $('tb-more'); if (more) { more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
+    if (MOBILE.includes(name)) more.removeAttribute('aria-current'); else more.setAttribute('aria-current', 'page'); }   // 아래 막대에 없는 화면도 어디 있는지 보이게
   if (push && location.hash.split('?')[0] !== '#' + name) history.replaceState(null, '', '#' + name);   // '#data?…' = 데이터 탭 보기 상태(data.js)
   drawer(false);
   { const nv = $('nav'), a = nv.querySelector('[aria-current="page"]');   // scrollIntoView는 화면 밖 서랍(휴대폰)에서 문서까지 밀 수 있어 메뉴 안에서만
@@ -1390,6 +1478,30 @@ function clipBox(box) {
   b.onclick = () => { if (clipOpen.has(id)) clipOpen.delete(id); else clipOpen.add(id); clipBox(box); };
 }
 // 현재 상태(STATUS.md)의 파일 경로(`data/worklog/….md`·`jobs/run_agent.sh`)는 사장님께 뜻이 없어 걷음(2026-11-06 UX 검토) — 원문은 git에
+// 화면 글 정리 한 곳(2026-11-12 리뉴얼 — 할 일 카드·주문 경로·상품 발굴이 따로 두던 것을 합침): 이모지·영어 코드(koLabel)·명령·서버 경로·주소를
+// 사람 말로. strict = 내부 이름(auto-*, snake_case, .py)까지 걷음(주문 경로처럼 서버 설명이 그대로 오는 화면). 원문은 접어 둔 '근거'·title에.
+function plainText(t, opt) {
+  let s = koLabel(noEmoji(t)).replace(/`/g, '');
+  s = s.replace(/`?(?:python3?|\S*venv\/bin\/python)\s+(?:-W ignore\s+)?(?:-m\s+)?[\w./-]+(?:\s+[^\s·,]+){0,3}`?/g, '명령')
+    .replace(/(?:\/(?:Users|private|tmp|var)\/|~\/)[^\s,)'"]+/g, '파일')
+    .replace(/https?:\/\/(?:www\.)?([^\s/]+)\S*/g, '$1')
+    .replace(/(?:\b[A-Z0-9][\w-]*\s+)?proof data required/gi, '쿠팡이 증빙 자료를 요구함').replace(/NullPointerException/g, '쿠팡 등록 오류')
+    .replace(/\s+[—–]\s+/g, ' · ').replace(/\s+-\s+(?=\S)/g, ' · ')
+    .replace(/(\d+)초(가|는|를)?/g, (m, n, j) => (+n >= 60 ? `${Math.round(n / 60)}분${j ? { 가: '이', 는: '은', 를: '을' }[j] : ''}` : m));   // 358초 → 6분
+  if (opt && opt.strict) {
+    s = s.replace(/\b(?:pricing|barun|auto|ops|dashboard|notify|core|jobs|config|tools|autoimprove|docs|clients)\/[\w./-]*\w/g, '')   // 코드 위치
+      .replace(/\b[a-z_]+\.[A-Z_]{3,}\b/g, '')                                              // orderedit.EDITABLE
+      .replace(/(?:커밋\s*)?\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,12}\b/g, '')        // 커밋·사안 번호(16진수)
+      .replace(/\bauto-[a-z]+\b/g, '자동').replace(/\b(?:[\w-]+\/)*[\w-]+\.(?:py|json|jsonl|toml|sh|md)\b\s*/g, '')
+      .replace(/\b[a-z]+(?:_[a-z]+)+(?:으로|로|를|을|이|가|에서|의)?/g, '').replace(/\bnew 상태/g, '새 상태');
+  } else {
+    s = s.replace(/\b(?:[\w-]+\/)+([\w-]+\.(?:py|json|jsonl|toml|sh|md))\b/g, '$1');
+  }
+  return s.replace(/\(\s*(?:[·,]\s*)*\)/g, '').replace(/\(\s*[·,]\s*/g, '(').replace(/\s*[·,]\s*\)/g, ')')
+    .replace(/(?:\s*·\s*){2,}/g, ' · ').replace(/^\s*·\s*|\s*·\s*$/g, '').replace(/\s{2,}/g, ' ').replace(/\s+([,.)])/g, '$1').trim();
+}
+window.plainText = plainText;
+const tidy = (t) => plainText(t);
 const PATH_RE = /`[^`\n]*?(?:[\w.*-]+\/)+[\w.*{}-]+(?:\.(?:md|py|json|jsonl|toml|sh|js|txt|log))?`/g;
 const noPaths = (md) => md.split('\n').map((l) => {
   if (!PATH_RE.test(l)) return l; PATH_RE.lastIndex = 0;
@@ -1449,7 +1561,7 @@ function renderSavings(sv) {
   const lh = el('div', 'lab'); lh.innerHTML = `<b></b>${ico('user')} 사람 시간`;
   const la = el('div', 'lab'); la.innerHTML = `<b></b>${ico('bot')} AI 시간`;
   const eh = el('div', 'eq'); eh.innerHTML = `근무일 <b>${workdays(hu.all)}일</b> · 주문 <b>${(hu.orders || 0).toLocaleString('ko-KR')}건</b> 단계 <b>${(hu.steps || 0).toLocaleString('ko-KR')}번</b> · 정기 일 <b>${(hu.rounds || 0).toLocaleString('ko-KR')}회</b>${hu.checks ? ` (그중 확인만 ${+hu.checks || 0}회)` : ''}`;
-  const ea = el('div', 'eq'); ea.innerHTML = `아낀 AI 비용 <b>$${(a.cost || 0).toFixed(2)}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
+  const ea = el('div', 'eq'); ea.innerHTML = `아낀 AI 비용 <b>${usd((a.cost || 0))}</b> · 약 ${krw(a.cost)} · 에이전트 안 띄움 <b>${(sv.runs_skipped || 0).toLocaleString('ko-KR')}번</b>`;
   H.append(lh, num(hu.all, 'h'), eh); A.append(la, num(a.secs, 'a'), ea);
   big.append(H, el('i'), A); hero.append(big);
   const pace = el('div', 'sv-pace');
@@ -1457,7 +1569,7 @@ function renderSavings(sv) {
   hero.append(pace);
   const mini = el('div', 'sv-mini');
   for (const [k, hh, aa, cc] of [['오늘', hu.today, t.secs, t.cost], [sv.week_label || '최근 7일', hu.week, w.secs, w.cost]]) {
-    const d = el('div'); d.innerHTML = `${escH(k)} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>$${(cc || 0).toFixed(2)}</b>`; mini.append(d);
+    const d = el('div'); d.innerHTML = `${escH(k)} &nbsp;<span class="h">사람</span> <b>${durK(hh)}</b> · <span class="a">AI</span> <b>${durK(aa)}</b> · <b>${usd((cc || 0))}</b>`; mini.append(d);
   }
   hero.append(mini); box.append(hero);
   if (!svCounted && !matchMedia('(prefers-reduced-motion: reduce)').matches) {      // 처음 열 때만 0에서 올라가게
@@ -1476,18 +1588,18 @@ function renderSavings(sv) {
     const max = Math.max(1, ...days.map((d) => Math.max(d.human, d.ai))) / 3600;
     const top = max <= 4 ? Math.ceil(max) : max <= 12 ? Math.ceil(max / 2) * 2 : Math.ceil(max / 5) * 5;
     const ch = el('div', 'sv-chart'), y = el('div', 'sv-y'), plot = el('div', 'sv-plot'), xs = el('div', 'sv-x');
-    for (let k = 0; k <= 4; k++) { const v = top * k / 4; const s = el('span', null, `${Number.isInteger(v) ? v : v.toFixed(1)}h`); s.style.bottom = `${k * 25}%`; y.append(s); if (k) { const g = el('div', 'gl'); g.style.bottom = `${k * 25}%`; plot.append(g); } }
+    for (let k = 0; k <= 4; k++) { const v = top * k / 4; const s = el('span', null, `${Number.isInteger(v) ? v : v.toFixed(1)}시간`); s.style.bottom = `${k * 25}%`; y.append(s); if (k) { const g = el('div', 'gl'); g.style.bottom = `${k * 25}%`; plot.append(g); } }
     const tip = el('div', 'sv-tip'); tip.hidden = true;
     const peakH = Math.max(...days.map((d) => d.human)), peakA = Math.max(...days.map((d) => d.ai));
     for (const d of days) {
       const g = el('div', 'sv-day'); g.tabIndex = 0;
-      const lab = `${d.day.slice(5).replace('-', '/')} — 사람 ${durK(d.human)} · AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; g.setAttribute('aria-label', lab);
+      const lab = `${d.day.slice(5).replace('-', '/')} 사람 ${durK(d.human)} · AI ${durK(d.ai)} · ${usd((d.cost || 0))}`; g.setAttribute('aria-label', lab);
       for (const [cls, v, peak] of [['h', d.human, peakH], ['a', d.ai, peakA]]) {
         const b = el('b', cls); b.style.height = `${Math.min(100, v / 3600 / top * 100)}%`;
         if (days.length <= 7 || v === peak) b.append(el('em', null, `${(v / 3600).toFixed(1)}`));      // 일주일 이하면 다, 길면 가장 큰 날만
         g.append(b);
       }
-      const show = () => { tip.innerHTML = `<b>${escH(String(d.day).slice(5).replace('-', '/'))}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · $${(d.cost || 0).toFixed(2)}`; tip.hidden = false;
+      const show = () => { tip.innerHTML = `<b>${escH(String(d.day).slice(5).replace('-', '/'))}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · ${usd((d.cost || 0))}`; tip.hidden = false;
         const r = g.getBoundingClientRect(), pr = ch.getBoundingClientRect(); tip.style.left = `${Math.min(pr.width - 170, Math.max(0, r.left - pr.left + r.width / 2 - 60))}px`; tip.style.top = '4px'; };
       g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('click', show); g.addEventListener('mouseleave', () => { tip.hidden = true; }); g.addEventListener('blur', () => { tip.hidden = true; });
       plot.append(g); xs.append(el('span', null, d.day.slice(5).replace('-', '/')));
@@ -1518,11 +1630,11 @@ function renderSavings(sv) {
   if (hu.changes > 60) hItems.push({ name: '손일 줄인 개선', secs: hu.changes, sub: '개선별 하루분 × 지난 날수' });
   hItems.sort((p, q) => q.secs - p.secs);
   const L = sv.labels || {};
-  const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · 아낀 AI 비용 $${b.cost.toFixed(2)}${k === 'api_cmd' ? ' · 10/25 16시 전 기록엔 감시가 30분마다 부른 확인도 섞여 실제보다 많아요' : ''}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
+  const aItems = Object.entries(a.by || {}).map(([k, b]) => ({ name: L[k] || k, secs: b.secs, sub: `${b.n.toLocaleString('ko-KR')}번 · 아낀 AI 비용 ${usd(b.cost)}${k === 'api_cmd' ? ' · 10/25 16시 전 기록엔 감시가 30분마다 부른 확인도 섞여 실제보다 많아요' : ''}` })).filter((x) => x.secs > 0 || x.sub).sort((p, q) => q.secs - p.secs);
   two.append(
     rowsCard('사장님 손 대신한 일', `누적 ${durK(hu.all)}`, hItems, '--sv-h', '손 안 탄 주문 단계와 끝낸 정기 회차(①② 제외) × 손으로 할 때 분. 기준을 바꾸면 지난 날도 다시 계산.',
       (() => { const b = el('button', 'btn xs weak', svEdit ? '완료' : '기준 고치기'); b.type = 'button'; b.onclick = () => { svEdit = !svEdit; renderSavings(sv); }; return b; })()),
-    rowsCard('AI·기계가 대신한 일', `누적 ${durK(a.secs)} · $${(a.cost || 0).toFixed(2)}`, aItems, '--sv-a', '횟수는 실측, 1번 절약량은 측정 평균.'));
+    rowsCard('AI·기계가 대신한 일', `누적 ${durK(a.secs)} · ${usd((a.cost || 0))}`, aItems, '--sv-a', '횟수는 실측, 1번 절약량은 측정 평균.'));
   box.append(two);
   // ④ 바뀐 것
   const ch = sv.changes || [];
@@ -1535,7 +1647,7 @@ function renderSavings(sv) {
       const li = el('li', fresh(x) ? 'sv-fresh' : null), top = el('div');
       if (fresh(x)) top.append(el('span', 'sv-new', 'NEW'));
       const sd = el('span', 'sv-side ' + (x.side === 'human' ? 'h' : 'a')); sd.innerHTML = x.side === 'human' ? `${ico('user')} 사람` : `${ico('bot')} AI`; top.append(sd, document.createTextNode(deE(x.what)));
-      const per = [x.day_secs ? `하루 ${durK(x.day_secs)}` : '', x.day_cost ? `$${x.day_cost.toFixed(2)}` : ''].filter(Boolean).join(' · ');
+      const per = [x.day_secs ? `하루 ${durK(x.day_secs)}` : '', x.day_cost ? `${usd(x.day_cost)}` : ''].filter(Boolean).join(' · ');
       li.append(el('span', 'muted small', x.at.slice(5, 16).replace('T', ' ') + (x.by ? ' · ' + x.by : '') + (per ? ' · ' + per : '')), top, x.detail ? el('div', 'muted small', x.detail) : '');
       ul.append(li);
     }
@@ -1612,20 +1724,20 @@ function render(s) {
   const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); const hshow = htxt.replace('마지막 실행 실패', '지금 실패'); hp.querySelector('.htxt').textContent = hshow; hp.setAttribute('aria-label', '전체 상태: ' + hshow);   // 2026-11-06: 아래 '24시간 동안 실패'와 다른 수인 걸 말로 · 2026-11-12: aria-label이 주석 안에 들어가 안 붙던 것
   $('hero-lead').textContent = `${busy}명 일하는 중` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
-  if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열(barund) 응답 없음${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
+  if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열이 응답하지 않아요${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
   else if (us.blocked) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`Claude 사용량 한도 · ${us.until} 해제 · 무인 회차는 Codex로, 작업판·대화는 멈춤`); }
   else al.hidden = true;
   renderSavings(sv);
   const ST = [
     // 2026-11-06 UX 검토: 이름이 세는 것을 그대로 말하게(위 막대 '지금 실패'와 '24시간 동안 실패'가 달라 보이던 것)
-    ['#할-일 카드', issues.length, '건', [urgent ? `긴급 ${urgent}건` : '#할-일', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
-    ['승인·답 기다림', approvals, '건', taskWait ? `승인 카드 ${s.approvals || 0} · 맡긴 일 ${taskWait}` : '승인 버튼 기다리는 카드', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
+    ['확인할 일', issues.length, '건', [urgent ? `긴급 ${urgent}건` : issues.length ? '디스코드 #할-일과 같아요' : '지금은 없어요', snoozed.length ? `미룸 ${snoozed.length}` : ''].filter(Boolean).join(' · '), urgent ? 'bad' : issues.length ? 'warn' : 'ok', 'todo'],
+    ['승인 기다림', approvals, '건', taskWait ? `승인 카드 ${s.approvals || 0} · 맡긴 일 ${taskWait}` : '버튼만 누르면 끝나요', approvals ? 'warn' : 'ok', taskWait && !s.approvals ? 'tasks' : 'todo'],
     ['일하는 중', busy, '명', `직원 ${team.length}명 중`, busy ? 'run' : '', 'home:office-sec'],
-    ['24시간 동안 실패', fails24.length, '번', fails24.length ? `지금 실패 ${failNow}건 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '24시간 동안 없음', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
-    ['AI 한도', us.blocked ? '다 씀' : (p5 ?? '-'), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `5시간 ${p5 ?? '-'}% 사용 · 7일 ${p7 ?? '-'}% 사용`,
+    ['24시간 동안 실패', fails24.length, '번', fails24.length ? `지금 실패 ${failNow}건 · ${[...new Set(fails24.map((f) => f.what))].slice(0, 2).join(', ')}` : '깨끗해요', failNow ? 'bad' : fails24.length ? 'warn' : 'ok', 'work'],
+    ['AI 사용량', us.blocked ? '다 씀' : (Math.max(p5 ?? 0, p7 ?? 0) || (p5 ?? '-')), us.blocked ? '' : '%', us.blocked ? `${us.until}에 풀림` : `${(p7 ?? 0) >= (p5 ?? 0) ? '7일' : '5시간'} 기준 · 5시간 ${p5 ?? '-'}% · 7일 ${p7 ?? '-'}%`,
       us.blocked ? 'bad' : ((p5 ?? 0) >= 90 || (p7 ?? 0) >= 85 ? 'warn' : 'ok'), 'work'],
     // 값은 숫자 + 작은 단위(좁은 화면에서 '11시간 20분'이 칸 밖으로 잘리던 것 — 2026-10-22 사장님)
-    ['아낀 시간', svH ? Math.round(svH / 360) / 10 : '-', svH ? '시간' : '', svH || svA.secs ? `사람 ${Math.round(svH / 360) / 10}시간 아낌 · AI ${Math.round((svA.secs || 0) / 360) / 10}시간 · AI 비용 $${(svA.cost || 0).toFixed(2)} 아낌` : '-', svH || svA.secs ? 'ok' : '', 'savings'],
+    ['아낀 시간', svH ? Math.round(svH / 3600) : '-', svH ? '시간' : '', svH || svA.secs ? `AI 비용 $${(svA.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 아낌` : '아직 기록이 없어요', svH || svA.secs ? 'ok' : '', 'savings'],
   ];
   const sg = $('stats'); sg.textContent = '';
   for (const [k, v, u, d, cls, go] of ST) {
@@ -1643,14 +1755,14 @@ function render(s) {
   const sys = $('sys'); sys.textContent = '';
   const H5 = (v) => v == null ? '—' : v;
   const SYS = [
-    ['회차 대기열', bd ? (bd.alive === false ? 'bad' : '') : 'idle', bd ? (bd.alive === false ? `멈춤 · ${hm(bd.at)}` : `실행 중 · 맡은 업무 ${(bd.managed || []).length}개`) : '정보 없음', 'work:jobs-sec'],
-    ['이벤트 허브', !H.sources ? 'idle' : !H.alive ? 'bad' : hubBad ? 'warn' : '', !H.sources ? '정보 없음' : !H.alive ? '멈춤' : hubBad ? `원천 ${hubBad}곳 확인 지연` : `원천 ${Object.keys(H.sources).length}곳 정상`, 'work:hub-sec'],
+    ['예약 업무 대기열', bd ? (bd.alive === false ? 'bad' : '') : 'idle', bd ? (bd.alive === false ? `멈춤 · ${hm(bd.at)}` : `실행 중 · 맡은 업무 ${(bd.managed || []).length}개`) : '정보 없음', 'work:jobs-sec'],
+    ['바뀜 감지', !H.sources ? 'idle' : !H.alive ? 'bad' : hubBad ? 'warn' : '', !H.sources ? '정보 없음' : !H.alive ? '멈춤' : hubBad ? `${hubBad}곳 확인 늦음` : `${Object.keys(H.sources).length}곳 모두 정상`, 'work:hub-sec'],
     ['다음 회차', nextJob ? '' : 'idle', nextJob ? `${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '오늘 남은 회차 없음', 'work:jobs-sec'],
     ['진행 신호', stale.length ? 'warn' : '', stale.length ? `멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : `${hbs.filter(([, h]) => h.state === 'running').length}개 진행 중`, 'activity'],
     ['AI 사용량(7일)', us.blocked ? 'bad' : (p7 ?? 0) >= 85 ? 'warn' : '', us.blocked ? `한도 · ${us.until}에 풀림` : `${H5(p7)}%${uw.seven_day && uw.seven_day.resets ? ` · ${uw.seven_day.resets} 채워짐` : ''}`, 'work'],
     ['최근 백업', s.backup.latest ? ((s.backup.hourly || {}).fails ? 'warn' : '') : 'bad', s.backup.latest ? `${s.backup.latest.slice(5).replace('-', '/')} · ${s.backup.count}일치 보관${(s.backup.hourly || {}).last_ok ? ` · 매시 ${relDay(s.backup.hourly.last_ok, s.now)}` : ''}` : '없음', 'records:backup-sec'],
-    ['기술부채', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
-    ['git', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? '커밋 동기화됨' : `앞 ${s.git.ahead ?? '?'} · 뒤 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 안 올린 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
+    ['고칠 거리', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
+    ['코드 저장소', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? '최신이에요' : `올릴 것 ${s.git.ahead ?? '?'} · 받을 것 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 저장 안 한 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
   ];
   for (const [k, c, v, go] of SYS) {
     const li = el('li'); const b = el('button'); b.type = 'button'; b.dataset.goto = go;
@@ -1663,20 +1775,20 @@ function render(s) {
   const sorted = [...issues].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3) || (oneTap(b) ? 1 : 0) - (oneTap(a) ? 1 : 0));
   const pv = $('todo-preview'); pv.textContent = '';
   const mn = $('mine-n'); mn.hidden = !issues.length; mn.textContent = `${issues.length}건`; mn.className = 'badge ' + (urgent ? 'bad' : 'warn');
-  if (!issues.length) pv.append(el('li', 'empty', '내 차례 없음'));
+  if (!issues.length) pv.append(el('li', 'empty', '지금 확인할 일이 없어요'));
   sorted.slice(0, 6).forEach((i) => {
     const li = el('li'); const [sl, sc] = SV[i.severity] || ['', ''];
     li.append(el('span', 'sv ' + (oneTap(i) && sc !== 'bad' ? 'run' : sc)));
-    const body = el('div'); const t = el('button', 'mt', clean(i.title)); t.type = 'button'; t.dataset.goto = 'todo'; t.dataset.focus = 'todo-' + i.key;
+    const body = el('div'); const t = el('button', 'mt', clean(i.title).replace(/\s*[—–-]\s*$/, '')); t.type = 'button'; t.dataset.goto = 'todo'; t.dataset.focus = 'todo-' + i.key;
     body.append(t, el('div', 'mm', [sl, dom[i.domain] || i.domain, i.last ? relDay(i.last, s.now) : '', i.todo].filter(Boolean).join(' · ')));
     const a = el('div', 'ma');
     const B = (lab, ac, cls, idx) => { const b = el('button', 'btn xs ' + cls, lab); b.type = 'button'; b.dataset.act = ac; b.dataset.key = i.key; if (idx != null) b.dataset.idx = idx; a.append(b); };
     if (i.approval) { B('승인', 'approve', 'primary'); B('거절', 'reject', 'ghost'); }
-    else if ((i.choices || []).length) (i.choices || []).slice(0, 3).forEach((c, k) => B(c.length > 14 ? c.slice(0, 13) + '…' : c, 'choose', k ? 'weak' : 'primary', k));
-    else if (i.key !== 'login-needed') B('처리했어요', 'done', 'weak');
+    else if ((i.choices || []).length) (i.choices || []).slice(0, 3).forEach((c, k) => B(c.length > 14 ? c.slice(0, 13) + '…' : c, 'choose', k ? 'ghost' : 'primary', k));
+    else if (i.key !== 'login-needed') B('처리했어요', 'done', 'primary');
     li.append(body, a); pv.append(li);
   });
-  if (issues.length > 6) { const li = el('li'); li.style.display = 'block'; const b = el('button', 'more-link', `${issues.length - 6}건 더 ›`); b.type = 'button'; b.dataset.goto = 'todo'; b.style.marginLeft = '0'; li.append(b); pv.append(li); }
+  if (issues.length > 6) { const li = el('li'); li.style.display = 'block'; const b = el('button', 'more-link', `${issues.length - 6}건 더 보기 ›`); b.type = 'button'; b.dataset.goto = 'todo'; b.style.marginLeft = '0'; li.append(b); pv.append(li); }
 
   // 할 일 — 급한 것·승인 먼저, 버튼은 한 줄(주 행동 하나 + 보조)
   const tl = $('todo-list'); tl.textContent = '';
@@ -1709,26 +1821,28 @@ function render(s) {
     const it = el('div', 'todo' + (openTodos.has(i.key) ? ' open' : '')); it.id = 'todo-' + i.key;
     const [sl, sc] = SV[i.severity] || [i.severity || '', ''];
     const meta = el('div', 'meta'); meta.append(chip(sl, sc));
-    if (i.approval) meta.append(chip('승인 필요', 'run'));
-    if ((i.choices || []).length) meta.append(chip('골라 주세요', 'run'));
+    if (i.approval) meta.append(chip('승인 필요'));             // 색은 급한 정도(맨 앞 칩)에만 — 종류 칩은 회색
+    if ((i.choices || []).length) meta.append(chip('골라 주세요'));
     if (i.state === 'ack') meta.append(chip('보는 중'));
     if (i.state === 'snoozed') meta.append(chip(`미룸${i.snooze_until ? ' · ' + relDay(i.snooze_until, s.now) + '까지' : ''}`));
     if (oldOne(i)) meta.append(chip(`${Math.floor((Date.parse(s.now) - Date.parse(i.last)) / 864e5)}일째`, 'warn'));
-    meta.append(el('span', null, [dom[i.domain] || i.domain, i.last ? relDay(i.last, s.now) : '', i.count > 1 ? `${i.count}번째` : ''].filter(Boolean).join(' · ')));
+    meta.append(el('span', null, [dom[i.domain] || i.domain, i.last ? relDay(i.last, s.now) : ''].filter(Boolean).join(' · ')));
     const t = el('div', 't', clean(i.title)); t.tabIndex = 0; t.setAttribute('role', 'button'); t.setAttribute('aria-expanded', String(openTodos.has(i.key)));
     const toggle = () => { it.classList.toggle('open'); openTodos[it.classList.contains('open') ? 'add' : 'delete'](i.key); t.setAttribute('aria-expanded', String(it.classList.contains('open'))); };
     t.onclick = toggle; t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
     it.append(meta, t);
     const content = i.presentation || { action: i.todo, facts: [], effects: [] };
-    if (content.action) it.append(el('div', 'what', '할 일 · ' + content.action.replace(/\*\*/g, '')));
-    if (content.facts?.length) { const facts = el('ul', 'card-facts'); content.facts.forEach(x => facts.append(el('li', null, x))); it.append(facts); }
-    if (content.effects?.length) it.append(el('p', 'small', content.effects.join('\n')));
+    if (content.action) it.append(el('div', 'what', '할 일 · ' + tidy(content.action.replace(/\*\*/g, ''))));
+    // 근거는 두 줄까지 보이고 나머지는 제목을 눌러 펼침(2026-11-12 리뉴얼 — 카드 25장이 8,700px이던 것)
+    if (content.facts?.length) { const facts = el('ul', 'card-facts'); content.facts.forEach(x => facts.append(el('li', null, tidy(x)))); it.append(facts);
+      if (content.facts.length > 2) { const mo = el('button', 'more-link facts-more', `근거 ${content.facts.length - 2}줄 더 보기`); mo.type = 'button'; mo.onclick = toggle; it.append(mo); } }
+    if (content.effects?.length) it.append(el('p', 'small effects', tidy(content.effects.join('\n'))));
     if (i.body) { const d = el('details'); d.append(el('summary', null, '전체 근거 보기'), el('pre', null, i.body)); it.append(d); }
     const bs = el('div', 'btns');
     const B = (lab, a, cls) => { const b = el('button', 'btn sm ' + (cls || ''), lab); b.type = 'button'; b.dataset.act = a; b.dataset.key = i.key; bs.append(b); };
     if (i.approval) { B('승인', 'approve', 'primary'); B('거절', 'reject', 'danger'); }
     (i.choices || []).forEach((c, k) => { const b = el('button', 'btn sm ' + (k ? 'weak' : 'primary'), c); b.type = 'button'; b.dataset.act = 'choose'; b.dataset.key = i.key; b.dataset.idx = k; bs.append(b); });
-    if (i.key !== 'login-needed') B('처리했어요', 'done', i.approval || (i.choices || []).length ? '' : 'weak');   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦(notify/logins)
+    if (i.key !== 'login-needed') B('처리했어요', 'done', i.approval || (i.choices || []).length ? 'ghost' : 'primary');   // 로그인 카드는 사이트별로 로그인되면 저절로 줄어듦(notify/logins)
     // 로그인 카드: 사이트 줄마다 '로그인했어요' — 자동 확인되는 곳은 확인 후, 확인 길이 없는 곳은 바로 지움(notify/logins.confirm)
     else (i.sites || []).forEach((st) => { const b = el('button', 'btn sm weak', `${st.replace(/\s*\(.*\)$/, '').slice(0, 16)} 로그인했어요`); b.type = 'button'; b.title = st; b.dataset.act = 'login_ok'; b.dataset.key = st; bs.append(b); });
     B('보는 중', 'ack', 'ghost'); B('내일 아침 다시', 'snooze', 'ghost');
@@ -1774,7 +1888,8 @@ function render(s) {
     const main = el('div'); main.append(el('div', 'nm', j.desc ? j.desc.split(' — ')[0] : j.id));
     if (j.desc && j.desc.includes(' — ')) main.append(el('div', 'ds', j.desc.split(' — ').slice(1).join(' — ')));
     const chips = el('div', 'chips'); chips.append(chip(KIND_KO[j.kind] || j.kind));
-    if (j.runner) chips.append(chip(j.runner)); if (j.browser && j.browser !== 'none') chips.append(chip(j.browser));
+    const RUNNER = { claude: 'Claude', codex: 'Codex' }, BROWSER = { aside: '브라우저 씀' };
+    if (j.runner) chips.append(chip(RUNNER[j.runner] || j.runner)); if (j.browser && j.browser !== 'none') chips.append(chip(BROWSER[j.browser] || j.browser));
     main.append(chips);
     const side = el('div', 'side');
     if (j.next) side.append(el('span', 'when', '다음 ' + j.next));
@@ -1789,7 +1904,7 @@ function render(s) {
     else if (ran.length) { const x = ran[0]; side.append(chip(x.end ? (x.rc === 0 ? '정상' : `실패 rc=${x.rc}`) : '진행 중', x.end ? (x.rc === 0 ? 'ok' : 'bad') : 'run')); }
     else if (j.launchd && j.launchd.pid) side.append(chip('실행 중', 'ok'));
     else if (j.launchd && j.launchd.last_exit != null) side.append(chip(j.launchd.last_exit === 0 ? '정상' : `종료코드 ${j.launchd.last_exit}`, j.launchd.last_exit === 0 ? 'ok' : 'bad'));
-    if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs weak'); b.innerHTML = `${ico('play')} 지금 실행`; b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
+    if (j.kind === 'agent' && j.label) { const b = el('button', 'btn xs ghost run-now'); b.innerHTML = `${ico('play')} 지금 실행`; b.title = '다음 예약을 기다리지 않고 한 번 돌려요'; b.type = 'button'; b.dataset.act = 'run'; b.dataset.job = j.id; side.append(b); }
     if (j.kind === 'agent' && sc && (!ran.length || sc.at > ran[0].start.replace(' ', 'T'))) main.append(el('div', 'ds', `스크립트가 대신 · 최근 ${relDay(sc.at, s.now)} ${sc.ok ? '정상' : '실패'}${sc.note ? ' · ' + clean(sc.note).slice(0, 80) : ''}`));
     { const lastRun = ran[0], useSc = j.kind !== 'agent' && sc && !(j.launchd && j.launchd.pid);   // 실패한 업무 = 왜 실패했는지 한 줄(원문은 접어서)
       const raw = useSc ? (!sc.ok ? (sc.note || '') : null) : lastRun && lastRun.end && lastRun.rc ? (lastRun.summary || `rc=${lastRun.rc}`).split('\n').slice(-3).join('\n')
@@ -1800,10 +1915,10 @@ function render(s) {
       const more = el('div', 'more'); const d = el('details');
       const last = ran[0], sk = skips[0];
       const skNewer = sk && (!last || sk.start > last.start);   // '최근'은 실제 회차와 건너뜀 중 늦은 것(2026-10-25 감사: ③이 10-23으로 보였음)
-      d.append(el('summary', null, skNewer ? `최근 ${hm(sk.start.replace(' ', 'T'))} · 건너뜀` : last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${last.secs}초` : ''}` : sc ? `최근 ${hm(sc.at)} · 스크립트` : '이전 회차'));
+      d.append(el('summary', null, skNewer ? `최근 ${hm(sk.start.replace(' ', 'T'))} · 건너뜀` : last ? `최근 ${hm(last.start.replace(' ', 'T'))}${last.secs != null ? ` · ${dur(last.secs)}` : ''}` : sc ? `최근 ${hm(sc.at)} · 스크립트` : '이전 회차'));
       if (last && last.summary) d.append(el('pre', null, (skNewer ? `지난 회차(${hm(last.start.replace(' ', 'T'))}) 결과\n` : '') + last.summary));
       if ((j.script || []).length) d.append(el('pre', null, j.script.map((x) => `${x.at.replace('T', ' ')}  스크립트 ${x.ok ? '정상' : '실패'} ${Math.round(x.secs || 0)}s${x.mode && x.mode !== 'apply' ? ' (' + x.mode + ')' : ''}  ${clean(x.note || '')}`).join('\n')));
-      if ((j.runs || []).length) d.append(el('pre', null, j.runs.map((x) => x.skip ? `${x.start}  건너뜀 — ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n')));
+      if ((j.runs || []).length) d.append(el('pre', null, j.runs.map((x) => x.skip ? `${x.start}  건너뜀: ${x.why}` : `${x.start}  ${x.end ? 'rc=' + x.rc + ' ' + x.secs + 's' : '진행/중단'}${x.info ? '  (' + x.info + ')' : ''}`).join('\n')));
       if (last && last.fallback) d.append(chip('Codex로 대체', 'warn'));
       more.append(d); r.append(more);
     }
@@ -1826,7 +1941,7 @@ function render(s) {
     for (const v of Object.values(H.sources)) {
       const b = el('div', 'hub-src' + (v.ok ? '' : ' bad'));
       const sp = el('span'); sp.innerHTML = dot(v.ok ? 'ok' : 'bad') + ' '; sp.append(`${v.label} · ${v.ok ? '정상' : (v.fails ? `실패 ${v.fails}번` : '확인 지연')}`); b.append(sp);
-      b.append(el('span', 'small', `${v.age_min == null ? '확인 전' : v.age_min + '분 전'} · ${Math.round(v.every / 60)}분마다` + (v.error && !v.ok ? ` · ${v.error.slice(0, 60)}` : '')));
+      b.append(el('span', 'small', `${v.age_min == null ? '확인 전' : v.age_min ? v.age_min + '분 전' : '방금'} · ${Math.round(v.every / 60)}분마다` + (v.error && !v.ok ? ` · ${failWhy(v.error).plain}` : '')));
       hh.append(b);
     }
   }
@@ -1836,7 +1951,7 @@ function render(s) {
     const sp = el('span'); sp.append(el('b', null, String(C[k] || 0)), document.createTextNode(lab)); hc.append(sp);
   }
   const hf = $('hub-flow'); hf.textContent = '';
-  const HST = { ok: ['처리됨', 'ok'], fail: ['실패', 'bad'], todo: ['사람 확인', 'warn'], running: ['진행 중', 'run'], skip: ['건너뜀', ''] };
+  const HST = { ok: ['처리됨', 'ok'], fail: ['실패', 'bad'], todo: ['사람 확인', 'warn'], running: ['진행 중', 'run'], skip: ['건너뜀', ''], later: ['나중에 다시', ''] };
   if (!(hub.incidents || []).length) hf.append(el('li', 'empty', '최근 24시간 변화 없음'));
   for (const i of (hub.incidents || [])) {
     const li = el('li');
@@ -1844,8 +1959,9 @@ function render(s) {
     const ch = el('div', 'chain');
     ch.append(el('span', 'pill det', '감지 · ' + i.detected));
     for (const st of i.steps) {
-      ch.append(el('span', 'arrow', '→'), el('span', 'pill ' + st.status, String(st.text).split('\n')[0].slice(0, 80)));
-      if (st.run) ch.append(el('span', 'arrow', '→'), el('span', 'pill ' + st.run.status, (st.run.status === 'ok' ? '회차 정상' : st.run.status === 'skip' ? '회차 건너뜀' : st.run.status === 'running' ? '회차 진행 중' : '회차 실패') + (st.run.secs ? ` ${st.run.secs}초` : '')));
+      const seg = (pill) => { const g = el('span', 'seg'); g.append(el('span', 'arrow', '→'), pill); ch.append(g); };   // 화살표가 줄 끝에 홀로 남지 않게 다음 칸과 묶음
+      seg(el('span', 'pill ' + st.status, String(st.text).split('\n')[0].slice(0, 80)));
+      if (st.run) seg(el('span', 'pill ' + st.run.status, (st.run.status === 'ok' ? '회차 정상' : st.run.status === 'skip' ? '회차 건너뜀' : st.run.status === 'running' ? '회차 진행 중' : '회차 실패') + (st.run.secs ? ` ${dur(st.run.secs)}` : '')));
     }
     const [lab, cls] = HST[i.status] || [i.status, ''];
     const r = el('div', 'result'); r.append(chip(lab, cls), document.createTextNode(' ' + deE(String(i.outcome || '').split('\n')[0].slice(0, 160))));
@@ -1857,7 +1973,7 @@ function render(s) {
 
   // 인보이스
   const inv = $('inv'); inv.textContent = '';
-  if (!(s.invoices || []).length) inv.append(el('li', 'empty', '인보이스 없음'));
+  if (!(s.invoices || []).length) inv.append(el('li', 'empty', '받은 인보이스가 아직 없어요'));
   for (const f of (s.invoices || [])) {
     const li = el('li'); const a = el('a', null, f.name); a.href = '#';
     // 2026-11-06: 받아 온 뒤 window.open하면 사파리가 팝업으로 막고, 404·503 응답도 그대로 열렸음 → 창을 먼저 열고 응답을 확인한 뒤 채움
@@ -1865,30 +1981,47 @@ function render(s) {
       try { const r = await apiFetch('/invoices/' + encodeURIComponent(f.name).replace(/%2F/g, '/')); if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
         const u = URL.createObjectURL(await r.blob()); if (w) w.location.href = u; else window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000);
       } catch (e) { if (w) w.close(); toast('열지 못함: ' + e.message); } };
-    li.append(a, el('span', 'muted small', ` · ${f.at.replace('T', ' ').slice(5)} · ${f.kb}KB`)); inv.append(li);
+    { const parts = f.name.replace(/\.pdf$/i, '').split('_').filter((x) => x && !/^(invoice|주문번호없음)$/i.test(x));
+      const shop = parts.find((x) => /\.[a-z]{2,}$/i.test(x)) || ''; const day = parts.find((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)) || '';
+      a.textContent = shop ? `${shop}${day ? ' · ' + day.slice(5).replace('-', '/') : ''}` : f.name; a.title = f.name; }
+    li.append(a, el('span', 'muted small', ` · 받은 때 ${f.at.replace('T', ' ').slice(5, 16).replace('-', '/')} · ${f.kb}KB`)); inv.append(li);
   }
 
   // 알림 기록
   const SEV = { urgent: ['긴급', 'bad'], critical: ['긴급', 'bad'], todo: ['확인 필요', 'warn'], high: ['우선 확인', 'warn'], info: ['참고', ''], debug: ['기록', ''] };
   const ev = $('events'); ev.textContent = '';
-  if (!(s.events || []).length) ev.append(el('li', 'empty', '기록 없음'));
+  if (!(s.events || []).length) ev.append(el('li', 'empty', '오늘 보낸 알림이 없어요'));
   // 서버는 오늘 것 전부를 보냄 — 처음엔 최근 40건, '더 보기'로 전부(2026-10-25 감사: 40건에서 잘려 오늘 긴급 알림이 안 보였음)
   const evAll = s.events || [], evToday = evAll.filter((e) => (e.at || '').slice(0, 10) === s.now.slice(0, 10)).length;
-  for (const e of (moreRec.events ? evAll : evAll.slice(0, 40))) {
+  const ROOM = { inbox: '할 일', todo: '할 일', orders: '주문', mail: '메일', pricing: '가격', inquiry: '문의', close: '마감', improve: '개선', infra: '시스템', sourcing: '소싱' };
+  const evShow = [], evSeen = new Map();          // 같은 제목이 이어서 여러 번 오면 한 줄 + 'n번'(2026-11-12 리뉴얼 — 456·457·458…회 반복이 줄마다 나오던 것)
+  for (const e of (moreRec.events ? evAll : evAll.slice(0, 80))) {
+    const k = clean(e.title); const hit = evSeen.get(k);
+    if (hit) { hit.n = (hit.n || 1) + 1; continue; }
+    const x = { ...e }; evSeen.set(k, x); evShow.push(x);
+  }
+  for (const e of evShow.slice(0, moreRec.events ? evShow.length : 40)) {
     const li = el('li'); li.id = 'ev-' + e.id;
     const [lab, cls] = SEV[e.severity] || [e.severity, ''];
     li.append(chip(lab, cls), document.createTextNode(' '), el('span', 'name', clean(e.title)));
     const where = Object.entries(e.delivered || {}).filter(([, v]) => v === true).map(([k]) => k === 'suppressed' ? '중복 묶음' : k).join('·') || '미발송';
-    li.append(el('div', 'muted small', `${hm(e.at)} · #${e.room} · ${dom[e.domain] || e.domain || '-'} · ${e.source || '-'} · ${where}` + (e.repeated ? ` · ${e.repeated}회 반복` : '')));
+    const src = e.source && !/[._]|^[a-z]/.test(e.source) ? e.source : '';
+    const whereKo = where.replace(/discord/g, '디스코드').replace('미발송', '보내지 않음');
+    li.append(el('div', 'muted small', [hm(e.at), ROOM[e.room] || e.room, dom[e.domain] || e.domain, src, whereKo, e.n > 1 ? `오늘 ${e.n}번` : (e.repeated ? `${e.repeated}번째` : '')].filter((x) => x && x !== '-').join(' · ')));
     if (e.body || e.todo) { const d = el('details'); d.append(el('summary', null, '내용')); d.append(el('pre', null, (e.body || '') + (e.todo ? '\n할 일: ' + e.todo : ''))); li.append(d); }
     ev.append(li);
   }
   if (evAll.length > 40) { const li = el('li'); const b = el('button', 'more-link', moreRec.events ? '최근 40건만 보기' : `오늘 ${evToday}건 중 40건 · 전부 보기`); b.type = 'button'; b.style.marginLeft = '0'; b.onclick = () => { moreRec.events = !moreRec.events; render(lastState); }; li.append(b); ev.append(li); }
 
   const wl = $('worklog'); wl.textContent = '';
-  if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 기록 없음'));
+  if (!s.worklog.length) wl.append(el('li', 'empty', '오늘 남긴 기록이 없어요'));
   if (s.worklog.length > 40) { const li = el('li'); const b = el('button', 'more-link', moreRec.worklog ? '최근 40줄만 보기' : `오늘 ${s.worklog.length}줄 중 최근 40줄 · 앞 ${s.worklog.length - 40}줄 더 보기`); b.type = 'button'; b.style.marginLeft = '0'; b.onclick = () => { moreRec.worklog = !moreRec.worklog; render(lastState); }; li.append(b); wl.append(li); }
-  for (const l of [...(moreRec.worklog ? s.worklog : s.worklog.slice(0, 40))].reverse()) wl.append(el('li', null, l));
+  for (const l of [...(moreRec.worklog ? s.worklog : s.worklog.slice(0, 40))].reverse()) {
+    const m = /^-?\s*(\d{1,2}:\d{2})\s*[·|]\s*([^·|]+?)\s*[·|]\s*(.*)$/s.exec(l);
+    const li = el('li', 'wl');
+    if (m) li.append(el('b', 'wt', m[1]), el('span', 'wa', m[2]), el('span', null, m[3])); else li.append(l);
+    wl.append(li);
+  }
   mdRender(noPaths(s.status_md || '(없음)'), $('status'));
   clipBox($('worklog')); clipBox($('status'));
 
@@ -1903,7 +2036,7 @@ function render(s) {
   const b = $('backup'); b.textContent = '';
   b.append(el('p', null, s.backup.latest ? `최근 ${s.backup.latest} · 로컬 ${s.backup.count}일치` : '로컬 백업 없음'));
   const bh = s.backup.hourly;   // 매시 외부 백업은 상태 파일로(backup.log의 '매시 … 정상(1.0시간 전)' 줄은 새벽에 쓴 옛말 — 2026-10-25 감사)
-  if (bh) b.append(el('p', bh.fails ? 'bad' : 'small', `매시 외부 백업 · 마지막 성공 ${bh.last_ok ? relDay(bh.last_ok, s.now) : '없음'}${bh.files ? ` · 파일 ${bh.files}개` : ''}${bh.fails ? ` · 연속 실패 ${bh.fails}번 — ${clean(bh.last_err || '')}` : ''}`));
+  if (bh) b.append(el('p', bh.fails ? 'bad' : 'small', `매시 외부 백업 · 마지막 성공 ${bh.last_ok ? relDay(bh.last_ok, s.now) : '없음'}${bh.files ? ` · 파일 ${bh.files}개` : ''}${bh.fails ? ` · 연속 실패 ${bh.fails}번 · ${clean(bh.last_err || '')}` : ''}`));
   const blog = s.backup.log.filter((l) => !(bh && l.includes('매시 외부 백업')));
   if (blog.length) b.append(el('pre', null, blog.join('\n')));
 }
@@ -1916,7 +2049,7 @@ async function tick() {
     if (!r.ok) throw new Error('자료를 불러오지 못했어요');
     const fresh = await r.json(); render(fresh); window.barunHealth?.(fresh);
   } catch (e) {
-    $('connection-notice').hidden = false; $('connection-notice').textContent = '연결을 다시 확인하고 있어요. 이전에 불러온 내용은 유지됩니다.';
+    $('connection-notice').hidden = false; $('connection-notice').textContent = '연결을 다시 잡는 중이에요. 그동안 마지막으로 불러온 내용을 보여 드려요';
     $('updated').textContent = '불러오기 실패 · ' + e.message; $('updated').className = 'upd err';
   } finally { busyTick = false; }
 }
@@ -1957,21 +2090,22 @@ function route() {
 }
 window.addEventListener('hashchange', route); route();
 </script>
-<script src="office.js?v=d8703360e8"></script>
-<script src="activity.js?v=d8703360e8"></script>
-<script src="data.js?v=d8703360e8"></script>
-<script src="sourcing.js?v=d8703360e8"></script>
-<script src="automation.js?v=d8703360e8"></script>
-<script src="paths.js?v=d8703360e8"></script>
-<script src="flow.js?v=d8703360e8"></script>
-<script src="catalog.js?v=d8703360e8"></script>
-<script src="asks.js?v=d8703360e8"></script>
-<script src="vat.js?v=d8703360e8"></script>
-<script src="pay.js?v=d8703360e8"></script>
-<script src="settings.js?v=d8703360e8"></script>
-<script src="agents.js?v=d8703360e8"></script>
-<script src="tasks.js?v=d8703360e8"></script>
-<script src="reports.js?v=d8703360e8"></script>
-<script src="health.js?v=d8703360e8"></script>
+<script src="office.js?v=eb461015d0"></script>
+<script src="activity.js?v=eb461015d0"></script>
+<script src="data.js?v=eb461015d0"></script>
+<script src="sourcing.js?v=eb461015d0"></script>
+<script src="automation.js?v=eb461015d0"></script>
+<script src="paths.js?v=eb461015d0"></script>
+<script src="flow.js?v=eb461015d0"></script>
+<script src="catalog.js?v=eb461015d0"></script>
+<script src="asks.js?v=eb461015d0"></script>
+<script src="vat.js?v=eb461015d0"></script>
+<script src="pay.js?v=eb461015d0"></script>
+<script src="settings.js?v=eb461015d0"></script>
+<script src="agents.js?v=eb461015d0"></script>
+<script src="tasks.js?v=eb461015d0"></script>
+<script src="reports.js?v=eb461015d0"></script>
+<script src="health.js?v=eb461015d0"></script>
+<script src="motion.js?v=eb461015d0"></script>
 </body>
 </html>
