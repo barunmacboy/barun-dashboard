@@ -127,7 +127,7 @@
       <div class="ct-list" id="ct-list" role="list"></div>
       <button class="btn ghost ct-more" type="button" id="ct-more" hidden>더 보기</button>
       <datalist id="ct-pids"></datalist><datalist id="ct-shops"></datalist>`;
-    const dr = E('aside', 'ct-dr'); dr.id = 'ct-dr'; dr.hidden = true; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-label', '상품 자세히');
+    const dr = E('aside', 'ct-dr'); dr.id = 'ct-dr'; dr.hidden = true; if (window.barunDrawer) window.barunDrawer(dr, { label: '상품 자세히' }); else { dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-label', '상품 자세히'); }   // 공용 서랍(index.html)
     const scrim = E('div', 'ct-scrim'); scrim.id = 'ct-scrim'; scrim.hidden = true; scrim.onclick = () => closeDr();
     document.body.append(scrim, dr);
     $('ct-q').addEventListener('input', (e) => { flt.q = e.target.value.trim().toLowerCase(); limit = PAGE; render(); });
@@ -158,7 +158,7 @@
     } finally { busy = false; }
   }
   async function act(body, btn, out) {
-    const lab = btn ? btn.textContent : '';
+    const kids = btn ? [...btn.childNodes] : [];   // 2026-11-12: 글만 기억해 되돌리면 그림 버튼(SVG)이 실패 뒤 그림을 잃었음 → 원래 내용 그대로
     if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
     try {
       const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'catalog' }, body)) });
@@ -168,7 +168,7 @@
       if (out) { out.hidden = false; out.className = 'ct-out ' + (j.ok ? 'ok' : 'bad'); out.textContent = msg; }
       if (j.ok) { said = msg; await load(true); if (openId) openDr(body.key || openId, null, true); }   // 다시 그린 서랍 맨 위에 결과 한 줄
       return j;
-    } catch (e) { if (window.toast) window.toast('실패: ' + e.message); return null; } finally { if (btn) { btn.disabled = false; btn.textContent = lab; } }
+    } catch (e) { if (window.toast) window.toast('실패: ' + e.message); return null; } finally { if (btn) { btn.disabled = false; btn.replaceChildren(...kids); } }
   }
 
   // ── 목록 ──

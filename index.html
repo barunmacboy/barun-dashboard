@@ -1069,9 +1069,9 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   </form>
 </dialog>
 
-<script src="config.js?v=676ee063ac"></script>
-<script src="transport.js?v=676ee063ac"></script>
-<script src="navigation.js?v=676ee063ac"></script>
+<script src="config.js?v=0f16874fcf"></script>
+<script src="transport.js?v=0f16874fcf"></script>
+<script src="navigation.js?v=0f16874fcf"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1275,6 +1275,45 @@ window.barunNew = (tab, at) => {
 };
 // 메뉴 숫자(할 일·맡긴 일·보낸 문의) — 모듈도 이걸로 바꿈
 window.barunBadge = (name, n) => document.querySelectorAll(`[data-badge="${name}"]`).forEach((b) => { b.textContent = n > 99 ? '99+' : String(n || ''); b.hidden = !n; });
+// 옆 서랍 공통(2026-11-12, 감사 남은 것): 화면(flow·catalog·data)이 서랍을 만들 때 barunDrawer(서랍, {label, modal}) 한 번만 부름 —
+//   role=dialog·aria-modal, 열린 동안 Tab을 맨 위 서랍 안에서만 돌리고, 닫힐 때 초점이 서랍 안·문서 처음에 남았으면 연 자리로 돌려줌.
+//   여닫기는 화면이 지금처럼 hidden으로. modal()이 거짓이면(휴대폰에서 제자리로 펼치는 필터 칸 등) 서랍으로 치지 않음.
+const DRAWERS = new Map();
+let outsideFocus = null;
+const drawerOn = (d) => !d.hidden && d.getClientRects().length > 0 && (!DRAWERS.get(d).modal || DRAWERS.get(d).modal());
+document.addEventListener('focusin', (e) => { if (![...DRAWERS.keys()].some((d) => !d.hidden && d.contains(e.target))) outsideFocus = e.target; });
+window.barunDrawer = (d, o = {}) => {
+  if (!d || DRAWERS.has(d)) return d;
+  const st = { modal: o.modal || null, open: false, opener: null };
+  DRAWERS.set(d, st);
+  d.setAttribute('role', 'dialog'); if (o.label) d.setAttribute('aria-label', o.label);
+  if (!d.hasAttribute('tabindex')) d.tabIndex = -1;
+  const sync = () => {
+    if (!d.hidden && (!st.modal || st.modal())) d.setAttribute('aria-modal', 'true'); else d.removeAttribute('aria-modal');
+    if (!d.hidden && !st.open) { st.open = true; st.opener = outsideFocus; }
+    else if (d.hidden && st.open) {
+      st.open = false; const a = document.activeElement, op = st.opener; st.opener = null;
+      if ((!a || a === document.body || d.contains(a)) && op && op.isConnected && op.getClientRects().length) op.focus({ preventScroll: true });
+    }
+  };
+  new MutationObserver(sync).observe(d, { attributes: true, attributeFilter: ['hidden'] });
+  sync();
+  return d;
+};
+const FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || document.querySelector('dialog[open]') || $('login')) return;   // 위에 뜬 창(dialog)은 브라우저가 가둠
+  const open = [...DRAWERS.keys()].filter(drawerOn); if (!open.length) return;
+  const z = (x) => +getComputedStyle(x).zIndex || 0;
+  const d = open.reduce((a, b) => (z(b) >= z(a) ? b : a));
+  const f = [...d.querySelectorAll(FOCUSABLE)].filter((x) => !x.disabled && x.getClientRects().length && !x.closest('[inert]'));
+  const a = document.activeElement;
+  if (!f.length) { e.preventDefault(); d.focus({ preventScroll: true }); return; }
+  const first = f[0], last = f[f.length - 1];
+  if (!d.contains(a)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+  else if (e.shiftKey && (a === first || a === d)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+});
 // 2026-11-06: 휴대폰 서랍 — 닫혀 화면 밖에 있을 때 Tab이 보이지 않는 메뉴로 들어가던 것(inert), 열린 동안 뒤 화면으로 초점이 새던 것, 닫으면 초점이 사라지던 것
 const MOB = matchMedia('(max-width: 1023px)');
 function drawer(open) {
@@ -1570,7 +1609,7 @@ function render(s) {
   else if (issues.length) { ht.append('확인할 일 ', el('em', null, `${issues.length}건`)); }
   else ht.textContent = '모두 정상';
   if (lvl === 'ok' && (stale.length || hubBad)) { lvl = 'warn'; htxt = stale.length ? '멈춤 의심' : '허브 확인 지연'; }
-  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); hp.querySelector('.htxt').textContent = htxt.replace('마지막 실행 실패', '지금 실패');   // 2026-11-06: 아래 '24시간 동안 실패'와 다른 수인 걸 말로 hp.setAttribute('aria-label', '전체 상태: ' + htxt);
+  const hp = $('health'); hp.className = 'health ' + (lvl === 'ok' ? '' : lvl); const hshow = htxt.replace('마지막 실행 실패', '지금 실패'); hp.querySelector('.htxt').textContent = hshow; hp.setAttribute('aria-label', '전체 상태: ' + hshow);   // 2026-11-06: 아래 '24시간 동안 실패'와 다른 수인 걸 말로 · 2026-11-12: aria-label이 주석 안에 들어가 안 붙던 것
   $('hero-lead').textContent = `${busy}명 일하는 중` + (nextJob ? ` · 다음 회차 ${nextJob.next} ${(nextJob.desc || nextJob.id).split(/ — |: /)[0]}` : '') + (stale.length ? ` · 멈춤 의심 ${stale.map(([n]) => n).join(', ')}` : '');
   const al = $('barund-alert');
   if (bd && bd.alive === false) { al.hidden = false; al.innerHTML = ico('alert') + ' '; al.append(`회차 대기열(barund) 응답 없음${bd.at ? ` · 마지막 신호 ${hm(bd.at)}` : ''} · 정기·이벤트 회차 멈춤`); }
@@ -1918,21 +1957,21 @@ function route() {
 }
 window.addEventListener('hashchange', route); route();
 </script>
-<script src="office.js?v=676ee063ac"></script>
-<script src="activity.js?v=676ee063ac"></script>
-<script src="data.js?v=676ee063ac"></script>
-<script src="sourcing.js?v=676ee063ac"></script>
-<script src="automation.js?v=676ee063ac"></script>
-<script src="paths.js?v=676ee063ac"></script>
-<script src="flow.js?v=676ee063ac"></script>
-<script src="catalog.js?v=676ee063ac"></script>
-<script src="asks.js?v=676ee063ac"></script>
-<script src="vat.js?v=676ee063ac"></script>
-<script src="pay.js?v=676ee063ac"></script>
-<script src="settings.js?v=676ee063ac"></script>
-<script src="agents.js?v=676ee063ac"></script>
-<script src="tasks.js?v=676ee063ac"></script>
-<script src="reports.js?v=676ee063ac"></script>
-<script src="health.js?v=676ee063ac"></script>
+<script src="office.js?v=0f16874fcf"></script>
+<script src="activity.js?v=0f16874fcf"></script>
+<script src="data.js?v=0f16874fcf"></script>
+<script src="sourcing.js?v=0f16874fcf"></script>
+<script src="automation.js?v=0f16874fcf"></script>
+<script src="paths.js?v=0f16874fcf"></script>
+<script src="flow.js?v=0f16874fcf"></script>
+<script src="catalog.js?v=0f16874fcf"></script>
+<script src="asks.js?v=0f16874fcf"></script>
+<script src="vat.js?v=0f16874fcf"></script>
+<script src="pay.js?v=0f16874fcf"></script>
+<script src="settings.js?v=0f16874fcf"></script>
+<script src="agents.js?v=0f16874fcf"></script>
+<script src="tasks.js?v=0f16874fcf"></script>
+<script src="reports.js?v=0f16874fcf"></script>
+<script src="health.js?v=0f16874fcf"></script>
 </body>
 </html>

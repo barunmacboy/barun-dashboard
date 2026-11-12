@@ -284,7 +284,7 @@
         <section class="card fl-feed"><h2 class="card-t" style="margin:0 0 8px;font-size:16px">오늘 움직인 주문</h2><ul id="fl-feed"></ul></section>
         <section class="card fl-next"><h2 class="card-t" style="margin:0 0 8px;font-size:16px">지금·다음</h2><ul id="fl-next"></ul></section>
       </div>`;
-    const dr = E('aside', 'fl-dr'); dr.id = 'fl-dr'; dr.hidden = true; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-label', '자세히');
+    const dr = E('aside', 'fl-dr'); dr.id = 'fl-dr'; dr.hidden = true; if (window.barunDrawer) window.barunDrawer(dr, { label: '자세히' }); else { dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-label', '자세히'); }   // 공용 서랍(index.html): aria-modal·Tab 가두기·초점 돌려주기
     const scrim = E('div', 'fl-scrim'); scrim.id = 'fl-scrim'; scrim.hidden = true; scrim.onclick = () => closeDr();
     document.body.append(scrim, dr);
     $('fl-q').addEventListener('input', (e) => { flt.q = e.target.value.trim().toLowerCase(); render(); });
@@ -329,7 +329,7 @@
   // 버튼 — 할 일·주문 데이터 화면과 같은 길. out(결과 줄)이 있으면 거기에, 시트가 회차 중이면 '그래도 하기'
   async function act(body, btn, out) {
     if (body.action === 'reject' && !confirm('거절할까요?')) return null;
-    const lab = btn ? btn.textContent : '';
+    const lab = btn ? [...btn.childNodes] : [];   // 그림 버튼이 끝난 뒤 그림을 잃지 않게(2026-11-12)
     if (btn) { btn.disabled = true; if (body.kind === 'sheet_edit') btn.textContent = '시트에 쓰는 중…'; }
     try {
       const r = await (window.barunFetch || fetch)('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -343,7 +343,7 @@
       }
       if (j.ok) await load(true);
       return j;
-    } catch (e) { if (window.toast) window.toast('실패: ' + e.message); return null; } finally { if (btn) { btn.disabled = false; btn.textContent = lab; } }
+    } catch (e) { if (window.toast) window.toast('실패: ' + e.message); return null; } finally { if (btn) { btn.disabled = false; btn.replaceChildren(...lab); } }
   }
 
   // ── 거르기 ──
@@ -462,10 +462,12 @@
     const bh = E('div', 'fl-bh'), tabs = E('div', 'fl-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '흐름');
     for (const ln of data.lanes) {
       const ss = data.stages.filter((s) => s.lane === ln.id);
-      const tot = ss.reduce((a, s) => a + cnt(s, by), 0), nh = ss.reduce((a, s) => a + s.human, 0);
+      // 2026-11-12: '주문 N'이 배송 완료(최근 3일, 끝난 주문) 칸까지 세던 것 → 끝난 칸은 칸에만 보이고 숫자는 진행 중만(위 '진행 중 주문'과 같은 셈)
+      const fin = ss.filter((s) => s.id === 'done').reduce((a, s) => a + cnt(s, by), 0);
+      const tot = ss.filter((s) => s.id !== 'done').reduce((a, s) => a + cnt(s, by), 0), nh = ss.reduce((a, s) => a + s.human, 0);
       const b = E('button', 'fl-tab'); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(ln.id === lane));
       b.append(document.createTextNode(ln.name), E('b', null, String(tot))); if (nh) b.append(hum('span', 'h', nh));
-      b.title = ln.desc; b.onclick = () => { setLane(ln.id); render(); }; tabs.append(b);
+      b.title = ln.desc + (fin ? ` · 숫자는 진행 중만(배송 중 포함, 배송 완료 ${fin}건 뺌)` : ''); b.onclick = () => { setLane(ln.id); render(); }; tabs.append(b);
     }
     const cur = data.lanes.find((l) => l.id === lane);
     bh.append(tabs, E('span', 'd', cur.desc));

@@ -36,8 +36,12 @@
   };
   const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = window.noEmoji ? String(text).split('\n').map(window.noEmoji).join('\n') : text; return e; };
   const T = (s) => new Date(s.length === 19 ? s + '+09:00' : s);
-  const hm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  // 2026-11-12: 기기 시간대로 보이던 시각을 한국 시각으로(업무 흐름·상품 대장처럼 서울 기준) — 눈금·날짜 띠·밤 음영도 KST.
+  //   KST는 서머타임 없이 +9시간 고정이라 9시간 민 시각을 UTC 칸으로 읽으면 서울 벽시계
+  const K = (t) => { const k = new Date(+t + 9 * 36e5); return { y: k.getUTCFullYear(), mo: k.getUTCMonth() + 1, d: k.getUTCDate(), h: k.getUTCHours(), mi: k.getUTCMinutes(), dow: k.getUTCDay() }; };
+  const hm = (d) => { const k = K(d); return `${String(k.h).padStart(2, '0')}:${String(k.mi).padStart(2, '0')}`; };
+  const md = (d) => { const k = K(d); return `${k.mo}/${k.d}`; };
+  const kstDay0 = (t) => { const k = K(t); return new Date(Date.UTC(k.y, k.mo - 1, k.d) - 9 * 36e5); };   // 그날 KST 0시
   const dur = (s) => s == null ? '' : s < 90 ? `${s}초` : s < 5400 ? `${Math.round(s / 60)}분` : `${(s / 3600).toFixed(1)}시간`;
 
   function controls() {
@@ -94,8 +98,7 @@
     const steps = [1, 2, 3, 6, 12, 24];
     const step = steps.find(s => (spanH / s) * 64 <= width) || 24;
     const out = [];
-    const d = new Date(t0); d.setMinutes(0, 0, 0);
-    while (d <= t1) { if (d >= t0 && d.getHours() % step === 0) out.push(new Date(d)); d.setHours(d.getHours() + 1); }
+    for (let d = Math.floor(+t0 / 36e5) * 36e5; d <= t1; d += 36e5) if (d >= t0 && K(d).h % step === 0) out.push(new Date(d));   // KST 정시 = UTC 정시(+9 고정)
     return out;
   }
 
@@ -131,26 +134,26 @@
       'aria-label': `에이전트 활동 타임라인, 최근 ${data.hours}시간` }, wrap);
 
     // 날짜 띠(하루씩 번갈아) + 밤 시간(00~07) 음영
-    const day = new Date(t0); day.setHours(0, 0, 0, 0);
+    let day = kstDay0(t0);
     let alt = 0;
     while (day < t1) {
-      const n = new Date(day); n.setDate(n.getDate() + 1);
+      const n = new Date(+day + 864e5);
       const a = Math.max(x(day), LABEL_W), b = Math.min(x(n), width - PAD_R);
       if (b > a) {
         if (alt % 2) svgEl('rect', { x: a, y: AXIS_H, width: b - a, height: height - AXIS_H, class: 'dayband' }, svg);
-        const nightEnd = new Date(day); nightEnd.setHours(7);
+        const nightEnd = new Date(+day + 7 * 36e5);
         const na = Math.max(x(day), LABEL_W), nb = Math.min(x(nightEnd), width - PAD_R);
         if (nb > na) svgEl('rect', { x: na, y: AXIS_H, width: nb - na, height: height - AXIS_H, class: 'night' }, svg);
-        if (x(day) >= LABEL_W) svgEl('text', { x: x(day) + 4, y: 12, class: 'axis-date' }, svg).textContent = `${md(day)} (${'일월화수목금토'[day.getDay()]})`;
+        if (x(day) >= LABEL_W) svgEl('text', { x: x(day) + 4, y: 12, class: 'axis-date' }, svg).textContent = `${md(day)} (${'일월화수목금토'[K(day).dow]})`;
       }
-      day.setDate(day.getDate() + 1); alt++;
+      day = n; alt++;
     }
     // 시각 눈금
     for (const d of ticksFor(t0, t1, plotW)) {
       const px = x(d);
       svgEl('line', { x1: px, x2: px, y1: AXIS_H - 6, y2: height, class: 'grid' }, svg);
       if (px < x(now) - 18 || px > x(now) + 78)   // '지금 HH:MM' 글자와 겹치는 눈금 글자는 뺀다
-        svgEl('text', { x: px, y: AXIS_H - 10, class: 'axis', 'text-anchor': 'middle' }, svg).textContent = `${d.getHours()}시`;
+        svgEl('text', { x: px, y: AXIS_H - 10, class: 'axis', 'text-anchor': 'middle' }, svg).textContent = `${K(d).h}시`;
     }
 
     let y = AXIS_H;

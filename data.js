@@ -68,6 +68,10 @@
       Object.assign(E('div', 'dt-fx'), { hidden: true }), sc, E('div', 'dt-more', null));
     root.append(card, Object.assign(E('div', 'dt-bar'), { id: 'dt-bar', hidden: true }), Object.assign(E('div', 'card dt-detail'), { id: 'dt-detail', hidden: true }));
     fitWatch(card);
+    if (window.barunDrawer) {   // 공용 서랍(index.html): aria-modal·Tab 가두기·닫으면 연 자리로 — 필터·바꾼 기록은 넓은 화면에서만 서랍(휴대폰은 제자리)
+      const wide = () => matchMedia('(min-width: 761px)').matches;
+      window.barunDrawer($('dt-detail'), { label: '줄 자세히' }); window.barunDrawer(fp, { label: '필터·정렬', modal: wide }); window.barunDrawer(au, { label: '바꾼 기록', modal: wide });
+    }
     const q = E('input', 'dt-q'); q.type = 'search'; q.placeholder = '받는 분·상품·주문번호·송장·전화'; q.setAttribute('aria-label', '찾기'); q.enterKeyHint = 'search';
     let t;
     const now = () => { clearTimeout(t); cur.q = q.value.trim(); cur.offset = 0; return load(); };
@@ -1206,7 +1210,7 @@
       : payload.kind === 'sheet_undo' ? `undo#${payload.line || payload.batch || payload.id}` : '';   // 되돌리기·되살리기도 회차가 끝나면 저절로
     if (wk && payload.force) delete rowWait[wk];
     if (wk && payload.retry && !(wk in rowWait)) return;          // '그래도 하기'로 이미 끝낸 대기
-    const label = btn && btn.textContent;
+    const label = btn ? [...btn.childNodes] : [];   // 그림 버튼(IB)이 끝난 뒤 그림을 잃지 않게 원래 내용 그대로(2026-11-12)
     if (btn) { btn.disabled = true; if (payload.kind.startsWith('sheet')) btn.textContent = '시트에 쓰는 중…'; }
     try {
       const j = await post(payload);
@@ -1226,7 +1230,7 @@
       }
       if (j.ok && !payload.kind.endsWith('preview')) { load(); loadTables(); }
       return j;
-    } catch (e) { toast(e.message, true); if (out) { out.textContent = ''; out.append(I('alert'), ' ', e.message); out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+    } catch (e) { toast(e.message, true); if (out) { out.textContent = ''; out.append(I('alert'), ' ', e.message); out.hidden = false; } } finally { if (btn) { btn.disabled = false; btn.replaceChildren(...label); } }
   }
 
   const field = (lab, input) => { const l = E('label', 'dt-field'); l.append(E('span', null, lab), input); return l; };
@@ -1264,12 +1268,12 @@
     if (!String(r.name || '').trim()) { toast('상품명이 비어 복사 불가 · [재고 넣기]로', true); return; }
     const wk = `${r.tab}#${r.row}`;
     if (!retry && !force && copyWait[wk]) { toast(`${r.tab} ${r.row}행은 회차가 끝나면 자동으로 넣어요`, false, 3600); return; }
-    const label = b && b.textContent; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
+    const label = b ? [...b.childNodes] : []; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'stock_copy', tab: r.tab, row: r.row, key: r.key || '', ident: ident(r) };   // 값은 서버가 지금 시트에서 다시 읽어 복사
     if (force) payload.force = true;
     if (retry) payload.retry = true;     // 자동 재시도 — 오류 장부는 첫 번만 셈
     let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
-    if (b) { b.disabled = false; b.textContent = label; }
+    if (b) { b.disabled = false; b.replaceChildren(...label); }
     const m = String(j.msg || '');
     if (j.ok) {
       delete copyWait[wk];
@@ -1292,11 +1296,11 @@
   }
   async function rowCopy(r, b, force) {     // 줄 전체 복사 — 값은 서버가 지금 장부에서 다시 읽음, 원래 줄은 그대로
     if (!r) return;
-    const label = b && b.textContent; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
+    const label = b ? [...b.childNodes] : []; if (b) { b.disabled = true; b.textContent = '넣는 중…'; }
     const payload = { kind: 'sheet_row', op: 'copy', tab: r.tab, row: r.row, key: isStock(r) ? '' : r.key || '', ident: ident(r) };
     if (force) payload.force = true;
     let j; try { j = await post(payload); } catch (e) { j = { ok: false, msg: e.message }; }
-    if (b) { b.disabled = false; b.textContent = label; }
+    if (b) { b.disabled = false; b.replaceChildren(...label); }
     const m = String(j.msg || '');
     if (j.ok) {
       const pos = m.match(/(\S+) (\d+)행에/);
