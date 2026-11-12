@@ -262,7 +262,7 @@
     const card = E('div', 'card'), h = E('div', 'card-h');
     const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
     h.append(E('h2', '', '쿠팡 계정 — 새 상품을 어디에 올릴까'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
-    card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품이 올라가요. 판매자 번호·Wing 아이디·출고지·반품지·연락처는 그 계정 것으로 바꿔 보내고, 바른청년 정보가 남으면 보내지 않아요.'));
+    card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품이 올라가요. 키를 넣은 계정은 그 계정 주문도 수집·발주확인·송장 올리기·취소·반품까지 바른청년과 똑같이 처리하고, 시트 플랫폼 칸에 "쿠팡·계정 이름"으로 보여요.'));
     const list = E('div', 'ac-list');
     for (const a of D.accounts) list.append(acctTile(a));
     card.append(list);
