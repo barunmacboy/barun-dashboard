@@ -116,6 +116,7 @@
   }
   // 목록 모양: 표(엑셀처럼) · 카드(휴대폰) — 고르지 않았으면 화면 폭으로(760px 이하 = 카드)
   const NARROW = matchMedia('(max-width: 760px)');
+  const TOUCHY = matchMedia('(max-width: 1023px), (pointer: coarse)');   // 휴대폰·태블릿(손가락) — 표 높이(fitH)
   const viewMode = () => { let v = ''; try { v = localStorage.getItem('barun.dt.view') || ''; } catch (e) { /* 없음 */ } return v === 'grid' || v === 'cards' ? v : (NARROW.matches ? 'cards' : 'grid'); };
   function setView(v) { try { localStorage.setItem('barun.dt.view', v === (NARROW.matches ? 'cards' : 'grid') ? '' : v); } catch (e) { /* 없음 */ } if (last) render(); }
   NARROW.addEventListener('change', () => { if (last && built) render(); });
@@ -968,7 +969,11 @@
     const w = document.querySelector('.dt-wrap'), p = $('p-data'); if (!w || !p || p.hidden) return;
     if (w.classList.contains('cards')) { w.style.maxHeight = w.style.minHeight = ''; return; }
     const b = w.getBoundingClientRect(), m = p.closest('main') || p, below = m.getBoundingClientRect().bottom - b.bottom;   // 화면(문서) 높이는 창보다 작아지지 않아 그걸로 재면 표가 줄기만 함
-    const h = Math.max(300, Math.floor(innerHeight - (b.top + scrollY) - below));
+    // 휴대폰·터치(2026-11-13): 위 찾기·칩 줄이 화면 절반을 먹어 표가 300px로 눌리던 것 → 화면을 끝까지 내리면 표가 위 막대 바로 아래부터
+    //   아래 줄(below)까지 꽉 차는 높이. 표 끝에서 더 밀면 화면이 넘어감(.dt-wrap overscroll-behavior-y)
+    const bh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 0;
+    const h = TOUCHY.matches ? Math.max(320, Math.floor(innerHeight - bh - below - 8))
+      : Math.max(300, Math.floor(innerHeight - (b.top + scrollY) - below));
     if (Math.abs((parseFloat(w.style.maxHeight) || 0) - h) > 1) { w.style.maxHeight = h + 'px'; w.style.minHeight = Math.min(h, 320) + 'px'; hSync(); }
   }
   function fitWatch(card) {      // 위 줄(필터 판·걸린 필터·칸 내용 줄)·아래 줄·고른 줄 막대의 높이가 바뀌면 다시 맞춤
@@ -1511,6 +1516,7 @@ table.dt.sheet tbody tr.painted { background: color-mix(in srgb, var(--row-bg) 7
 /* 틀 고정: 표 높이를 화면 바닥까지로 맞추니(fitH) 아래 큰 여백은 줄임 — 화면 전체가 넘어가 위 줄이 사라지지 않게 */
 @media (min-width: 1024px) { main.pages:has(> #p-data:not([hidden])) { padding-bottom: 16px; } }
 .dt-wrap { overscroll-behavior: contain; }
+@media (max-width: 1023px), (pointer: coarse) { .dt-wrap { overscroll-behavior-y: auto; } }   /* 표 끝에서 더 밀면 화면이 넘어감(갇히지 않게) */
 .dt-save { min-width: 180px; justify-content: center; }
 .ov-chip.ov-link { background: var(--blue-bg); color: var(--blue-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; } .ov-chip.ov-link:hover { text-decoration: underline; }
 /* 휴대폰 줄 자세히(2026-10-26 감사): 붙어 있는 머리(이름·상품 두 줄·칩 세 줄)가 화면 1/3을 먹던 것 → 버튼은 오른쪽 위에 겹치고

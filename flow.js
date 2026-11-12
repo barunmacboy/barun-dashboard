@@ -178,9 +178,17 @@
       .fl-ac .w { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
       .fl-ac.run { color: var(--blue-ink); font-weight: 600; } .fl-ac.run .w { color: var(--blue-ink); }
       .fl-ac.fail .w { color: var(--red-ink); }
-      .fl-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }
+      .fl-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 8px; }   /* 칸 끝에 닿으면 화면이 넘어감(2026-11-13 갇힘 정리) */
       /* 칸 아래로 더 있으면 끝을 흐리게(카드가 줄 가운데서 잘려 보이던 것) */
       .fl-body.fade-b { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent); }
+      /* 휴대폰·터치(2026-11-13 '스크롤이 안되는 화면'): 칸마다 안에서 넘기면 손가락이 칸에 갇혀 화면이 안 내려감 → 칸은 내용만큼 길게, 화면이 넘어감.
+         옆으로는 칸 하나씩 붙어 넘어감(휴대폰 칸 폭은 아래 좁은 화면 절) */
+      @media (max-width: 1023px), (pointer: coarse) {
+        .fl-cols { height: auto; scroll-snap-type: x mandatory; }
+        .fl-col { align-self: flex-start; }
+        .fl-body { overflow: visible; }
+        .fl-body.fade-b { -webkit-mask-image: none; mask-image: none; }
+      }
       .fl-body > details { background: var(--card); border-radius: var(--r-sm); padding: 8px 12px; font-size: 12px; }
       .fl-body > details > summary { color: var(--sub); font-weight: 600; font-size: 12.5px; padding: 0; }
       .fl-body > details[open] { display: grid; gap: 8px; } .fl-body > details .fl-ag { background: var(--fill2); }
@@ -305,7 +313,7 @@
         .fl-mlg { margin-left: 0; }
         .fl-bh { padding: 12px 12px 0; } .fl-bh .d { display: none; }
         .fl-tabs { flex: 1 1 auto; }
-        .fl-cols { padding: 12px; gap: 8px; scroll-snap-type: x mandatory; scroll-padding-inline: 12px; height: calc(100dvh - 160px); }
+        .fl-cols { padding: 12px; gap: 8px; scroll-padding-inline: 12px; }
         .fl-node .b i.in { display: inline-flex; }
         .fl-col { flex: 0 0 84vw; max-width: none; }
         .fl-dr { width: 100vw; }

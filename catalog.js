@@ -50,7 +50,6 @@
       .ct-seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
       /* 정렬 — 칩과 같은 높이·모양(기본 고르기 상자가 따로 놀던 것) */
       .ct-selw { position: relative; display: inline-flex; flex: none; }
-      .ct-selw::after { content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px; margin-top: -5px; border: solid var(--sub); border-width: 0 2px 2px 0; transform: rotate(45deg); pointer-events: none; }
       .ct-sel { appearance: none; -webkit-appearance: none; box-sizing: border-box; height: 32px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink2);
         font: inherit; font-size: 13px; font-weight: 600; padding: 0 32px 0 12px; cursor: pointer; transition: background-color .18s var(--ease); }
       .ct-sel:hover { background: var(--hover); } .ct-sel:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }

@@ -589,8 +589,9 @@ table.dt tbody tr.on { background: var(--blue-bg); }
 .sv-day b.h { background: var(--sv-h); } .sv-day b.a { background: var(--sv-a); }
 .sv-day b em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10.5px; color: var(--ink2); white-space: nowrap; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
 .sv-x { grid-column: 2; display: flex; gap: 4px; padding: 6px 2px 0; font-size: 11.5px; color: var(--muted); }
-.sv-x span { flex: 1 1 0; text-align: center; min-width: 0; white-space: nowrap; overflow: hidden; }
-@media (max-width: 560px) { .sv-x span:nth-child(even) { visibility: hidden; } }   /* 좁으면 날짜를 하나 걸러(10/·30 두 줄로 깨지던 것) */
+.sv-x span { flex: 1 1 0; min-width: 0; white-space: nowrap; display: flex; justify-content: center; }   /* 칸보다 긴 날짜는 가운데에서 양옆으로(잘려 '10/'만 보이던 것, 2026-11-13) */
+@media (max-width: 900px) { .sv-x span:not(.x2) { visibility: hidden; } }   /* 좁으면 마지막 날부터 이틀마다 */
+@media (max-width: 560px) { .sv-x span:not(.x4) { visibility: hidden; } }   /* 휴대폰은 나흘마다 */
 .sv-legend { display: flex; gap: 14px; margin-top: 4px; font-size: 12.5px; color: var(--sub); flex-wrap: wrap; }
 .sv-legend span { display: inline-flex; align-items: center; gap: 6px; } .sv-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .sv-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--card); box-shadow: var(--pop); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; white-space: nowrap; }
@@ -985,10 +986,52 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   /* 표 줄 — 마우스가 있는 줄 */
   @media (hover: hover) { table tbody tr:hover > td { background: color-mix(in srgb, var(--hover) 70%, transparent); } }
 }
+/* ── 불러오는 중(2026-11-13 사장님 "로딩중이면 로딩중 애니메이션 나오게") — 켜고 끄기는 dashboard/motion.js(받는 중인 요청 = transport.js)
+   맨 위 얇은 막대(#loadbar) · '불러오는 중' 글 앞 도는 고리(.ld) · 아직 빈 카드(.sk)·빈 화면(.sk-page)은 회색 줄 뼈대가 반짝임 */
+#loadbar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 90; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .3s var(--ease); }
+#loadbar.on { opacity: 1; }
+#loadbar::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; border-radius: 0 3px 3px 0; background: var(--blue); animation: loadbar 1.1s var(--ease) infinite; }
+@keyframes loadbar { from { transform: translateX(-100%); } to { transform: translateX(270%); } }
+.ld::before { content: ""; display: inline-block; flex: none; width: .95em; height: .95em; margin-right: .45em; vertical-align: -.14em; box-sizing: border-box; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--blue); animation: spin .75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sk.sk, .sk-lines, .page.sk-page::before { --bone: var(--fill); background-color: var(--card);
+  background-image: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--card) 75%, transparent) 50%, transparent 80%),
+    linear-gradient(var(--bone) 0 0), linear-gradient(var(--bone) 0 0), linear-gradient(var(--bone) 0 0), linear-gradient(var(--bone) 0 0);
+  background-repeat: no-repeat; background-size: 60% 100%, 38% 18px, calc(100% - 40px) 12px, 70% 12px, 48% 12px;
+  background-position: -150% 0, 20px 22px, 20px 56px, 20px 80px, 20px 104px; background-origin: border-box; animation: bones 1.3s linear infinite; }
+.sk.sk { min-height: 132px; }
+.sk-lines { height: 92px; margin-top: 4px; border-radius: 8px; background-position: -150% 0, 0 4px, 0 34px, 0 58px, 0 82px; background-size: 60% 100%, 38% 14px, 100% 10px, 70% 10px, 48% 10px; animation-name: bones-l; }
+@keyframes bones-l { to { background-position: 250% 0, 0 4px, 0 34px, 0 58px, 0 82px; } }
+.page.sk-page::before { content: ""; display: block; height: 132px; border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+@keyframes bones { to { background-position: 250% 0, 20px 22px, 20px 56px, 20px 80px, 20px 104px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .ld { color: var(--muted) !important; background: none; } }
+
+/* ── 휴대폰·터치 화면(2026-11-13 사장님 "스크롤이 안되거나 화면이 깨지는 부분 다 잡아, 모바일 UIUX 개선") ──
+   · 카드 안 세로 스크롤 상자는 손가락이 갇혀 화면이 안 내려감 → 상자 스크롤을 끄고 접어서 '더 보기'(.tclip — motion.js fold + clipBox)
+   · 화면 전체가 옆으로 흔들리지 않게(옆으로 넘기는 칩 줄·표는 그 안에서만 넘어감)
+   · 고르기 상자·입력칸: 아이폰은 기본 모양이면 높이·여백을 무시해 21px로 작아지고, 16px보다 작은 글이면 누를 때 화면이 확대됨 */
+body { overflow-x: clip; }
+select { -webkit-appearance: none; appearance: none; cursor: pointer; min-height: 34px; padding-right: 32px !important; text-overflow: ellipsis;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%) !important;
+  background-position: right 16px center, right 11px center !important; background-size: 5px 5px !important; background-repeat: no-repeat !important; }
+@media (max-width: 1023px), (pointer: coarse) {
+  .tclip { overflow-y: hidden !important; overscroll-behavior: auto; }
+  select { min-height: 40px; }
+}
+@media (pointer: coarse) { input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, 1em) !important; } }
+/* 손가락으로 누르는 글자 버튼·링크는 누르는 자리를 넓게(글자 높이 17~24px라 옆 줄을 잘못 누르던 것) — 줄 모양은 그대로, 누르는 칸만 */
+@media (pointer: coarse) {
+  .more-link { min-height: 32px; display: inline-flex; align-items: center; }
+  .mine .mt { padding-block: 4px; }
+  ul.log li > a, .tk-t a, .fl-feed li > button { padding-block: 6px; }   /* 화면 모듈의 all: unset보다 무겁게 */
+  .todo .t { padding-block: 2px; }
+}
 </style>
 </head>
 <body>
+<div id="loadbar" class="on" aria-hidden="true"></div>
 <aside class="sidebar" id="side" aria-label="메뉴">
   <div class="brand"><span class="logo" aria-hidden="true">바</span><span><b>바른청년</b><small>운영 현황</small></span>
     <button class="icon-btn side-close" id="side-close" type="button" aria-label="메뉴 닫기"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -1132,9 +1175,9 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   </form>
 </dialog>
 
-<script src="config.js?v=eb461015d0"></script>
-<script src="transport.js?v=eb461015d0"></script>
-<script src="navigation.js?v=eb461015d0"></script>
+<script src="config.js?v=d042f69c39"></script>
+<script src="transport.js?v=d042f69c39"></script>
+<script src="navigation.js?v=d042f69c39"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1466,17 +1509,27 @@ $('task-send').onclick = async (ev) => {
 };
 $('task-text').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('task-send').click(); });
 
-const clipOpen = new Set();   // 펼친 상자(5초·20초 갱신에도 그대로)
+// 긴 상자 접기 한 곳(일지·현재 상태 + 휴대폰·터치에서는 카드 안 스크롤 상자 전부 — motion.js fold, 2026-11-13): 아래를 흐리게 + '더 보기 ›'.
+// 누를 때마다 화면 한 장 반씩 더 펼치고, 끝까지 펼치면 '접기'. id가 있는 상자는 20초 갱신으로 다시 그려도 펼친 만큼 그대로(clipOpen).
+const clipOpen = new Map();
 function clipBox(box) {
   const id = box.id; let b = box.nextElementSibling; if (!(b && b.classList.contains('clip-more'))) b = null;
-  const open = clipOpen.has(id); box.classList.toggle('clip-open', open);
-  const over = open || box.scrollHeight > box.clientHeight + 4;
-  box.classList.toggle('clip-fade', over && !open);
-  if (!over) { if (b) b.remove(); return; }
+  const step = id ? (clipOpen.get(id) || 0) : +(box.dataset.clipStep || 0);
+  box.style.maxHeight = ''; box.classList.remove('clip-open');
+  const base = parseFloat(getComputedStyle(box).maxHeight), full = box.scrollHeight;
+  if (!(base > 0) || full <= base + 4) { box.classList.remove('clip-fade'); if (b) b.remove(); return; }
+  const lim = base + step * Math.max(600, Math.round(innerHeight * 1.5)), all = step > 0 && lim >= full - 4;
+  if (all) box.classList.add('clip-open'); else if (step) box.style.maxHeight = lim + 'px';
+  box.classList.toggle('clip-fade', !all);
   if (!b) { b = el('button', 'more-link clip-more'); b.type = 'button'; b.style.marginLeft = '0'; box.after(b); }
-  b.textContent = open ? '접기' : '더 보기 ›'; b.setAttribute('aria-expanded', String(open));
-  b.onclick = () => { if (clipOpen.has(id)) clipOpen.delete(id); else clipOpen.add(id); clipBox(box); };
+  b.textContent = all ? '접기' : '더 보기 ›'; b.setAttribute('aria-expanded', String(all));
+  b.onclick = () => {
+    const n = all ? 0 : step + 1;
+    if (id) { if (n) clipOpen.set(id, n); else clipOpen.delete(id); } else box.dataset.clipStep = String(n);
+    clipBox(box); if (!n) box.scrollIntoView({ block: 'nearest' });
+  };
 }
+window.clipBox = clipBox;
 // 현재 상태(STATUS.md)의 파일 경로(`data/worklog/….md`·`jobs/run_agent.sh`)는 사장님께 뜻이 없어 걷음(2026-11-06 UX 검토) — 원문은 git에
 // 화면 글 정리 한 곳(2026-11-12 리뉴얼 — 할 일 카드·주문 경로·상품 발굴이 따로 두던 것을 합침): 이모지·영어 코드(koLabel)·명령·서버 경로·주소를
 // 사람 말로. strict = 내부 이름(auto-*, snake_case, .py)까지 걷음(주문 경로처럼 서버 설명이 그대로 오는 화면). 원문은 접어 둔 '근거'·title에.
@@ -1604,7 +1657,9 @@ function renderSavings(sv) {
       const show = () => { tip.innerHTML = `<b>${escH(String(d.day).slice(5).replace('-', '/'))}</b><br><i style="background:var(--sv-h)"></i>사람 ${durK(d.human)}<br><i style="background:var(--sv-a)"></i>AI ${durK(d.ai)} · ${usd((d.cost || 0))}`; tip.hidden = false;
         const r = g.getBoundingClientRect(), pr = ch.getBoundingClientRect(); tip.style.left = `${Math.min(pr.width - 170, Math.max(0, r.left - pr.left + r.width / 2 - 60))}px`; tip.style.top = '4px'; };
       g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('click', show); g.addEventListener('mouseleave', () => { tip.hidden = true; }); g.addEventListener('blur', () => { tip.hidden = true; });
-      plot.append(g); xs.append(el('span', null, d.day.slice(5).replace('-', '/')));
+      const back = days.length - 1 - days.indexOf(d), xl = el('span', null, d.day.slice(5).replace('-', '/'));
+      if (back % 2 === 0) xl.classList.add('x2'); if (back % 4 === 0) xl.classList.add('x4');
+      plot.append(g); xs.append(xl);
     }
     ch.append(y, plot, xs, tip); c.append(ch); box.append(c);
   }
@@ -2092,23 +2147,25 @@ function route() {
   showTab(TABS.includes(h) ? h : (TABS.includes(last) ? last : 'home'), false);
 }
 window.addEventListener('hashchange', route); route();
+// 주소의 #화면 이름이 같은 id를 가진 요소(#health = 위 막대 상태 단추)를 브라우저가 열 때 골라 초점을 줘 파란 테두리가 남던 것(2026-11-13) — 화면 이름은 요소 고르기가 아님
+window.addEventListener('load', () => { const a = document.activeElement, h = location.hash.slice(1).split('?')[0]; if (a && h && a.id === h) a.blur(); });
 </script>
-<script src="office.js?v=eb461015d0"></script>
-<script src="activity.js?v=eb461015d0"></script>
-<script src="data.js?v=eb461015d0"></script>
-<script src="sourcing.js?v=eb461015d0"></script>
-<script src="automation.js?v=eb461015d0"></script>
-<script src="paths.js?v=eb461015d0"></script>
-<script src="flow.js?v=eb461015d0"></script>
-<script src="catalog.js?v=eb461015d0"></script>
-<script src="asks.js?v=eb461015d0"></script>
-<script src="vat.js?v=eb461015d0"></script>
-<script src="pay.js?v=eb461015d0"></script>
-<script src="settings.js?v=eb461015d0"></script>
-<script src="agents.js?v=eb461015d0"></script>
-<script src="tasks.js?v=eb461015d0"></script>
-<script src="reports.js?v=eb461015d0"></script>
-<script src="health.js?v=eb461015d0"></script>
-<script src="motion.js?v=eb461015d0"></script>
+<script src="office.js?v=d042f69c39"></script>
+<script src="activity.js?v=d042f69c39"></script>
+<script src="data.js?v=d042f69c39"></script>
+<script src="sourcing.js?v=d042f69c39"></script>
+<script src="automation.js?v=d042f69c39"></script>
+<script src="paths.js?v=d042f69c39"></script>
+<script src="flow.js?v=d042f69c39"></script>
+<script src="catalog.js?v=d042f69c39"></script>
+<script src="asks.js?v=d042f69c39"></script>
+<script src="vat.js?v=d042f69c39"></script>
+<script src="pay.js?v=d042f69c39"></script>
+<script src="settings.js?v=d042f69c39"></script>
+<script src="agents.js?v=d042f69c39"></script>
+<script src="tasks.js?v=d042f69c39"></script>
+<script src="reports.js?v=d042f69c39"></script>
+<script src="health.js?v=d042f69c39"></script>
+<script src="motion.js?v=d042f69c39"></script>
 </body>
 </html>

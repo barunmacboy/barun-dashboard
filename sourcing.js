@@ -66,6 +66,7 @@
       .sc-share .bar { height: 10px; border-radius: 5px; background: var(--fill2); overflow: hidden; }
       .sc-share .bar b { display: block; height: 100%; background: var(--st-run); border-radius: 5px; }
       .sc-share .m { grid-column: 2; color: var(--muted); font-size: 12px; }
+      @media (max-width: 560px) { .sc-share { grid-template-columns: minmax(0, 1fr) 42%; } .sc-share .m { grid-column: 1 / -1; } }   /* 휴대폰: 설명이 좁은 오른쪽 칸에서 여러 줄로 깨지던 것 */
       .sc-li .row-body { gap: 2px; } .sc-li .row-title { font-size: 14px; }
       .sc-li .muted { font-size: 12.5px; overflow-wrap: anywhere; }
       .sc-li .id { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }

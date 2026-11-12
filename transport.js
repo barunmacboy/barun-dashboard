@@ -1,6 +1,16 @@
-/* 현황판 요청: 읽기만 제한 재시도·시간 제한, 쓰기는 중복 실행 없이 결과 확인을 안내한다. */
+/* 현황판 요청: 읽기만 제한 재시도·시간 제한, 쓰기는 중복 실행 없이 결과 확인을 안내한다.
+   받는 중인 요청 수(pending)를 'barun:net' 알림으로 — 맨 위 불러오는 막대·빈 카드 뼈대(motion.js)가 이걸 봄(2026-11-13). */
 (function (root) {
+  let pending = 0;
+  const note = (d) => {
+    pending = Math.max(0, pending + d);
+    try { if (root.dispatchEvent && typeof CustomEvent === 'function') root.dispatchEvent(new CustomEvent('barun:net', { detail: pending })); } catch (e) { /* 알림 실패는 요청과 무관 */ }
+  };
   async function request(url, opts = {}) {
+    note(1);
+    try { return await send(url, opts); } finally { note(-1); }
+  }
+  async function send(url, opts) {
     const { timeoutMs = 15000, ...options } = opts;
     const method = (options.method || 'GET').toUpperCase();
     const read = method === 'GET' || method === 'HEAD';
@@ -23,5 +33,5 @@
       }
     }
   }
-  root.BarunTransport = { request };
+  root.BarunTransport = { request, get pending() { return pending; } };
 })(typeof window === 'undefined' ? globalThis : window);

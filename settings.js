@@ -27,6 +27,9 @@
       #p-settings { display: grid; gap: 14px; }
       .st-sticky { position: sticky; top: calc(var(--bar-h) + 6px); z-index: 5; box-shadow: 0 6px 20px rgba(16, 24, 40, .06); }
       @media (max-width: 1023px) { .st-sticky { top: calc(var(--bar-h) + 4px); padding: 12px; } }
+      /* 휴대폰: 묶음 칩이 네 줄로 늘어 붙어 있는 찾기 판이 화면 1/3을 가리던 것(2026-11-13) → 칩은 한 줄로 옆으로 넘김 */
+      @media (max-width: 720px) { #st-groups { flex-wrap: nowrap; overflow-x: auto; margin: 10px -12px 0 !important; padding: 0 12px; scroll-padding-inline: 12px; }
+        #st-groups .st-chip { flex: none; white-space: nowrap; } }
       .st-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       .st-bar input[type=search] { font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); flex: 1 1 240px; min-width: 0; }
       .st-chip { font: inherit; font-size: 13px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--sub); cursor: pointer; }

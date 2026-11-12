@@ -35,9 +35,6 @@
       .py-f { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--sub); min-width: 0; }
       .py-f input, .py-f select, .py-sel { box-sizing: border-box; font: inherit; font-size: 14px; font-weight: 400; min-height: 34px; padding: 0 12px; border-radius: var(--r-sm);
         border: 1px solid var(--line); background-color: var(--card); color: var(--ink); min-width: 0; width: 100%; }
-      .py-f select, .py-sel { -webkit-appearance: none; appearance: none; padding-right: 32px; cursor: pointer; text-overflow: ellipsis;
-        background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-        background-position: right 16px center, right 11px center; background-size: 5px 5px; background-repeat: no-repeat; }
       .py-f input:hover, .py-f select:hover, .py-sel:hover { border-color: var(--axis); }
       .py-add { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); } #py-cards:empty + .py-add { margin-top: 0; padding-top: 0; border-top: 0; }
       .py-add h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; } .py-add p { margin: 8px 0 0; }

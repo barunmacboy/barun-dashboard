@@ -60,9 +60,6 @@
       .vt-sum b { font-variant-numeric: tabular-nums; }
       .vt-fix { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
       .vt-fix select, .vt-fix input, .vt-dlg input, .vt-dlg select { font: inherit; font-size: 13.5px; min-height: 34px; padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background-color: var(--card); color: var(--ink); min-width: 0; }
-      .vt-fix select, .vt-dlg select { -webkit-appearance: none; appearance: none; padding-right: 32px; cursor: pointer;
-        background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-        background-position: right 16px center, right 11px center; background-size: 5px 5px; background-repeat: no-repeat; }
       .vt-fix select:hover, .vt-fix input:hover, .vt-dlg input:hover, .vt-dlg select:hover { border-color: var(--axis); }
       .vt-fix input { flex: 1 1 112px; max-width: 160px; } .vt-fix input.wide { flex-basis: 152px; max-width: 200px; } .vt-fix select { flex: 0 1 auto; }
       .vt-dlg input, .vt-dlg select { min-height: 42px; font-size: 14.5px; }

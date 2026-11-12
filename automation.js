@@ -46,7 +46,7 @@
       .au-flow-wrap.more-r::after { content: ""; position: absolute; top: 0; right: 0; bottom: 12px; width: 40px; pointer-events: none;
         background: linear-gradient(to right, transparent, var(--card)); }
       .au-hint { font-size: 12px; color: var(--muted); text-align: right; margin: 0 0 4px; }
-      .au-step { flex: 0 0 120px; width: 120px; height: 112px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card);
+      .au-step { flex: 0 0 120px; width: 120px; min-height: 112px; align-self: stretch; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card);
         padding: 8px 12px 12px; text-align: left; cursor: pointer; scroll-snap-align: start; position: relative; font: inherit; color: inherit;
         display: grid; grid-template-rows: auto 36px auto 1fr; align-content: start; overflow: hidden; }
       .au-step:hover { background: var(--hover); } .au-step:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
