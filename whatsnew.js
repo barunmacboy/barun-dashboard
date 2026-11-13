@@ -46,6 +46,8 @@
       desc: '다른 쿠팡 계정 키로 상품을 읽었는지, 심사·반려와 30일 주문을 보여요.' },
     { id: 'acct-home', at: '2026-11-13', page: 'home', target: '#sys [data-goto="health:acct-sec"] .k', title: '판매 계정',
       desc: '시스템 카드에 판매 계정과 새 상품을 올리는 계정이 보여요.' },
+    { id: 'disk', at: '2026-11-14', page: 'home', target: '#sys [data-goto="health"] .k', title: '저장 공간',
+      desc: '맥미니에 남은 저장 공간을 보여 줘요. 설정 기준(20GB·8GB) 아래면 노랑·빨강으로 바뀌고 매일 감사가 알려요.' },
     { id: 'whatsnew', at: '2026-11-13', page: 'home', target: '#wn-sec .card-h h2', title: '새 기능 알림',
       desc: '새로 생긴 기능에 NEW 표가 붙어요. 확인하면 꺼지고, 14일이 지나면 저절로 사라져요.' },
   ];

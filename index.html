@@ -1182,9 +1182,9 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; min-height
   </form>
 </dialog>
 
-<script src="config.js?v=65b50f0bd4"></script>
-<script src="transport.js?v=65b50f0bd4"></script>
-<script src="navigation.js?v=65b50f0bd4"></script>
+<script src="config.js?v=4655e78e51"></script>
+<script src="transport.js?v=4655e78e51"></script>
+<script src="navigation.js?v=4655e78e51"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1836,6 +1836,8 @@ function render(s) {
     ['고칠 거리', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
     ['코드 저장소', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? '최신이에요' : `올릴 것 ${s.git.ahead ?? '?'} · 받을 것 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 저장 안 한 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
   ];
+  { const dk = s.disk || {};   // 저장 공간(2026-11-14 감사 — 98%인데 어디에도 안 보였음): 남은 GB, 설정 기준 아래면 주의·위험
+    if (dk.free_gb != null) SYS.splice(1, 0, ['저장 공간', dk.level === 'bad' ? 'bad' : dk.level === 'warn' ? 'warn' : '', `남은 ${dk.free_gb}GB · ${dk.used_pct}% 사용${dk.level !== 'ok' ? ' · 정리 필요' : ''}`, 'health']); }
   if ((s.accounts || []).length > 1) {   // 판매 계정이 둘 이상이면 — 새 상품을 어디에 올리는지, 준비 덜 된 계정
     const reg = s.accounts.find((a) => a.register) || s.accounts[0], notReady = s.accounts.filter((a) => !a.ready);
     SYS.splice(1, 0, ['판매 계정', notReady.length ? 'warn' : '', `${s.accounts.map((a) => a.label).join(' · ')} · 새 상품은 ${reg.label}${notReady.length ? ` · 준비 덜 됨 ${notReady.map((a) => a.label).join(', ')}` : ''}`, 'health:acct-sec']);
@@ -2169,23 +2171,23 @@ window.addEventListener('hashchange', route); route();
 // 주소의 #화면 이름이 같은 id를 가진 요소(#health = 위 막대 상태 단추)를 브라우저가 열 때 골라 초점을 줘 파란 테두리가 남던 것(2026-11-13) — 화면 이름은 요소 고르기가 아님
 window.addEventListener('load', () => { const a = document.activeElement, h = location.hash.slice(1).split('?')[0]; if (a && h && a.id === h) a.blur(); });
 </script>
-<script src="office.js?v=65b50f0bd4"></script>
-<script src="activity.js?v=65b50f0bd4"></script>
-<script src="data.js?v=65b50f0bd4"></script>
-<script src="sourcing.js?v=65b50f0bd4"></script>
-<script src="automation.js?v=65b50f0bd4"></script>
-<script src="paths.js?v=65b50f0bd4"></script>
-<script src="flow.js?v=65b50f0bd4"></script>
-<script src="catalog.js?v=65b50f0bd4"></script>
-<script src="asks.js?v=65b50f0bd4"></script>
-<script src="vat.js?v=65b50f0bd4"></script>
-<script src="pay.js?v=65b50f0bd4"></script>
-<script src="settings.js?v=65b50f0bd4"></script>
-<script src="agents.js?v=65b50f0bd4"></script>
-<script src="tasks.js?v=65b50f0bd4"></script>
-<script src="reports.js?v=65b50f0bd4"></script>
-<script src="health.js?v=65b50f0bd4"></script>
-<script src="whatsnew.js?v=65b50f0bd4"></script>
-<script src="motion.js?v=65b50f0bd4"></script>
+<script src="office.js?v=4655e78e51"></script>
+<script src="activity.js?v=4655e78e51"></script>
+<script src="data.js?v=4655e78e51"></script>
+<script src="sourcing.js?v=4655e78e51"></script>
+<script src="automation.js?v=4655e78e51"></script>
+<script src="paths.js?v=4655e78e51"></script>
+<script src="flow.js?v=4655e78e51"></script>
+<script src="catalog.js?v=4655e78e51"></script>
+<script src="asks.js?v=4655e78e51"></script>
+<script src="vat.js?v=4655e78e51"></script>
+<script src="pay.js?v=4655e78e51"></script>
+<script src="settings.js?v=4655e78e51"></script>
+<script src="agents.js?v=4655e78e51"></script>
+<script src="tasks.js?v=4655e78e51"></script>
+<script src="reports.js?v=4655e78e51"></script>
+<script src="health.js?v=4655e78e51"></script>
+<script src="whatsnew.js?v=4655e78e51"></script>
+<script src="motion.js?v=4655e78e51"></script>
 </body>
 </html>
