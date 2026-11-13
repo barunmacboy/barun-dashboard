@@ -18,6 +18,7 @@
   --red: #f04452; --red-bg: #fdeeef; --red-ink: #d22030;
   --orange: #ff9f00; --orange-bg: #fff4e2; --orange-ink: #b86400;
   --green: #03b26c; --green-bg: #e6f7ef; --green-ink: #02804e;
+  --violet: #7c5cff; --violet-bg: #f1edff; --violet-ink: #5b3dd9;   /* 다른 쿠팡 판매 계정 이름표(2026-11-13) */
   --shadow: 0 1px 2px rgba(16, 24, 40, .04);
   --pop: 0 12px 32px rgba(16, 24, 40, .14), 0 0 0 1px var(--line);
   --r: 16px; --r-sm: 10px;
@@ -36,6 +37,7 @@
     --red: #f66570; --red-bg: #3a1f23; --red-ink: #ff9aa2;
     --orange: #ffa938; --orange-bg: #382a16; --orange-ink: #ffc46b;
     --green: #2fca86; --green-bg: #163128; --green-ink: #6fe0ad;
+    --violet: #9d85ff; --violet-bg: #2a2342; --violet-ink: #c3b4ff;
     --shadow: none; --pop: 0 12px 32px rgba(0, 0, 0, .5), 0 0 0 1px var(--line);
     --st-run: #4593fc; --grid: #26272e; --axis: #3a3b43; --surface: #1a1b20; --night: rgba(120, 140, 255, .05); --band: rgba(255, 255, 255, .02);
   }
@@ -986,6 +988,11 @@ table.dt tr:hover .row-del, .row-del:focus-visible { opacity: 1; } .row-del:hove
   /* 표 줄 — 마우스가 있는 줄 */
   @media (hover: hover) { table tbody tr:hover > td { background: color-mix(in srgb, var(--hover) 70%, transparent); } }
 }
+/* ── 판매 계정 이름표(2026-11-13 사장님 'UI 전체에 걸쳐서 다중계정에 잘 대응') — 바른청년은 표시 없음, 다른 쿠팡 계정 주문·상품만 보라 이름표(acctTag) */
+.acct { display: inline-flex; align-items: center; flex: none; max-width: 100%; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 12px; font-weight: 650;
+  line-height: 20px; background: var(--violet-bg); color: var(--violet-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: 1px; }
+.acct.lg { height: 24px; line-height: 24px; padding: 0 9px; font-size: 12.5px; }
+
 /* ── 불러오는 중(2026-11-13 사장님 "로딩중이면 로딩중 애니메이션 나오게") — 켜고 끄기는 dashboard/motion.js(받는 중인 요청 = transport.js)
    맨 위 얇은 막대(#loadbar) · '불러오는 중' 글 앞 도는 고리(.ld) · 아직 빈 카드(.sk)·빈 화면(.sk-page)은 회색 줄 뼈대가 반짝임 */
 #loadbar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 90; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .3s var(--ease); }
@@ -1175,9 +1182,9 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; min-height
   </form>
 </dialog>
 
-<script src="config.js?v=cc306cc04b"></script>
-<script src="transport.js?v=cc306cc04b"></script>
-<script src="navigation.js?v=cc306cc04b"></script>
+<script src="config.js?v=3cc35cbe09"></script>
+<script src="transport.js?v=3cc35cbe09"></script>
+<script src="navigation.js?v=3cc35cbe09"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1247,6 +1254,12 @@ function koLabel(t) {
   return v.replace(/\b[A-Z][A-Z_]{3,}\b/g, (m) => KO_LABEL[m] || m);
 }
 window.koLabel = koLabel;
+// 판매 계정(2026-11-13 '화면 전체 다중 계정') — /api/state accounts 한 곳. 화면 자료에 보이는 이름(label)이 오면 그것, 없으면 이 목록으로.
+window.BARUN_ACCTS = [];
+const acctLabel = (name, label) => (!name ? '바른청년' : label || (window.BARUN_ACCTS.find((a) => a.name === name) || {}).label || name);
+const acctTag = (name, label, lg) => { if (!name) return null; const t = el('span', 'acct' + (lg ? ' lg' : ''), acctLabel(name, label)); t.title = `쿠팡 판매 계정 ${acctLabel(name, label)}`; return t; };
+const platName = (platform, name, label) => (/^(naver|네이버)/.test(platform || '') ? '네이버' : name ? `쿠팡·${acctLabel(name, label)}` : '쿠팡');
+Object.assign(window, { acctLabel, acctTag, platName, multiAcct: () => window.BARUN_ACCTS.length > 1 });
 function toast(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); } t.textContent = noEmoji(msg); t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000); }
 async function act(body, btn) {
   if (body.action === 'reject' && !confirm('거절할까요?')) return;
@@ -1740,6 +1753,8 @@ document.addEventListener('barun:tasks', (e) => {
 
 function render(s) {
   lastState = s;
+  { const accts = s.accounts || [];   // 판매 계정이 바뀌면 화면 모듈에 알림(계정 거르기·이름표를 다시 그림)
+    if (JSON.stringify(accts) !== JSON.stringify(window.BARUN_ACCTS)) { window.BARUN_ACCTS = accts; document.dispatchEvent(new CustomEvent('barun:accounts', { detail: accts })); } }
   $('updated').textContent = `${hm(s.now).slice(6)} 갱신`; $('updated').className = 'upd';
   const team = s.team || [];
   const dom = Object.fromEntries(team.map((m) => [m.domain, m.name.replace(/^\S+\s+/, '')]));
@@ -1821,6 +1836,10 @@ function render(s) {
     ['고칠 거리', im.debt_new ? 'warn' : '', `${H5(im.debt_score)}점 · 열린 제안 ${im.open || 0}`, 'auto'],
     ['코드 저장소', s.git.ahead === 0 && s.git.behind === 0 ? '' : 'warn', (s.git.ahead === 0 && s.git.behind === 0 ? '최신이에요' : `올릴 것 ${s.git.ahead ?? '?'} · 받을 것 ${s.git.behind ?? '?'}`) + (s.git.dirty.length ? ` · 저장 안 한 파일 ${s.git.dirty.length}` : ''), 'records:git-sec'],
   ];
+  if ((s.accounts || []).length > 1) {   // 판매 계정이 둘 이상이면 — 새 상품을 어디에 올리는지, 준비 덜 된 계정
+    const reg = s.accounts.find((a) => a.register) || s.accounts[0], notReady = s.accounts.filter((a) => !a.ready);
+    SYS.splice(1, 0, ['판매 계정', notReady.length ? 'warn' : '', `${s.accounts.map((a) => a.label).join(' · ')} · 새 상품은 ${reg.label}${notReady.length ? ` · 준비 덜 됨 ${notReady.map((a) => a.label).join(', ')}` : ''}`, 'health:acct-sec']);
+  }
   for (const [k, c, v, go] of SYS) {
     const li = el('li'); const b = el('button'); b.type = 'button'; b.dataset.goto = go;
     b.append(el('span', 'dot ' + c), el('span', 'k', k), el('span', 'v', v)); b.title = v; li.append(b); sys.append(li);
@@ -2150,22 +2169,22 @@ window.addEventListener('hashchange', route); route();
 // 주소의 #화면 이름이 같은 id를 가진 요소(#health = 위 막대 상태 단추)를 브라우저가 열 때 골라 초점을 줘 파란 테두리가 남던 것(2026-11-13) — 화면 이름은 요소 고르기가 아님
 window.addEventListener('load', () => { const a = document.activeElement, h = location.hash.slice(1).split('?')[0]; if (a && h && a.id === h) a.blur(); });
 </script>
-<script src="office.js?v=cc306cc04b"></script>
-<script src="activity.js?v=cc306cc04b"></script>
-<script src="data.js?v=cc306cc04b"></script>
-<script src="sourcing.js?v=cc306cc04b"></script>
-<script src="automation.js?v=cc306cc04b"></script>
-<script src="paths.js?v=cc306cc04b"></script>
-<script src="flow.js?v=cc306cc04b"></script>
-<script src="catalog.js?v=cc306cc04b"></script>
-<script src="asks.js?v=cc306cc04b"></script>
-<script src="vat.js?v=cc306cc04b"></script>
-<script src="pay.js?v=cc306cc04b"></script>
-<script src="settings.js?v=cc306cc04b"></script>
-<script src="agents.js?v=cc306cc04b"></script>
-<script src="tasks.js?v=cc306cc04b"></script>
-<script src="reports.js?v=cc306cc04b"></script>
-<script src="health.js?v=cc306cc04b"></script>
-<script src="motion.js?v=cc306cc04b"></script>
+<script src="office.js?v=3cc35cbe09"></script>
+<script src="activity.js?v=3cc35cbe09"></script>
+<script src="data.js?v=3cc35cbe09"></script>
+<script src="sourcing.js?v=3cc35cbe09"></script>
+<script src="automation.js?v=3cc35cbe09"></script>
+<script src="paths.js?v=3cc35cbe09"></script>
+<script src="flow.js?v=3cc35cbe09"></script>
+<script src="catalog.js?v=3cc35cbe09"></script>
+<script src="asks.js?v=3cc35cbe09"></script>
+<script src="vat.js?v=3cc35cbe09"></script>
+<script src="pay.js?v=3cc35cbe09"></script>
+<script src="settings.js?v=3cc35cbe09"></script>
+<script src="agents.js?v=3cc35cbe09"></script>
+<script src="tasks.js?v=3cc35cbe09"></script>
+<script src="reports.js?v=3cc35cbe09"></script>
+<script src="health.js?v=3cc35cbe09"></script>
+<script src="motion.js?v=3cc35cbe09"></script>
 </body>
 </html>

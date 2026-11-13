@@ -19,7 +19,9 @@
   const ORIGIN = (o) => String(o || '').replace('같은 상품·', '같은 상품 ').replace('사장님 제공', '사장님').replace('주문 실측', '실측').replace('공홈 확인', '공홈');
   // 원가 근거 줄임말 풀이(칸에는 짧게, 마우스를 올리면 뜻)
   const ORIGIN_WHY = (o) => { const s = String(o || ''); return /실측/.test(s) ? '실제 주문에서 확인한 값' : /사장님/.test(s) ? '사장님이 알려 준 값' : /공홈/.test(s) ? '공식 홈페이지에서 확인한 값' : /같은 상품/.test(s) ? '같은 물건의 다른 옵션에서 가져온 값' : s; };
-  const PLATS = [['', '모든 플랫폼'], ['coupang', '쿠팡'], ['naver', '네이버'], ['both', '둘 다'], ['one', '한쪽만']];
+  const PLATS0 = [['', '모든 플랫폼'], ['coupang', '쿠팡'], ['naver', '네이버'], ['both', '둘 다'], ['one', '한쪽만']];
+  // 다른 쿠팡 판매 계정마다 거르기 '@<계정>'(2026-11-13 다중 계정 — 그 계정에도 올린 상품)
+  let PLATS = PLATS0;
   const PAGE = 60;
   let data = null, timer = 0, busy = false, shown = false, openId = null, lastFocus = null, limit = PAGE, seqN = 0, applied = 0, said = null;
   const flt = { q: '', p: '', plat: '', sort: 'orders' };
@@ -43,6 +45,7 @@
         background: var(--fill); color: var(--ink); font: inherit; font-size: 14px; }
       .ct-q::placeholder { color: var(--muted); }
       .ct-q:focus { outline: 2px solid var(--blue); outline-offset: 0; background: var(--card); }
+      .ct-pl .acct.wait { opacity: .75; } .ct-pl .acct.off { background: var(--fill); color: var(--muted); }
       .ct-seg { display: inline-flex; background: var(--fill); border-radius: var(--r-sm); padding: 2px; gap: 2px; max-width: 100%; overflow-x: auto; }
       .ct-seg button { all: unset; box-sizing: border-box; flex: none; height: 28px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--sub); cursor: pointer;
         white-space: nowrap; display: inline-flex; align-items: center; transition: background-color .18s var(--ease), color .18s var(--ease); }
@@ -202,10 +205,11 @@
 
   // ── 목록 ──
   const platOk = (r) => {
+    if (flt.plat && flt.plat[0] === '@') return (r.accts || []).some((a) => a.account === flt.plat.slice(1));
     const c = (r.plats.coupang || {}).opts, n = (r.plats.naver || {}).opts;
     return !flt.plat || (flt.plat === 'coupang' ? c : flt.plat === 'naver' ? n : flt.plat === 'one' ? !(c && n) : (c && n));
   };
-  const hay = (r) => [r.id, r.name, r.brand, r.spec, r.shop, r.tab, ...Object.keys(r.tabs || {}), ...(r.problems || []).map((p) => (data.labels || {})[p] || '')].join(' ').toLowerCase();
+  const hay = (r) => [r.id, r.name, r.brand, r.spec, r.shop, r.tab, ...Object.keys(r.tabs || {}), ...(r.accts || []).map((a) => a.label), ...(r.problems || []).map((p) => (data.labels || {})[p] || '')].join(' ').toLowerCase();
   function list() {
     let rows = data.products.filter((r) => (!flt.p || r.problems.includes(flt.p)) && platOk(r));
     if (flt.q) { const ws = flt.q.split(/\s+/); rows = rows.filter((r) => { const h = hay(r) + ' ' + (r._ids || ''); return ws.every((w) => h.includes(w)); }); }
@@ -223,6 +227,13 @@
       const b = E('span', 'ct-pb' + (off ? (wait ? ' wait' : ' off') : ''), `${PL[pl]} ${d.selling || d.opts}${d.units > 1 ? ` · 상품 ${d.units}` : ''}`);
       b.title = `${PL[pl]} ${off ? `판매 중인 옵션 없음(옵션 ${d.opts}개)` : `판매 중 옵션 ${d.selling}개`}${d.units > 1 ? ` · 등록상품 ${d.units}개` : ''}\n`
         + Object.entries(d.status).map(([s, n]) => `${ST[s] || s} ${n}`).join(' · ');
+      box.append(b);
+    }
+    for (const a of r.accts || []) {        // 다른 쿠팡 계정에도 올린 상품 — 보라 이름표 + 판매 중 옵션 수(심사·반려면 흐리게)
+      const wait = !a.selling && Object.keys(a.status).some((s) => /심사|임시|대기/.test(s)), rej = !a.selling && !wait;
+      const b = E('span', 'acct' + (wait ? ' wait' : rej ? ' off' : ''), `${a.label} ${a.selling || a.opts}`);
+      b.title = `쿠팡·${a.label} ${a.selling ? `판매 중 옵션 ${a.selling}개` : `판매 중인 옵션 없음(옵션 ${a.opts}개)`}${a.units > 1 ? ` · 등록상품 ${a.units}개` : ''}\n`
+        + Object.entries(a.status).map(([s, n]) => `${ST[s] || s} ${n}`).join(' · ');
       box.append(b);
     }
     return box;
@@ -248,7 +259,7 @@
     // 2026-11-06: 칸 '원가 모름(팔림) 0' 옆 칩 '원가 모름 82'가 같은 걸 다르게 센 것처럼 보여서 — 안 팔린 쪽임을 이름에
     for (const p of data.problems) if (p.code === 'nocost' && p.label === '원가 모름') p.label = '원가 모름(안 팔림)';
     if (flt.p && !data.problems.some((p) => p.code === flt.p && p.n)) { flt.p = ''; keep(); }   // 저장해 둔 칩이 0건이 되면 보이지 않는 거르기로 빈 목록만 남던 것
-    if (!PLATS.some(([v]) => v === flt.plat)) flt.plat = '';
+    if (!PLATS0.some(([v]) => v === flt.plat) && !(data.accounts || []).some((a) => '@' + a.account === flt.plat)) flt.plat = '';
     data.labels = Object.fromEntries(data.problems.map((p) => [p.code, p.label]));
     const k = data.kpi, pc = Object.fromEntries(data.problems.map((p) => [p.code, p.n]));
     const kp = $('ct-kpis'); kp.textContent = '';
@@ -262,6 +273,16 @@
     tile('정리할 것', k.fix.toLocaleString(), '상품 수 · 한 상품이 여러 칩에 들기도 해요', k.fix > 0);
     tile('원가 모르는 팔린 상품', (pc.nocost_sold || 0).toLocaleString(), `안 팔린 ${pc.nocost || 0}개도 원가 모름`, (pc.nocost_sold || 0) > 0, 'nocost_sold');
     tile('판매 전 오래 머묾', (pc.stuck || 0).toLocaleString(), '쿠팡 임시저장·심사·반려', (pc.stuck || 0) > 0, 'stuck');
+    PLATS = [...PLATS0, ...(data.accounts || []).map((a) => ['@' + a.account, `쿠팡·${a.label}`])];
+    { const lg = document.querySelector('#p-catalog .ct-legend');   // 파는 곳 칸 읽는 법에 다른 계정 이름표도
+      if (lg && (data.accounts || []).length && !lg.querySelector('.acct')) { const sp = E('span'); sp.append(E('i', 'acct', `${data.accounts[0].label} 3`), '다른 쿠팡 계정'); lg.append(sp); } }
+    for (const a of data.accounts || []) {   // 다른 쿠팡 판매 계정 — 누르면 그 계정에도 올린 상품만
+      const t = E('button', 'stat acct-stat' + (a.ok === false ? ' warn' : '')); t.type = 'button'; t.setAttribute('aria-pressed', String(flt.plat === '@' + a.account));
+      const sub = a.ok === false ? `상품을 읽지 못했어요 · ${when(a.at)}` : [`판매 중 ${a.selling}`, a.review ? `심사 ${a.review}` : '', a.rejected ? `반려 ${a.rejected}` : ''].filter(Boolean).join(' · ');
+      t.title = `쿠팡·${a.label} 등록상품 ${a.products}개 · ${sub}${a.at ? ` · ${when(a.at)} 읽음` : ''} · 누르면 이 계정에도 올린 상품만 봐요`;
+      t.onclick = () => { flt.plat = flt.plat === '@' + a.account ? '' : '@' + a.account; keep(); limit = PAGE; render(); };
+      t.append(E('div', 'k', `쿠팡·${a.label}`), E('div', 'v', a.products.toLocaleString()), E('div', 'd', sub)); kp.append(t);
+    }
     const pb = $('ct-probs'); pb.textContent = '';
     const chip = (code, label, n) => {
       const b = E('button', 'ct-chip'); b.type = 'button'; b.setAttribute('aria-pressed', String(flt.p === code)); b.append(document.createTextNode(label));
@@ -292,6 +313,10 @@
       box.append(b);
     }
     if (!rows.length) box.append(E('div', 'ct-empty', flt.q || flt.p || flt.plat ? '조건에 맞는 상품이 없어요. 거르기를 풀어 보세요.' : '아직 상품이 없어요.'));
+    if ((data.unlinked || []).length && (!flt.plat || flt.plat[0] === '@')) {   // 다른 계정 상품 중 대장 물건을 못 찾은 것(코드·복사 기록·이름이 다 다름)
+      const u = data.unlinked.filter((x) => !flt.plat || '@' + x.account === flt.plat);
+      if (u.length) { const n = E('div', 'ct-empty', `대장 물건을 못 찾은 다른 계정 상품 ${u.length}개: ${u.slice(0, 5).map((x) => `${x.label} ${x.product_name}(${ST[x.status] || x.status})`).join(', ')}${u.length > 5 ? ' …' : ''}`); box.append(n); }
+    }
     $('ct-more').hidden = rows.length <= limit;
     $('ct-more').textContent = `${(rows.length - limit).toLocaleString()}개 더 보기`;
     const dl = $('ct-pids'); if (!dl.childElementCount || dl.dataset.n !== String(data.products.length)) {
@@ -408,16 +433,22 @@
     const ul = E('ul', 'ct-opts');
     for (const o of j.options) {
       const u = `${o.platform}:${o.unit}`;
-      if (u !== lastUnit) { lastUnit = u; const t = E('li', 'u'); t.append(E('div', 'ct-unit', `${PL[o.platform]} ${o.platform === 'coupang' ? '등록상품' : '상품'} ${o.unit}${o.group && o.platform === 'naver' ? ` · 그룹 ${o.group}` : ''}`)); ul.append(t); }
+      if (u !== lastUnit) {
+        lastUnit = u; const t = E('li', 'u'), h = E('div', 'ct-unit');
+        if (o.account && window.acctTag) h.append(window.acctTag(o.account, o.account_label), ' ');   // 다른 쿠팡 판매 계정 등록상품(읽기만)
+        h.append(`${PL[o.platform]} ${o.platform === 'coupang' ? '등록상품' : '상품'} ${o.unit}${o.group && o.platform === 'naver' ? ` · 그룹 ${o.group}` : ''}`);
+        t.append(h); ul.append(t);
+      }
       const li = E('li');
       const t = E('span', 't', `${o.opt || o.name}`);
-      const right = E('span', null, `${o.qty ? `${o.qty}개 · ` : '수량 모름 · '}${won(o.price)}`);
+      const right = E('span', null, `${o.qty ? `${o.qty}개 · ` : o.account ? '' : '수량 모름 · '}${won(o.price)}`);
       const m = E('span', 'm');
-      const cst = E('span', null, [ST[o.status] || o.status, o.cost ? `원가 ${won(o.cost.krw)}(${ORIGIN(o.cost.origin)}${o.cost.est ? ' · 추정' : ''})` : '원가 모름',
+      const cst = E('span', null, [ST[o.status] || o.status, o.account ? '' : o.cost ? `원가 ${won(o.cost.krw)}(${ORIGIN(o.cost.origin)}${o.cost.est ? ' · 추정' : ''})` : '원가 모름',
         o.how ? `묶은 근거 ${o.how}` : '', o.tab ? `탭 ${o.tab}` : ''].filter(Boolean).join(' · '));
       if (o.cost) cst.title = ORIGIN_WHY(o.cost.origin);
       m.append(cst);
       if (/^https?:\/\//i.test(o.url || '')) { const a = E('a', null, '판매 화면'); a.href = o.url; a.target = '_blank'; a.rel = 'noopener'; m.append(a); }
+      if (o.account) { li.append(t, right, m); ul.append(li); continue; }   // 다른 계정 옵션은 보기만(옮기기는 바른청년 대장 고치기)
       const mvb = E('button', 'btn xs weak', '옮기기'); mvb.type = 'button';
       m.append(mvb);
       li.append(t, right, m);

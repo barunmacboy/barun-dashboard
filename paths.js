@@ -112,6 +112,7 @@
       const li = E('li');
       const t = E('div', 't'); if (o.late) t.append(E('span', 'pa-late', '기한 넘김 · ')); else if (o.over) t.append(E('span', 'pa-late', '오래 머묾 · '));
       t.append(document.createTextNode(`${o.where} ${o.receiver} · ${o.product}`));
+      if (o.account && window.acctTag) { t.append(' '); t.append(window.acctTag(o.account, o.account_label)); }   // 다른 쿠팡 판매 계정 주문(2026-11-13)
       const by = plain(o.by);
       li.append(t);
       // 거르기가 이미 '사람이 해야 해요'면 줄마다 같은 표시를 되풀이하지 않음

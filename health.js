@@ -177,6 +177,17 @@
     const freightReasons = Object.entries(cv['운임부족사유'] || {}).map(([reason, count]) => `${reason} ${count}개`);
     if (freightReasons.length) coverage.append(node('p', 'hl-note', `운임 근거가 부족한 이유: ${freightReasons.join(' · ')}`));
     coverage.append(node('p', 'hl-note', `마지막 검사 ${h.monitor?.scanned_at ? when(h.monitor.scanned_at) : '아직 안 함'} · AI 모델 호출 ${h.monitor?.llm_calls ?? '—'}회`));
+    // 다른 쿠팡 판매 계정(2026-11-13 다중 계정) — 키로 상품을 읽었는지·심사·반려·30일 주문. 계정이 바른청년뿐이면 안 보임
+    if ((h.accounts || []).length) {
+      const ac = section('판매 계정', '바른청년 말고 키를 넣은 쿠팡 계정이에요. 상품은 15분마다, 주문은 바른청년과 같이 읽어요.'); ac.id = 'acct-sec';
+      statusList(ac, 'acct-ok', h.accounts.map((a) => {
+        const bad = a.ok === false || (a.problems || []).length;
+        const parts = a.ok === false ? [`상품을 읽지 못했어요(${window.plainText ? window.plainText(a.error || '') : (a.error || '')})`] : [`상품 ${a.products}`, `판매 중 ${a.selling}`, a.review ? `심사 ${a.review}` : '', a.rejected ? `반려 ${a.rejected}` : '', `30일 주문 ${a.orders30}`];
+        if ((a.problems || []).length) parts.push(`채울 것: ${a.problems.join(', ')}`);
+        return { dot: bad ? 'warn' : 'ok', label: `쿠팡·${a.label}`, ok: !bad, warn: !!bad, value: parts.filter(Boolean).join(' · ') + (a.at ? ` · ${at(a.at)}` : '') };
+      }), '개', h.accounts.map((a) => a.at || '').sort().pop());
+      ac.append(action('계정 설정 열기', 'settings', 'acct-settings'));
+    }
     const freshness = section('화면 자료', '못 읽은 자료는 마지막으로 읽은 값을 보여 줘요');
     const secs = Object.entries(s.sections || {});
     const lastRead = secs.map(([, v]) => v.last_ok || '').sort().pop();

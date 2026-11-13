@@ -22,7 +22,7 @@
   const won = (v) => (+v).toLocaleString('ko-KR') + '원';
   const COLNAME = { lead_id: '번호', title: '상품', quantity: '수량', state: '상태', profit: '수익', cost_krw: '도착원가', market_krw: '시장가', plan: '계획가',
     marks: '표시', reason: '판정 이유', waiting: '대기', updated: '고친 시각', source_key: '원천 번호', country: '나라', site: '사이트', currency: '통화', unit_price: '단가', fx_krw: '환율',
-    checked_at: '확인 시각', status: '상태', notes: '메모', platform: '플랫폼', listing_id: '상품 번호', name: '상품명', qty: '수량', price: '가격', seller_code: '판매자 코드',
+    checked_at: '확인 시각', status: '상태', notes: '메모', platform: '플랫폼', account: '판매 계정', listing_id: '상품 번호', name: '상품명', qty: '수량', price: '가격', seller_code: '판매자 코드',
     group_no: '그룹 번호', at: '시각', action: '한 일', applied: '적용', ok: '성공', summary: '요약', approved_by: '승인한 사람', tab: '탭', row: '행', receiver: '받는 분',
     option: '옵션', progress: '진행상태', intl_tracking: '해외송장', kr_invoice: '국내송장', fwd_request: '배대지 신청번호', memo: '메모', problem: '문제', key: '주문 키',
     ordered_at: '주문일', claim_status: '클레임', paid: '결제액', courier: '택배사', invoice: '송장', src: '출처', field: '칸', old: '전 값', new: '새 값',
@@ -56,6 +56,7 @@
   const rid = (r) => `${r.tab}:${r.row}`;
 
   const fmt = (k, v) => {
+    if (k === 'account') return window.acctLabel ? window.acctLabel(v) : (v || '바른청년');   // 쿠팡 판매 계정(비면 바른청년, 2026-11-13)
     if (v == null || v === '') return '';
     if (['profit', 'cost_krw', 'market_krw', 'price', 'paid', 'settle'].includes(k) && !isNaN(+v) && String(v).trim() !== '') return won(v);
     if (typeof v === 'string' && (v.startsWith('[') || v.startsWith('{'))) { try { const j = JSON.parse(v); return Array.isArray(j) ? j.join(', ') : Object.entries(j).map(([a, b]) => `${a === 'naver' ? '네이버' : a === 'coupang' ? '쿠팡' : a} ${typeof b === 'number' ? b.toLocaleString('ko-KR') : (typeof b === 'object' ? JSON.stringify(b) : b)}`).join(' · '); } catch (e) { /* 그대로 */ } }
@@ -158,7 +159,7 @@
   const tabHide = () => { const t = isSheet() && last && tabPicked(); return (t && (last.tab_hide || {})[t]) || []; };
   const hidden = (c) => cur.hide.includes(c) || (tabHide().includes(c) && !cur.show.includes(c));
   const visCols = () => { const cs = last.cols.filter((c) => !hidden(c)); const p = cur.pin.filter((c) => cs.includes(c)); return [...p, ...cs.filter((c) => !p.includes(c))]; };
-  const blankName = (c, v) => (v == null || v === '' ? (c === 'platform' ? '재고·수동' : '빈칸') : CODE_COLS.includes(c) ? ko(v) : String(v));
+  const blankName = (c, v) => (c === 'account' ? fmt(c, v) : v == null || v === '' ? (c === 'platform' ? '재고·수동' : '빈칸') : CODE_COLS.includes(c) ? ko(v) : String(v));
   function setFilter(c, f) { cur.filters = cur.filters.filter((x) => x.c !== c); if (f) cur.filters.push(f); cur.offset = 0; }
   function toggleVal(c, v) {        // 칩: 같은 칸에서 여러 값 고르기(누르면 넣고, 다시 누르면 뺌)
     const f = cur.filters.find((x) => x.c === c && x.op === 'in');

@@ -64,7 +64,8 @@
       .st-job .jd { font-size: 12.5px; color: var(--sub); line-height: 1.5; padding: 0 2px 6px 22px; }
       .st-job .st-row { padding-left: 22px; border-top: 0; }
       .st-tbl { width: 100%; border-collapse: collapse; font-size: 13px; } .st-tbl td, .st-tbl th { padding: 7px 6px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
-      .st-tbl th { color: var(--muted); font-weight: 600; } .st-tbl td.v, .st-tbl td.t { white-space: nowrap; }
+      .st-tbl th { color: var(--muted); font-weight: 600; } .st-tbl td.t { white-space: nowrap; } .st-tbl td.v { overflow-wrap: anywhere; min-width: 72px; }
+      #st-hist { overflow-x: auto; }   /* 휴대폰: 바꾼 기록 표가 화면 밖으로 밀던 것(긴 값은 줄바꿈, 그래도 넓으면 표 안에서 옆으로) */
       .st-links { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: stretch; }
       .st-link { display: flex; flex-direction: column; justify-content: flex-start; gap: 3px; text-align: left; font: inherit; padding: 10px 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--fill2); color: var(--ink); cursor: pointer; }
       .st-link span { font-size: 12.5px; color: var(--sub); }

@@ -23,6 +23,8 @@
   const NVS = { OUTOFSTOCK: '품절', SUSPENSION: '판매중지', PROHIBITION: '판매금지', SALE: '판매 중' };
   const ONLY = [['', '전체'], ['late', '기한 지남'], ['human', '사람 차례'], ['stuck', '오래 머묾']];
   const PLAT = [['', '모든 플랫폼'], ['쿠팡', '쿠팡'], ['네이버', '네이버']];
+  // 판매 계정이 둘 이상이면 쿠팡 계정마다 거르기(2026-11-13 다중 계정) — 값 '@<계정>'(바른청년은 '@')
+  const platOpts = () => (window.multiAcct && window.multiAcct() ? [...PLAT, ...window.BARUN_ACCTS.map((a) => ['@' + a.name, `쿠팡·${a.label}`])] : PLAT);
   const LIMIT = () => (NARROW.matches ? 20 : 40);       // 칸마다 따로 스크롤 — 그 아래는 '더 보기'
   const NARROW = matchMedia('(max-width: 760px)');
   let data = null, timer = 0, busy = false, shown = false, openObj = null, lastFocus = null, seqN = 0, applied = 0;
@@ -346,7 +348,8 @@
     document.body.append(scrim, dr);
     $('fl-q').addEventListener('input', (e) => { flt.q = e.target.value.trim().toLowerCase(); render(); });
     chips('fl-only', ONLY, 'only', 'fl-chip');
-    chips('fl-plat', PLAT, 'plat', '');
+    chips('fl-plat', platOpts(), 'plat', '');
+    document.addEventListener('barun:accounts', () => { if (!platOpts().some(([v]) => v === flt.plat)) flt.plat = ''; chips('fl-plat', platOpts(), 'plat', ''); if (data) render(); });
     // 2026-11-06: 서랍에서 연 '맡기기' 창(dialog)에서 Esc를 누르면 서랍까지 같이 닫혔음 → 위에 창이 열려 있으면 그것만
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('fl-dr').hidden && !document.querySelector('dialog[open]')) closeDr(); });
     document.addEventListener('barun:page', (e) => { shown = e.detail === 'flow'; if (shown) { load(); start(); } else { stop(); closeDr(); } });
@@ -416,13 +419,14 @@
 
   // ── 거르기 ──
   const pass = (o) => {
-    if (flt.plat && o.plat && o.plat !== flt.plat) return false;
+    if (flt.plat && flt.plat[0] === '@') { if (o.k !== 'o' || o.plat !== '쿠팡' || (o.acct || '') !== flt.plat.slice(1)) return false; }   // 쿠팡 판매 계정
+    else if (flt.plat && o.plat && o.plat !== flt.plat) return false;
     if (flt.plat && !o.plat && o.k === 'o') return false;
     if (flt.only === 'late' && o.due_k !== 'late') return false;
     if (flt.only === 'human' && !(o.human || []).length) return false;
     if (flt.only === 'stuck' && !o.stuck) return false;
     if (flt.q) {
-      const hay = [o.who, o.name, o.opt, o.id, o.tab, o.sub, o.tab && o.row ? `${o.tab} ${o.row}행` : ''].join(' ').toLowerCase();
+      const hay = [o.who, o.name, o.opt, o.id, o.tab, o.sub, o.acct_label, o.tab && o.row ? `${o.tab} ${o.row}행` : ''].join(' ').toLowerCase();
       if (!flt.q.split(/\s+/).every((w) => hay.includes(w))) return false;
     }
     return true;
@@ -710,6 +714,7 @@
     const b = E('button', 'fl-ob ' + lateCls + (moved ? ' moved' : '')); b.type = 'button'; b.dataset.id = o.id;
     const r1 = E('div', 'r1');
     if (o.plat) r1.append(E('span', 'pl ' + (o.plat === '쿠팡' ? 'c' : 'n'), o.plat));
+    if (o.acct && window.acctTag) r1.append(window.acctTag(o.acct, o.acct_label));   // 다른 쿠팡 판매 계정 주문
     const title = o.k === 'o' ? (o.who || '받는 분 없음') : o.k === 'a' ? (o.who || '문의') : (ko(o.sub) || '상품');
     r1.append(E('span', 'who', title));
     if (o.due_t && o.due_k !== 'ok') r1.append(E('span', 'du ' + o.due_k, `기한 ${o.due_t}`));
@@ -830,7 +835,7 @@
     if (j.edit) body.append(sect(`시트 칸 고치기 · ${j.edit.tab} ${j.edit.row}행`, editBox(j, o), 'edit'));
     else if (o.stage === 'new') body.append(E('div', 'fl-info', '시트 줄이 아직 없어요. ① 주문·발송 회차가 만들어요.'));
     const od = j.order || {}, r = (j.rows || [])[0] || {}, l = j.ledger || {};
-    body.append(sect('주문', kv([['플랫폼', o.plat], ['주문번호', od.order_id], ['주문 시각', (od.ordered_at || '').replace('T', ' ').slice(0, 16)], ['결제 금액', od.paid ? won(od.paid) : ''],
+    body.append(sect('주문', kv([['플랫폼', o.acct && window.platName ? window.platName('coupang', o.acct, o.acct_label) : o.plat], ['주문번호', od.order_id], ['주문 시각', (od.ordered_at || '').replace('T', ' ').slice(0, 16)], ['결제 금액', od.paid ? won(od.paid) : ''],
       ['발송기한', od.due ? `${String(od.due).slice(0, 10)}${j.due_t ? ` (${j.due_t})` : ''}` : ''], ['플랫폼 상태', ko(od.status_label || od.status)], ['처리 방식', l.handling], ['시트', r.tab ? `${r.tab} ${r.row}행${(j.rows || []).length > 1 ? ` 외 ${j.rows.length - 1}줄` : ''}` : '']])));
     body.append(sect('구매·배송', kv([['진행상태', ko(r.progress)], ['구매처', r.shop], ['공홈주문번호', r.shop_order], ['공홈가', r.shop_price], ['해외송장', [ko(r.intl_carrier), r.intl_tracking].filter(Boolean).join(' ')],
       ['배대지', [r.fwd_center, r.fwd_request].filter(Boolean).join(' · ')], ['배송방식', r.ship_mode], ['국내송장', r.kr_invoice || od.invoice], ['택배사', ko(od.courier)], ['보낼 수량', r.send_qty], ['문제', r.problem], ['메모', r.memo]])));
