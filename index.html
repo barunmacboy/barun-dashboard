@@ -1182,9 +1182,9 @@ select { -webkit-appearance: none; appearance: none; cursor: pointer; min-height
   </form>
 </dialog>
 
-<script src="config.js?v=3cc35cbe09"></script>
-<script src="transport.js?v=3cc35cbe09"></script>
-<script src="navigation.js?v=3cc35cbe09"></script>
+<script src="config.js?v=65b50f0bd4"></script>
+<script src="transport.js?v=65b50f0bd4"></script>
+<script src="navigation.js?v=65b50f0bd4"></script>
 <script>
 // 같은 화면을 두 곳에서 쓴다: 맥미니(tailnet)에서는 같은 주소, GitHub Pages에서는 config.js의 BARUN_API(맥미니 Funnel)로 + 사람별 토큰.
 const API = (window.BARUN_API || '').replace(/\/$/, '');
@@ -1413,7 +1413,7 @@ window.barunNew = (tab, at) => {
     if (!n && on) { n = el('span', 'nb new', 'NEW'); n.title = '24시간 안에 새로 생긴 것'; b.append(n); }
     if (n) n.hidden = !on;
   });
-  const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
+  const more = $('tb-more'); if (more) more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden]), .nav-i .nb.wn:not([hidden])'));   // 새 자료·새 기능(whatsnew.js)
 };
 // 메뉴 숫자(할 일·맡긴 일·보낸 문의) — 모듈도 이걸로 바꿈
 window.barunBadge = (name, n) => document.querySelectorAll(`[data-badge="${name}"]`).forEach((b) => { b.textContent = n > 99 ? '99+' : String(n || ''); b.hidden = !n; });
@@ -1489,7 +1489,7 @@ function showTab(name, push = true) {
   document.title = name === 'home' ? '바른청년 운영 현황' : `${PAGES[name].label} · 바른청년`;
   try { localStorage.setItem('barun.tab', name); localStorage.setItem(seenKey(name), String(Date.now())); } catch (e) { /* 무시 */ }
   document.querySelectorAll(`.nav-i[data-tab="${name}"] .nb.new`).forEach((n) => { n.hidden = true; });
-  const more = $('tb-more'); if (more) { more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden])'));
+  const more = $('tb-more'); if (more) { more.classList.toggle('has-new', !!document.querySelector('.nav-i .nb.new:not([hidden]), .nav-i .nb.wn:not([hidden])'));
     if (MOBILE.includes(name)) more.removeAttribute('aria-current'); else more.setAttribute('aria-current', 'page'); }   // 아래 막대에 없는 화면도 어디 있는지 보이게
   if (push && location.hash.split('?')[0] !== '#' + name) history.replaceState(null, '', '#' + name);   // '#data?…' = 데이터 탭 보기 상태(data.js)
   drawer(false);
@@ -2169,22 +2169,23 @@ window.addEventListener('hashchange', route); route();
 // 주소의 #화면 이름이 같은 id를 가진 요소(#health = 위 막대 상태 단추)를 브라우저가 열 때 골라 초점을 줘 파란 테두리가 남던 것(2026-11-13) — 화면 이름은 요소 고르기가 아님
 window.addEventListener('load', () => { const a = document.activeElement, h = location.hash.slice(1).split('?')[0]; if (a && h && a.id === h) a.blur(); });
 </script>
-<script src="office.js?v=3cc35cbe09"></script>
-<script src="activity.js?v=3cc35cbe09"></script>
-<script src="data.js?v=3cc35cbe09"></script>
-<script src="sourcing.js?v=3cc35cbe09"></script>
-<script src="automation.js?v=3cc35cbe09"></script>
-<script src="paths.js?v=3cc35cbe09"></script>
-<script src="flow.js?v=3cc35cbe09"></script>
-<script src="catalog.js?v=3cc35cbe09"></script>
-<script src="asks.js?v=3cc35cbe09"></script>
-<script src="vat.js?v=3cc35cbe09"></script>
-<script src="pay.js?v=3cc35cbe09"></script>
-<script src="settings.js?v=3cc35cbe09"></script>
-<script src="agents.js?v=3cc35cbe09"></script>
-<script src="tasks.js?v=3cc35cbe09"></script>
-<script src="reports.js?v=3cc35cbe09"></script>
-<script src="health.js?v=3cc35cbe09"></script>
-<script src="motion.js?v=3cc35cbe09"></script>
+<script src="office.js?v=65b50f0bd4"></script>
+<script src="activity.js?v=65b50f0bd4"></script>
+<script src="data.js?v=65b50f0bd4"></script>
+<script src="sourcing.js?v=65b50f0bd4"></script>
+<script src="automation.js?v=65b50f0bd4"></script>
+<script src="paths.js?v=65b50f0bd4"></script>
+<script src="flow.js?v=65b50f0bd4"></script>
+<script src="catalog.js?v=65b50f0bd4"></script>
+<script src="asks.js?v=65b50f0bd4"></script>
+<script src="vat.js?v=65b50f0bd4"></script>
+<script src="pay.js?v=65b50f0bd4"></script>
+<script src="settings.js?v=65b50f0bd4"></script>
+<script src="agents.js?v=65b50f0bd4"></script>
+<script src="tasks.js?v=65b50f0bd4"></script>
+<script src="reports.js?v=65b50f0bd4"></script>
+<script src="health.js?v=65b50f0bd4"></script>
+<script src="whatsnew.js?v=65b50f0bd4"></script>
+<script src="motion.js?v=65b50f0bd4"></script>
 </body>
 </html>

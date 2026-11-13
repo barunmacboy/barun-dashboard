@@ -341,7 +341,7 @@
       const ts = await fetchJ('/api/db/tables');
       box.textContent = '';
       for (const t of ts) {
-        const b = E('button', 'tab', null); b.type = 'button';
+        const b = E('button', 'tab', null); b.type = 'button'; b.dataset.table = t.name;   // 새 기능 알림(whatsnew.js)이 가리키는 이름
         b.setAttribute('aria-selected', String(t.name === cur.table));
         b.append(document.createTextNode(tableName(t.name, t.label)), E('span', 'dt-n', t.count.toLocaleString('ko-KR')));
         b.onclick = () => {

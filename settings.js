@@ -274,7 +274,7 @@
   let addOpen = false, rekey = '';   // [계정 추가] 펼침 · 키를 바꾸는 중인 계정
 
   function acctCard() {
-    const card = E('div', 'card'), h = E('div', 'card-h');
+    const card = E('div', 'card'), h = E('div', 'card-h'); card.id = 'st-acct-card';
     const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
     h.append(E('h2', '', '쿠팡 계정'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
     card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품·수량 옵션이 올라가요(소싱 자동 등록 포함 — 소싱·등록 묶음 맨 위와 같은 설정). 키를 넣은 계정은 그 계정 주문도 수집·발주확인·송장 올리기·취소·반품까지 바른청년과 똑같이 처리하고, 시트 플랫폼 칸에 "쿠팡·계정 이름"으로 보여요.'));
