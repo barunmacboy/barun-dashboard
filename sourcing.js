@@ -77,10 +77,13 @@
       .sc-fold > summary h2 { font-size: 16.5px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
       .sc-fold > summary .desc { flex-basis: 100%; color: var(--muted); font-size: 13px; padding-left: 20px; }
       .sc-fold[open] > summary { margin-bottom: 12px; }
-      .sc-in { margin-top: 8px; } .sc-in > summary { font-weight: 600; color: var(--sub); }`;
+      .sc-in { margin-top: 8px; } .sc-in > summary { font-weight: 600; color: var(--sub); }
+      .sc-acct { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; padding: 8px 12px; border-radius: var(--r-sm); background: var(--fill2); font-size: 13.5px; }
+      .sc-acct .k { color: var(--sub); } .sc-acct b { font-weight: 700; } .sc-acct b.other { color: var(--blue-ink); } .sc-acct .muted { font-size: 12.5px; }`;
     document.head.append(css);
     sec.innerHTML = `
-      <div class="card hero" id="sc-top"><h2 id="sc-title">불러오는 중…</h2><p class="lead" id="sc-lead"></p><div class="stats" id="sc-stats"></div>
+      <div class="card hero" id="sc-top"><h2 id="sc-title">불러오는 중…</h2><p class="lead" id="sc-lead"></p>
+        <div class="sc-acct" id="sc-acct" hidden></div><div class="stats" id="sc-stats"></div>
         <nav class="sc-nav" id="sc-nav" aria-label="이 화면 안 바로 가기">
           <button type="button" data-go="sc-m">자동 발굴</button><button type="button" data-go="sc-progress">장부 진행</button>
           <button type="button" data-go="sc-ready-card">등록 준비 <span class="n" id="sc-n-ready"></span></button><button type="button" data-go="sc-wait-card">외부 대기 <span class="n" id="sc-n-wait"></span></button>
@@ -211,6 +214,14 @@
     // 2026-10-25: '오늘 처리'가 재확인 메모만 남긴 줄까지 셌음 → 상태가 실제로 바뀐 줄과 재확인을 따로
     $('sc-lead').textContent = `오늘 상태 바뀐 줄 ${t.n}(재확인 ${t.recheck || 0}) · 남은 후보 ${d.open}(원가 근거 없음 ${d.nocost}) · 등록 준비 ${d.ready.length}줄` +
       (ap.status === 'pending' ? '. 사장님 승인을 기다려요.' : ap.status === 'approved' ? '. 승인됐고 다음 회차가 등록해요.' : '');
+    // 쿠팡 등록 계정(자동 등록 포함, 2026-11-13) — 어느 계정으로 올라가는지 늘 보이게, 바꾸기는 설정 > 소싱·등록
+    const ca = d.cp_account || {}, acct = $('sc-acct');
+    acct.hidden = false; acct.textContent = '';
+    acct.append(E('span', 'k', '쿠팡 등록 계정'), E('b', ca.main === false ? 'other' : null, ca.error ? '못 읽음' : (ca.label || '바른청년')),
+      E('span', 'muted', ca.error ? '쿠팡은 올리지 않고 건너뛰어요' : '자동 등록·등록 명령 모두'));
+    const go = E('button', 'more-link', '바꾸기 ›'); go.type = 'button'; go.dataset.goto = 'settings';
+    go.onclick = () => { setTimeout(() => { const q = document.getElementById('st-q'); if (q) { q.value = '쿠팡 등록 계정'; q.dispatchEvent(new Event('input')); } }, 400); };
+    acct.append(go);
     $('sc-bar-title').textContent = `장부 ${N(d.total)}줄 상태`;
     $('sc-bar-desc').textContent = '끝·탈락·외부 대기를 닫힌 줄로 봐요' + (man.n ? ` · 장부 밖에서 직접 올린 ${man.n}줄은 빼고 셌어요` : '');
     const st = $('sc-stats'); st.innerHTML = '';

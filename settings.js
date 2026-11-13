@@ -19,6 +19,10 @@
   let D = null, busy = false, q = '', grp = '', onlyChanged = false;
   const openJobs = new Set(), openAcct = new Set(), acctMsg = new Map();   // 계정마다 마지막 결과 글(다시 그려도 남게)
   const ACCT_GROUP = '판매 수수료·계정', ACCT_KEY = 'account.coupang_register';
+  // 쿠팡 등록 계정은 '소싱·등록'에서도 고름(2026-11-13 사장님 '자동 등록 계정도 설정에서 선택 가능하게') — 같은 설정 하나, 계정 카드의 [여기에 올리기]와 같음
+  const AUTO_GROUP = '소싱·등록';
+  const inGroup = (it, g) => it.key === ACCT_KEY ? g === AUTO_GROUP : it.group === g;
+  const acctName = (c) => ((D.accounts || []).find((a) => a.name === c) || {}).label || c || '바른청년';
   const COUNTRY = { DE: '독일', US: '미국', AU: '호주', FR: '프랑스', NZ: '뉴질랜드', JP: '일본', IT: '이탈리아', ES: '스페인', GB: '영국', CA: '캐나다', KR: '한국' };
 
   function install() {
@@ -136,7 +140,7 @@
     if (it.kind === 'bool' || it.kind === 'choice') {
       const s = E('select');
       if (it.kind === 'bool') s.append(new Option('켬', '1'), new Option('끔', '0'));
-      else for (const c of it.choices) s.append(new Option(optName(c), c));
+      else for (const c of it.choices) s.append(new Option(it.key === ACCT_KEY ? acctName(c) : optName(c), c));
       const cur = it.kind === 'bool' ? (it.value ? '1' : '0') : it.value;
       s.value = cur; s.setAttribute('aria-label', it.label);
       const b = E('button', 'btn sm', '저장'); b.type = 'button'; b.disabled = true;
@@ -234,7 +238,7 @@
     let n = 0;
     for (const g of D.groups) {
       if (grp && g !== grp) continue;
-      const items = D.items.filter((it) => it.group === g && hit(it) && it.key !== ACCT_KEY);   // 새 상품 계정은 아래 '쿠팡 계정' 카드에서
+      const items = D.items.filter((it) => inGroup(it, g) && hit(it)).sort((a, b) => (b.key === ACCT_KEY) - (a.key === ACCT_KEY));   // 쿠팡 등록 계정은 '소싱·등록' 맨 위(+ '판매 수수료·계정'의 쿠팡 계정 카드)
       const acctHere = g === ACCT_GROUP && !onlyChanged && (!q || '쿠팡 계정 올리기 등록 판매자 출고지 반품지 wing'.includes(q) || D.accounts.some((a) => (a.label + a.name).toLowerCase().includes(q)));
       if (acctHere) { n += 1; }
       if (!items.length) { if (acctHere) out.append(acctCard()); continue; }
@@ -255,7 +259,7 @@
     const gs = $('st-groups'); gs.innerHTML = '';
     for (const g of ['', ...D.groups]) {
       const c = E('button', 'st-chip', g || '전체'); c.type = 'button'; c.setAttribute('aria-pressed', String(grp === g && !onlyChanged));
-      const xs = D.items.filter((it) => (!g || it.group === g) && it.key !== ACCT_KEY);   // 예약 업무는 칸 수가 아니라 업무 수, 새 상품 계정은 '쿠팡 계정' 카드라 안 셈
+      const xs = D.items.filter((it) => !g || inGroup(it, g));   // 예약 업무는 칸 수가 아니라 업무 수
       c.append(E('span', 'n', String(g === '예약 업무' ? new Set(xs.map((x) => x.job && x.job.job)).size : xs.length)));
       c.onclick = () => { grp = g; onlyChanged = false; chips(); body(); }; gs.append(c);
     }
@@ -272,7 +276,7 @@
     const card = E('div', 'card'), h = E('div', 'card-h');
     const cur = D.accounts.find((a) => a.name === D.register_account) || D.accounts[0];
     h.append(E('h2', '', '쿠팡 계정'), E('span', 'desc', `지금: ${cur ? cur.label : '바른청년'}`));
-    card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품이 올라가요. 키를 넣은 계정은 그 계정 주문도 수집·발주확인·송장 올리기·취소·반품까지 바른청년과 똑같이 처리하고, 시트 플랫폼 칸에 "쿠팡·계정 이름"으로 보여요.'));
+    card.append(h, E('div', 'st-gdesc', '고른 계정에 새 쿠팡 상품·수량 옵션이 올라가요(소싱 자동 등록 포함 — 소싱·등록 묶음 맨 위와 같은 설정). 키를 넣은 계정은 그 계정 주문도 수집·발주확인·송장 올리기·취소·반품까지 바른청년과 똑같이 처리하고, 시트 플랫폼 칸에 "쿠팡·계정 이름"으로 보여요.'));
     const list = E('div', 'ac-list');
     for (const a of D.accounts) list.append(acctTile(a));
     card.append(list);
