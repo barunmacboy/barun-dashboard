@@ -19,6 +19,18 @@
   let D = null, busy = false, q = '', grp = '', onlyChanged = false;
   const openJobs = new Set(), openAcct = new Set(), acctMsg = new Map();   // 계정마다 마지막 결과 글(다시 그려도 남게)
   const ACCT_GROUP = '판매 수수료·계정', ACCT_KEY = 'account.coupang_register';
+  // 결제 수단(2026-11-14 사장님 "결제수단도 설정 페이지에서 저장되게 하자 에이전트가 그 정보들로 일할 수 있게") — 결제 화면과 같은 부품(dashboard/payedit.js)을
+  // '결제·비용' 맨 위에. 화면을 다시 그려도 부품은 한 번만 만들고 같은 상자를 옮겨 붙임(읽기·알림이 겹치지 않게)
+  const PAY_GROUP = '결제·비용';
+  let payBox = null;
+  function payCard() {
+    if (payBox) return payBox;
+    payBox = E('div', 'card'); payBox.id = 'st-pay-card';
+    const h = E('div', 'card-h'); h.append(E('h2', '', '결제 수단'), E('span', 'desc', '카드 끝 4자리·적립 혜택·구매처마다 쓸 카드와 사이트 저장 여부 — 에이전트가 결제할 때 이걸 봐요'));
+    const inner = E('div'); payBox.append(h, inner);
+    if (window.barunPayEdit) window.barunPayEdit.mount(inner); else inner.append(E('div', 'muted small', '결제 수단 부품을 읽지 못했어요. 화면을 새로 고쳐 주세요.'));
+    return payBox;
+  }
   // 쿠팡 등록 계정은 '소싱·등록'에서도 고름(2026-11-13 사장님 '자동 등록 계정도 설정에서 선택 가능하게') — 같은 설정 하나, 계정 카드의 [여기에 올리기]와 같음
   const AUTO_GROUP = '소싱·등록';
   const inGroup = (it, g) => it.key === ACCT_KEY ? g === AUTO_GROUP : it.group === g;
@@ -240,6 +252,7 @@
     for (const g of D.groups) {
       if (grp && g !== grp) continue;
       const items = D.items.filter((it) => inGroup(it, g) && hit(it)).sort((a, b) => (b.key === ACCT_KEY) - (a.key === ACCT_KEY));   // 쿠팡 등록 계정은 '소싱·등록' 맨 위(+ '판매 수수료·계정'의 쿠팡 계정 카드)
+      if (g === PAY_GROUP && !onlyChanged && (!q || '결제 수단 카드 끝 4자리 구매처 적립 수수료'.includes(q))) { n += 1; out.append(payCard()); }   // 결제 수단(payedit.js 부품)
       const acctHere = g === ACCT_GROUP && !onlyChanged && (!q || '쿠팡 계정 올리기 등록 판매자 출고지 반품지 wing'.includes(q) || D.accounts.some((a) => (a.label + a.name).toLowerCase().includes(q)));
       if (acctHere) { n += 1; }
       if (!items.length) { if (acctHere) out.append(acctCard()); continue; }
