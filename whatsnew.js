@@ -2,8 +2,9 @@
 // 화면 기능을 새로 만들거나 크게 바꾸면 FEATURES에 한 줄 — {id, at: 만든 날, page: 화면 이름(index.html PAGES — ''면 화면 전체),
 //   target: NEW를 붙일 글자 칸(CSS 선택자 — 없으면 그 화면 위 '새 기능' 줄), put: 'start'(칸 맨 앞에 — 옆으로 넘기는 줄 끝은 휴대폰에서 안 보임), title, desc(한 문장)}.
 //  · 만든 날부터 14일만 보이고, 이 브라우저에서 확인하면 꺼짐(사람·기기마다 따로 — localStorage)
-//  · 메뉴 NEW(그 화면에 아직 안 본 새 기능) · 가리킨 칸 옆 NEW 표 + 첫 하나는 화살표 말풍선 · 칸이 없거나 아직 안 그려졌으면 화면 위 '새 기능' 줄
-//  · 한눈에 '새로 생긴 기능' 카드 — 누르면 그 화면으로 가서 그 칸을 반짝임
+//  · 메뉴 NEW(그 화면에 아직 안 본 새 기능) · 가리킨 칸 옆 작은 NEW 표 · 칸이 없거나 아직 안 그려졌으면 화면 위 '새 기능' 줄
+//  · 한눈에 '새로 생긴 기능' 카드(맨 아래) — 누르면 그 화면으로 가서 그 칸을 반짝이고 화살표 말풍선
+//  · 2026-11-15 사장님 'new도 좀 덜 강조되게 하고 아주 조금만': 옅은 바탕 작은 글자, 깜빡임 없음, 말풍선은 저절로 안 뜸(카드에서 누를 때만)
 // 빠진 곳 검사: dashboard/tests/test_whatsnew.py(화면 이름·가리킨 칸이 코드에 있는지·날짜)
 (() => {
   const DAYS = 14, KEY = 'barun.wn.seen';
@@ -125,8 +126,7 @@
     }
     bar(p);
     const keep = tipFor && here.find((f) => f.id === tipFor && shown(f));
-    const inView = (f) => { const r = (document.querySelector(`.wn-pill[data-id="${f.id}"]`) || { getBoundingClientRect: () => ({}) }).getBoundingClientRect(); return r.width && r.top >= 0 && r.bottom <= innerHeight; };
-    tip(keep || here.filter(live).find(inView) || here.find(live) || null);   // 말풍선은 지금 보이는 새 기능부터(목록 차례로 고르면 화면 밖을 가리켜 안 보이던 것)
+    tip(keep || null);   // 말풍선은 '새로 생긴 기능' 카드에서 눌렀을 때만(go) — 저절로 띄우지 않음(2026-11-15)
   }
 
   function bar(p) {
@@ -224,20 +224,19 @@
   // ── 모양 ──
   const css = E('style');
   css.textContent = `
-    .nb.wn { font-size: 10px; letter-spacing: .05em; padding: 0 5px; line-height: 17px; }
-    .wn-pill { display: inline-flex; align-items: center; flex: none; height: 16px; padding: 0 5px; margin-left: 6px; border-radius: 5px; background: var(--red); color: #fff;
-      font-size: 10px; font-weight: 800; letter-spacing: .04em; line-height: 16px; vertical-align: 2px; font-style: normal; white-space: nowrap; }
+    .nb.wn { font-size: 9.5px; letter-spacing: .04em; padding: 0 4px; line-height: 15px; min-width: 0; background: var(--red-bg); color: var(--red-ink); }
+    .wn-pill { display: inline-flex; align-items: center; flex: none; height: 14px; padding: 0 4px; margin-left: 5px; border-radius: 4px; background: var(--red-bg); color: var(--red-ink);
+      font-size: 9px; font-weight: 700; letter-spacing: .04em; line-height: 14px; vertical-align: 2px; font-style: normal; white-space: nowrap; }
     .wn-bh .wn-pill, .wn-home .wn-pill { margin-left: 0; } .wn-pill.start { margin: 0 6px 0 4px; align-self: center; }
     .wn-tip { position: fixed; z-index: 85; background: var(--ink); color: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: var(--pop); font-size: 13px; line-height: 1.5; }
     .wn-tip .wn-k { display: block; font-size: 12px; font-weight: 700; color: color-mix(in srgb, var(--card) 70%, transparent); }
     .wn-tip b { display: block; font-size: 14.5px; margin: 2px 0; } .wn-tip p { margin: 0 0 10px; color: color-mix(in srgb, var(--card) 86%, transparent); }
     .wn-tip .wn-arrow { position: absolute; top: -5px; left: var(--ax, 24px); width: 12px; height: 12px; background: var(--ink); transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
     .wn-tip.up .wn-arrow { top: auto; bottom: -5px; }
-    .wn-bar { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
     .wn-bh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .wn-bh b { font-size: 15px; } .wn-bh .btn { margin-left: auto; }
     .wn-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
     .wn-list li { display: grid; gap: 2px; font-size: 13.5px; color: var(--sub); } .wn-list li b { color: var(--ink); font-size: 14px; }
-    #wn-sec { order: 0; } .wn-home { list-style: none; margin: 4px 0 0; padding: 0; display: grid; }
+    #wn-sec { order: 9; } .wn-home { list-style: none; margin: 4px 0 0; padding: 0; display: grid; }
     .wn-home li + li { border-top: 1px solid var(--line); }
     .wn-home button { all: unset; box-sizing: border-box; display: grid; gap: 2px; width: 100%; padding: 10px 4px; cursor: pointer; border-radius: 10px; }
     .wn-home button:hover { background: var(--hover); } .wn-home button:focus-visible { outline: 2px solid var(--blue); }
@@ -245,13 +244,11 @@
     .wn-home .m { font-size: 12px; color: var(--muted); } .wn-home li.off .t b { font-weight: 600; color: var(--sub); }
     .wn-more > summary { font-size: 13px; color: var(--sub); padding: 8px 0 0; }
     @media (prefers-reduced-motion: no-preference) {
-      .wn-pill { animation: wn-pulse 1.8s ease-in-out infinite; }
       .wn-tip:not([hidden]) { animation: wn-in .28s var(--ease-out, ease-out); }
       .wn-flash { animation: wn-flash 2.4s var(--ease-out, ease-out); }
     }
-    @keyframes wn-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 22%, transparent); } }
     @keyframes wn-in { from { opacity: 0; transform: translateY(4px); } }
-    @keyframes wn-flash { 0%, 55% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 55%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }`;
+    @keyframes wn-flash { 0%, 55% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 35%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }`;
   document.head.append(css);
 
   // ── 언제 ──

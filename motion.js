@@ -1,6 +1,6 @@
 // 움직임·마우스 반응 한 곳(2026-11-12 사장님 "인터랙티브한 애니메이션이나 마우스 반응 등을 넣어줘. 시인성과 사용성을 끌어올릴 수 있도록").
 // 화면 모듈(*.js)을 고치지 않고 모든 화면에 같이 — CSS는 index.html '움직임' 절, 여기는 그 CSS가 쓰는 값·클래스만 붙인다.
-//  · 마우스 빛: 카드·숫자 칸·버튼 위에서 커서를 따라가는 옅은 빛(--mx·--my)
+//  · (마우스 빛 — 커서를 따라가던 옅은 빛은 2026-11-15 사장님 '이상한 그림자는 안 나오게'로 뺌)
 //  · 화면 들어올 때: 'barun:page' → 그 화면 카드가 차례로 떠오름(.enter)
 //  · 숫자 바뀜: .stat .v·[data-count] 숫자가 바뀌면 이전 값에서 새 값까지 세며 바뀜
 //  · 불러오는 중: '불러오는 중' 글에 도는 고리·반짝임(.ld), 맨 위 얇은 막대(#loadbar), 아직 빈 카드·빈 화면은 뼈대(.sk·.sk-page) — 2026-11-13 사장님
@@ -9,22 +9,6 @@
 // 시스템 '동작 줄이기'면 아무것도 움직이지 않는다(CSS도 같은 조건).
 (() => {
   const still = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const LIGHT = '.card, .stat, .btn, .ac, .st-link, .nav-i, .chip, .st-chip';
-
-  // ── 마우스 빛 ────────────────────────────────────────────────
-  let lit = null;
-  document.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || still()) return;
-    const el = e.target && e.target.closest ? e.target.closest(LIGHT) : null;
-    if (lit && lit !== el) lit.classList.remove('lit');
-    lit = el;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty('--mx', `${Math.round(e.clientX - r.left)}px`);
-    el.style.setProperty('--my', `${Math.round(e.clientY - r.top)}px`);
-    el.classList.add('lit');
-  }, { passive: true });
-  document.addEventListener('pointerleave', () => { if (lit) lit.classList.remove('lit'); lit = null; });
 
   // ── 화면 들어올 때 ──────────────────────────────────────────
   function enter(name) {
