@@ -43,13 +43,15 @@
       .py-tbl .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .py-tbl .py-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--sub); } .py-tbl td.py-shop { font-weight: 600; }
       .py-tbl .dash { color: var(--muted); }
+      .py-tbl td.py-what { color: var(--sub); font-size: 13px; min-width: 200px; overflow-wrap: anywhere; } .py-tbl td.py-what small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
       @media (max-width: 1100px) { .py-cols { grid-template-columns: minmax(0, 1fr); } }
       @media (max-width: 640px) {
         .py-tbl thead { display: none; }
         .py-tbl, .py-tbl tbody { display: block; }
-        .py-tbl tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "shop amt" "when st" "card rw"; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+        .py-tbl tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "shop amt" "what what" "when st" "card rw"; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
         .py-tbl tbody tr:first-child { border-top: 0; padding-top: 0; }
         .py-tbl td { padding: 0; border: 0; min-width: 0; }
+        .py-tbl td.py-what { grid-area: what; min-width: 0; font-size: 12.5px; }
         .py-tbl td.py-shop { grid-area: shop; overflow-wrap: anywhere; } .py-tbl td.py-amt { grid-area: amt; font-weight: 700; }
         .py-tbl td.py-when { grid-area: when; font-size: 12.5px; } .py-tbl td.py-st { grid-area: st; text-align: right; }
         .py-tbl td.py-cd { grid-area: card; font-size: 12.5px; color: var(--sub); overflow-wrap: anywhere; } .py-tbl td.py-rw { grid-area: rw; font-size: 12.5px; }
@@ -66,7 +68,7 @@
             <button class="btn sm primary" type="button" id="py-q-b">카드 보기</button></div>
           <datalist id="py-shop-list"></datalist>
           <div class="py-pick" id="py-q-out" aria-live="polite"></div></div>
-      <div class="card"><div class="card-h"><h2>최근 AI 결제</h2><span class="desc">AI가 낸 결제 기록과 쓴 카드, 예상 적립이에요.</span></div><div id="py-recent"></div></div>`;
+      <div class="card"><div class="card-h"><h2 id="py-recent-h">최근 AI 결제</h2><span class="desc">AI가 낸 결제마다 산 것·주문번호·쓴 카드예요. 디스코드 #자동-결제에도 한 줄씩 올라가요.</span></div><div id="py-recent"></div></div>`;
     if (window.barunPayEdit) window.barunPayEdit.mount($('py-edit'));
     document.addEventListener('barun:pay', () => { if (!$('p-pay').hidden) load(); });   // 편집 부품에서 바꾸면 숫자도 다시
     $('py-q-b').onclick = pickNow;
@@ -126,13 +128,17 @@
     const name = Object.fromEntries(d.cards.map((c) => [c.id, `${c.name}(끝 ${c.last4})`]));
     const anyRw = d.recent.some((p) => p.reward_krw);   // 예상 적립이 한 줄도 없으면 칸을 숨김
     const rt = E('table', 'py-tbl');
-    rt.innerHTML = `<thead><tr><th>시각</th><th>구매처</th><th class="r">금액</th><th>상태</th><th>카드</th>${anyRw ? '<th class="r">예상 적립</th>' : ''}</tr></thead>`;
+    rt.innerHTML = `<thead><tr><th>시각</th><th>구매처</th><th>산 것</th><th class="r">금액</th><th>상태</th><th>카드</th>${anyRw ? '<th class="r">예상 적립</th>' : ''}</tr></thead>`;
     const tb = E('tbody');
     for (const p of d.recent) {
       const tr = E('tr');
       const [lab, cls] = PST[p.status] || [p.status ? (window.koLabel ? window.koLabel(p.status) : p.status) : '', ''];
       const stc = E('td', 'py-st'); if (lab) stc.append(E('span', 'badge ' + cls, lab));
-      tr.append(E('td', 'py-when', when(p.at)), E('td', 'py-shop', p.shop ? shopName(p.shop) : '—'), E('td', 'r py-amt', p.krw ? won(p.krw) : '—'), stc,
+      const wt = E('td', 'py-what'), ws = p.what || [];        // 산 것(시트 줄)·주문번호 — barun/pay_log(디스코드 #자동-결제와 같은 글)
+      wt.append(E('span', '', ws.length ? ws[0] + (ws.length > 1 ? ` 외 ${ws.length - 1}건` : '') : '—'));
+      if (ws.length > 1) wt.title = ws.join('\n');
+      if (p.shop_order) wt.append(E('small', '', `주문 ${p.shop_order}`));
+      tr.append(E('td', 'py-when', when(p.at)), E('td', 'py-shop', p.shop ? shopName(p.shop) : '—'), wt, E('td', 'r py-amt', p.krw ? won(p.krw) : '—'), stc,
         E('td', 'py-cd', p.card ? (name[p.card] || p.card) : (p.how || '—')));
       if (anyRw) tr.append(p.reward_krw ? E('td', 'r py-rw', won(p.reward_krw)) : E('td', 'r py-rw dash', '—'));
       tb.append(tr);
