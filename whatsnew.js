@@ -54,7 +54,7 @@
     { id: 'pay-what', at: '2026-11-15', page: 'pay', target: '#py-recent-h', title: '결제마다 산 것',
       desc: 'AI가 결제할 때마다 산 것과 주문번호가 보여요. 디스코드 #자동-결제에도 한 줄씩 올라가요.' },
     { id: 'amazon-autopay', at: '2026-11-15', page: 'settings', target: '[data-key="pay.auto_pay_shops"]', title: '아마존·Chewy 자동 결제',
-      desc: '아마존·Chewy도 AI가 사이트에 저장된 결제수단으로 결제해요. 관문 상한을 넘거나 결과를 모르면 멈추고 알려요. 빼면 장바구니까지만 해요.' },
+      desc: '아마존(미국·일본·이탈리아·스페인)·Chewy도 AI가 사이트에 저장된 결제수단으로 결제해요. 관문 상한을 넘거나 결과를 모르면 멈추고 알려요. 빼면 장바구니까지만 해요.' },
     { id: 'disk', at: '2026-11-14', page: 'home', target: '#sys [data-goto="health"] .k', title: '저장 공간',
       desc: '맥미니에 남은 저장 공간을 보여 줘요. 설정 기준(20GB·8GB) 아래면 노랑·빨강으로 바뀌고 매일 감사가 알려요.' },
     { id: 'whatsnew', at: '2026-11-13', page: 'home', target: '#wn-sec .card-h h2', title: '새 기능 알림',
