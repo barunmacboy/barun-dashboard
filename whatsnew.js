@@ -51,6 +51,8 @@
       desc: '시스템 카드에 판매 계정과 새 상품을 올리는 계정이 보여요.' },
     { id: 'pay-methods', at: '2026-11-14', page: 'settings', target: '#st-pay-card .card-h h2', title: '결제 수단',
       desc: '카드 끝 4자리와 구매처마다 쓸 카드, 그 사이트에 카드가 저장됐는지를 설정에서 관리해요. 에이전트가 결제할 때 이걸 봐요.' },
+    { id: 'first-confirm', at: '2026-11-16', page: 'settings', target: '[data-key="pay.first_confirm"]', title: '첫 결제 확인 끄기',
+      desc: '구매처마다 처음 한 번 받던 결제 확인을 끌 수 있어요. 지금은 꺼져 있어 관문만 통과하면 바로 결제해요.' },
     { id: 'pay-what', at: '2026-11-15', page: 'pay', target: '#py-recent-h', title: '결제마다 산 것',
       desc: 'AI가 결제할 때마다 산 것과 주문번호가 보여요. 디스코드 #자동-결제에도 한 줄씩 올라가요.' },
     { id: 'amazon-autopay', at: '2026-11-15', page: 'settings', target: '[data-key="pay.auto_pay_shops"]', title: '아마존·Chewy 자동 결제',
