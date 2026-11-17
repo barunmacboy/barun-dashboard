@@ -9,6 +9,8 @@
 (() => {
   const DAYS = 14, KEY = 'barun.wn.seen';
   const FEATURES = [
+    { id: 'switches', at: '2026-11-18', page: 'switches', target: '#sw-title', title: '자동화 켜고 끄기',
+      desc: 'AI가 스스로 하는 일을 업무별 토글로 켜고 꺼요. 스위치마다 무엇을 하는지와 실제 예시가 있어요.' },
     { id: 'pay-page', at: '2026-11-06', page: 'pay', target: '#py-title', title: '결제 화면',
       desc: 'AI가 결제할 카드와 적립 혜택, 구매처별 카드, AI가 쓴 금액을 한 화면에서 봐요.' },
     { id: 'sheet-row-color', at: '2026-11-09', page: 'data', title: '주문 시트 줄 색 칠하기',
@@ -21,6 +23,8 @@
       desc: '일본 탭 구매처 칸에서 포스트몰·재팬인사이트·amazon.co.jp 중 하나를 골라요.' },
     { id: 'renewal', at: '2026-11-12', page: '', title: '현황판 새 디자인',
       desc: '모든 화면의 글·버튼·움직임을 다듬었어요. 마우스를 올리면 카드에 옅은 빛이 따라가요.' },
+    { id: 'jinsight-time', at: '2026-11-17', page: 'settings', title: '재팬인사이트 점검 시각',
+      desc: '하쿠주 재팬인사이트 확인·발송을 매일 09:30에 한 번 해요. 시각은 여기서 바꿀 수 있어요.' },
     { id: 'account-hold-markup', at: '2026-11-15', page: 'settings', title: '다른 쿠팡 계정 판매 막기 인상액',
       desc: '헬스플래닛 옵션을 원래 가격보다 이만큼 올려 둬요. 판매를 시작할 때 0으로 바꾸면 원래 가격으로 돌아가요.' },
     { id: 'settings-page', at: '2026-11-12', page: 'settings', target: '#st-title', title: '설정 화면',
